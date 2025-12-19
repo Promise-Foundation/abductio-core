@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 from behave import given, then, when
 
 from application.testing import StepWorld
+from application.canonical import canonical_id_for_statement
 
 
 def get_world(context) -> StepWorld:
@@ -320,37 +321,77 @@ def then_ledger_sum(context, tolerance: float) -> None:
 @then('each named root has p_ledger = (1 - gamma) / N where N is count(named_roots)')
 def then_named_root_p_ledger(context) -> None:
     world = get_world(context)
-    world.mark_pending("Root initialization check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    gamma = float(world.config.get("gamma", 0.0))
+    named_roots = [root_id for root_id in world.result["roots"] if root_id != "H_other"]
+    count_named = len(named_roots)
+    expected = (1.0 - gamma) / count_named if count_named else 0.0
+    for root_id in named_roots:
+        actual = world.result["ledger"].get(root_id)
+        assert actual is not None
+        assert abs(actual - expected) <= 1e-9
 
 
 @then('H_other has p_ledger = gamma')
 def then_h_other_gamma(context) -> None:
     world = get_world(context)
-    world.mark_pending("H_other gamma check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    gamma = float(world.config.get("gamma", 0.0))
+    actual = world.result["ledger"].get("H_other")
+    assert actual is not None
+    assert abs(actual - gamma) <= 1e-9
 
 
 @then('every root starts with k_root = 0.15')
 def then_every_root_k_root(context) -> None:
     world = get_world(context)
-    world.mark_pending("k_root initialization check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    for root in world.result.get("roots", {}).values():
+        assert abs(root.get("k_root", 0.0) - 0.15) <= 1e-12
 
 
 @then('every named root starts with status "{status}"')
 def then_named_root_status(context, status: str) -> None:
     world = get_world(context)
-    world.mark_pending("status initialization check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    for root_id, root in world.result.get("roots", {}).items():
+        if root_id == "H_other":
+            continue
+        assert root.get("status") == status
 
 
 @then("the engine records a canonical_id for every root derived from normalized statement text")
 def then_canonical_id_recorded(context) -> None:
     world = get_world(context)
-    world.mark_pending("canonical_id recording not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    for root_id, root in world.result.get("roots", {}).items():
+        if root_id == "H_other":
+            continue
+        expected = canonical_id_for_statement(root["statement"])
+        assert root.get("canonical_id") == expected
 
 
 @then("canonical_id does not depend on the input ordering of roots")
 def then_canonical_id_ordering(context) -> None:
     world = get_world(context)
-    world.mark_pending("canonical_id ordering check not implemented")
+    if not world.result or not world.replay_result:
+        world.mark_pending("Session results not available")
+    canonical_a = {
+        root_id: root.get("canonical_id")
+        for root_id, root in world.result.get("roots", {}).items()
+        if root_id != "H_other"
+    }
+    canonical_b = {
+        root_id: root.get("canonical_id")
+        for root_id, root in world.replay_result.get("roots", {}).items()
+        if root_id != "H_other"
+    }
+    assert canonical_a == canonical_b
 
 
 @then('both "{root_a}" and "{root_b}" become status "{status}"')
@@ -410,13 +451,17 @@ def then_audit_op_fields(context) -> None:
 @then('stop_reason is "{reason}"')
 def then_stop_reason(context, reason: str) -> None:
     world = get_world(context)
-    world.mark_pending("stop reason check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    assert world.result.get("stop_reason") == reason
 
 
 @then("no operations were executed")
 def then_no_operations_executed(context) -> None:
     world = get_world(context)
-    world.mark_pending("no operations executed check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    assert len(world.result.get("operation_log", [])) == 0
 
 
 @then('credits_remaining = {credits:d}')

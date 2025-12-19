@@ -11,6 +11,14 @@ from typing import Any, Dict, List, Optional
 
 from behave.exceptions import Pending
 
+from application.dto import RootSpec, SessionConfig, SessionRequest
+from application.ports import RunSessionDeps
+from application.result import SessionResult
+from application.testing.deterministic_decomposer import DeterministicDecomposer
+from application.testing.deterministic_evaluator import DeterministicEvaluator
+from application.testing.in_memory_audit import InMemoryAuditSink
+from application.use_cases.run_session import run_session
+
 
 @dataclass
 class StepWorld:
@@ -104,7 +112,67 @@ class StepWorld:
         }
 
     def run_engine(self, mode: str) -> None:
-        self.mark_pending(f"Engine execution not implemented for mode: {mode}")
+        if mode.startswith("start_session:"):
+            claim = mode.split(":", 1)[1]
+            roots = self.roots
+        elif mode == "until_credits_exhausted":
+            claim = self.config.get("claim", "Untitled claim")
+            roots = self.roots
+        elif mode == "until_stops":
+            claim = self.config.get("claim", "Untitled claim")
+            roots = self.roots
+        elif mode == "run_set_a":
+            claim = self.config.get("claim", "Untitled claim")
+            roots = self.roots_a
+        elif mode == "run_set_b":
+            claim = self.config.get("claim", "Untitled claim")
+            roots = self.roots_b
+        else:
+            self.mark_pending(f"Engine execution not implemented for mode: {mode}")
+            return
+
+        session_request = self._build_request(claim, roots)
+        deps = self._build_deps()
+        result = run_session(session_request, deps)
+        result_view = result.to_dict_view()
+        if mode == "run_set_b":
+            self.replay_result = result_view
+        else:
+            self.result = result_view
 
     def derive_k_from_rubric(self) -> None:
         self.mark_pending("k-derivation policy not implemented")
+
+    def _build_request(self, claim: str, roots: List[Dict[str, Any]]) -> SessionRequest:
+        config = SessionConfig(
+            tau=float(self.config.get("tau", 0.0)),
+            epsilon=float(self.config.get("epsilon", 0.0)),
+            gamma=float(self.config.get("gamma", 0.0)),
+            alpha=float(self.config.get("alpha", 0.0)),
+        )
+        root_specs = [
+            RootSpec(
+                root_id=row["id"],
+                statement=row["statement"],
+                exclusion_clause=row.get("exclusion_clause", ""),
+            )
+            for row in roots
+        ]
+        credits = int(self.credits or 0)
+        return SessionRequest(
+            claim=claim,
+            roots=root_specs,
+            config=config,
+            credits=credits,
+            required_slots=self.required_slots,
+        )
+
+    def _build_deps(self) -> RunSessionDeps:
+        evaluator = DeterministicEvaluator(self.evaluator_script)
+        decomposer = DeterministicDecomposer(self.decomposer_script)
+        audit_sink = InMemoryAuditSink()
+        return RunSessionDeps(
+            evaluator=evaluator,
+            decomposer=decomposer,
+            audit_sink=audit_sink,
+        )

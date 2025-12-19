@@ -1,9 +1,14 @@
-"""Application layer public surface.
+"""Application layer public surface."""
 
-This module intentionally avoids domain imports so test step definitions can
-import only from application as required by the architecture document.
-"""
+from application.dto import RootSpec, SessionConfig, SessionRequest
+from application.result import SessionResult, StopReason
+from application.use_cases.run_session import run_session
 
-from .testing.step_world import StepWorld
-
-__all__ = ["StepWorld"]
+__all__ = [
+    "RootSpec",
+    "SessionConfig",
+    "SessionRequest",
+    "SessionResult",
+    "StopReason",
+    "run_session",
+]
