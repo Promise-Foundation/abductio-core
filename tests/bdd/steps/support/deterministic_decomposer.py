@@ -9,6 +9,15 @@ class DeterministicDecomposer:
     script: Dict[str, Any] = field(default_factory=dict)
 
     def decompose(self, root_id: str) -> Dict[str, Any]:
+        slot_decompositions = self.script.get("slot_decompositions", {})
+        if root_id in slot_decompositions:
+            return {
+                "ok": True,
+                "type": slot_decompositions[root_id].get("type"),
+                "coupling": slot_decompositions[root_id].get("coupling"),
+                "children": slot_decompositions[root_id].get("children", []),
+            }
+
         fail_roots = self.script.get("fail_roots", set())
         if root_id in fail_roots:
             return {"ok": False}
@@ -34,5 +43,15 @@ class DeterministicDecomposer:
                         "defeater_statement": row.get("defeater_statement", ""),
                     }
             return {"ok": False}
+
+        scoped_roots = self.script.get("scoped_roots", set())
+        if root_id in scoped_roots:
+            return {
+                "ok": True,
+                "feasibility_statement": f"{root_id} is feasible",
+                "availability_statement": f"{root_id} is available",
+                "fit_statement": f"{root_id} fits",
+                "defeater_statement": f"{root_id} resists defeaters",
+            }
 
         return {"ok": False}

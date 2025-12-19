@@ -32,3 +32,10 @@ class SessionRequest:
     config: SessionConfig
     credits: int
     required_slots: Optional[List[Dict[str, Any]]] = None
+    run_mode: Optional[str] = None
+    run_count: Optional[int] = None
+    run_target: Optional[str] = None
+    initial_ledger: Optional[Dict[str, float]] = None
+    pre_scoped_roots: Optional[List[str]] = None
+    slot_k_min: Optional[Dict[str, float]] = None
+    slot_initial_p: Optional[Dict[str, float]] = None

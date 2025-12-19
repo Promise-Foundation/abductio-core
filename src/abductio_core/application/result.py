@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 
 class StopReason(str, Enum):
     CREDITS_EXHAUSTED = "CREDITS_EXHAUSTED"
+    FRONTIER_CONFIDENT = "FRONTIER_CONFIDENT"
 
 
 @dataclass
