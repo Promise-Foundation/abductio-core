@@ -1,7 +1,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, List, Optional
+
+
+@dataclass
+class Node:
+    node_key: str
+    statement: str
+    role: str
+    p: float = 1.0
+    k: float = 0.15
+    children: List[str] = field(default_factory=list)
+    decomp_type: Optional[str] = None
+    coupling: Optional[float] = None
 
 
 @dataclass
@@ -12,6 +24,8 @@ class RootHypothesis:
     canonical_id: str
     status: str = "UNSCOPED"
     k_root: float = 0.15
+    obligations: Dict[str, Node] = field(default_factory=dict)
+    credits_spent: int = 0
 
 
 @dataclass
