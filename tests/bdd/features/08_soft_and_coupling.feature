@@ -28,7 +28,8 @@ Feature: Soft-AND aggregation with coupling buckets
 
     Examples:
       | c    | p1  | p2  | expected |
-      | 0.20 | 0.5 | 0.5 | 0.30     |  # min=0.5 prod=0.25 => 0.2*0.5 + 0.8*0.25 = 0.1 + 0.2 = 0.3 (NOTE: update expected to your exact rule if differs)
+      # min=0.5 prod=0.25 => 0.2*0.5 + 0.8*0.25 = 0.1 + 0.2 = 0.3
+      | 0.20 | 0.5 | 0.5 | 0.30     |
       | 0.80 | 0.7 | 0.9 | 0.714    |
 
   Scenario: Unassessed NEC children are treated as p=1.0

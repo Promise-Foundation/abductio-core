@@ -16,7 +16,8 @@ Feature: Confidence k rubric mapping and guardrails
       | A | B | C | D | k_expected |
       | 0 | 0 | 0 | 0 | 0.15       |
       | 1 | 1 | 0 | 0 | 0.35       |
-      | 2 | 1 | 1 | 0 | 0.55       |  # capped if any=0 (still <=0.55)
+      # capped if any=0 (still <=0.55)
+      | 2 | 1 | 1 | 0 | 0.55       |
       | 2 | 2 | 2 | 2 | 0.90       |
 
   Scenario: Guardrail cap is applied when any check is zero

@@ -9,7 +9,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from behave.exceptions import Pending
+try:
+    from behave import Pending  # type: ignore[attr-defined]
+except Exception:  # pragma: no cover - fallback for behave versions without Pending
+    class Pending(RuntimeError):
+        """Fallback pending exception for Behave versions without Pending."""
 
 from abductio_core.application.dto import RootSpec, SessionConfig, SessionRequest
 from abductio_core.application.ports import RunSessionDeps
