@@ -15,7 +15,7 @@ Contains: use cases, DTOs, ports (interfaces), transaction boundaries (even if �
 
 Imports: domain + ports; never imports presentation.
 
-Exposes: a stable “library surface” for external users + test step defs.
+Exposes: a stable “library surface” for external users.
 
 Infrastructure (adapters)
 
@@ -31,8 +31,8 @@ Must be thin: parse input → call application → render output.
 
 No domain rules, no scheduling logic, no math.
 
-Hard rule: step definitions import only from application.
-So application must offer test-friendly entrypoints and “testing doubles” to avoid step defs reaching down into domain.
+Hard rule: step definitions import production code only via abductio_core and keep testing helpers in tests.
+So test-friendly entrypoints live in the library, while BDD testing doubles live under tests.
 
 2) Canonical “library surface” (application API)
 
@@ -110,7 +110,7 @@ Decomposer.decompose(target: TargetSpec) -> DecompositionOutcome
 
 AuditSink.append(event: AuditEvent) -> None
 
-Testing doubles live in application/testing:
+Testing doubles live under tests/bdd/steps/support:
 
 DeterministicEvaluator(outcomes_map)
 
@@ -150,7 +150,7 @@ Goal: enforce architecture before writing logic.
 
 Deliverables:
 
-Package layout: domain/, application/, infrastructure/, presentation/.
+Package layout: src/abductio_core/domain/, src/abductio_core/application/, infrastructure/, presentation/, tests/.
 
 application/use_cases/run_session.py exists but can be stub.
 
@@ -457,7 +457,7 @@ Also: write invariant checks with tolerances but keep audit replay using the exa
 
 Pitfall: step defs start importing domain because it’s “easier”
 
-Prevention: put all test harnesses in application/testing (builders, snapshot query helpers, deterministic doubles). Make it strictly more convenient than touching domain directly.
+Prevention: put all test harnesses in tests/bdd/steps/support (builders, snapshot query helpers, deterministic doubles). Make it strictly more convenient than touching domain directly.
 
 Pitfall: evaluator/decomposer contract not enforced consistently
 

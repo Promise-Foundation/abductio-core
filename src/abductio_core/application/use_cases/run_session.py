@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import Dict
 
-from application.dto import RootSpec, SessionRequest
-from application.result import SessionResult, StopReason
-from application.ports import RunSessionDeps
-from domain.audit import AuditEvent
-from domain.canonical import canonical_id_for_statement
-from domain.invariants import H_OTHER_ID, enforce_absorber
-from domain.model import HypothesisSet, RootHypothesis
+from abductio_core.application.dto import RootSpec, SessionRequest
+from abductio_core.application.result import SessionResult, StopReason
+from abductio_core.application.ports import RunSessionDeps
+from abductio_core.domain.audit import AuditEvent
+from abductio_core.domain.canonical import canonical_id_for_statement
+from abductio_core.domain.invariants import H_OTHER_ID, enforce_absorber
+from abductio_core.domain.model import HypothesisSet, RootHypothesis
 
 
 def _init_hypothesis_set(request: SessionRequest) -> HypothesisSet:

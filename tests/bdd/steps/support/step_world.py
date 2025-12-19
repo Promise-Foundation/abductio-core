@@ -1,7 +1,7 @@
 """Scenario state for Behave step definitions.
 
-This stays within the application layer so steps do not reach into domain
-or infrastructure code.
+Lives in tests/ so the shipped library stays free of BDD/test dependencies.
+Steps should interact with abductio_core via its public application API.
 """
 
 from __future__ import annotations
@@ -11,13 +11,13 @@ from typing import Any, Dict, List, Optional
 
 from behave.exceptions import Pending
 
-from application.dto import RootSpec, SessionConfig, SessionRequest
-from application.ports import RunSessionDeps
-from application.result import SessionResult
-from application.testing.deterministic_decomposer import DeterministicDecomposer
-from application.testing.deterministic_evaluator import DeterministicEvaluator
-from application.testing.in_memory_audit import InMemoryAuditSink
-from application.use_cases.run_session import run_session
+from abductio_core.application.dto import RootSpec, SessionConfig, SessionRequest
+from abductio_core.application.ports import RunSessionDeps
+from abductio_core.application.result import SessionResult
+from abductio_core.application.use_cases.run_session import run_session
+from tests.bdd.steps.support.deterministic_decomposer import DeterministicDecomposer
+from tests.bdd.steps.support.deterministic_evaluator import DeterministicEvaluator
+from tests.bdd.steps.support.in_memory_audit import InMemoryAuditSink
 
 
 @dataclass

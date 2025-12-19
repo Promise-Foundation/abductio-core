@@ -4,8 +4,8 @@ from typing import Any, Dict, List
 
 from behave import given, then, when
 
-from application.testing import StepWorld
-from application.canonical import canonical_id_for_statement
+from abductio_core.application.canonical import canonical_id_for_statement
+from tests.bdd.steps.support.step_world import StepWorld
 
 
 def get_world(context) -> StepWorld:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List
 
-from domain.audit import AuditEvent
+from abductio_core.domain.audit import AuditEvent
 
 
 @dataclass

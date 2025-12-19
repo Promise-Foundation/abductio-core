@@ -1,4 +1,4 @@
-# features/10_evaluator_contract_conservative_updates.feature
+# tests/bdd/features/10_evaluator_contract_conservative_updates.feature
 Feature: Evaluator contract enforcement (conservative update with no evidence_refs)
   If evidence_refs is empty, the engine must enforce conservative movement: |Δp| <= 0.05 from prior node.p.
 
