@@ -1,0 +1,50 @@
+# features/06_deterministic_scheduling_and_frontier.feature
+Feature: Deterministic scheduling, frontier selection, and tie-breaking
+  Scheduling must be seed-invariant: no focal injection, canonical ordering by hash(statement),
+  and round-robin credit slices over the frontier.
+
+  Background:
+    Given default config:
+      | tau     | 0.70 |
+      | epsilon | 0.05 |
+      | gamma   | 0.20 |
+      | alpha   | 0.40 |
+    And required template slots:
+      | slot_key            | role |
+      | feasibility         | NEC  |
+      | availability        | NEC  |
+      | fit_to_key_features | NEC  |
+      | defeater_resistance | NEC  |
+
+  Scenario: Frontier is defined purely from p_ledger and epsilon (no focal injection)
+    Given a hypothesis set with named roots:
+      | id   | statement       | exclusion_clause                |
+      | H1   | Mechanism A     | Not explained by any other root |
+      | H2   | Mechanism B     | Not explained by any other root |
+      | H3   | Mechanism C     | Not explained by any other root |
+    And the ledger is set to:
+      | id | p_ledger |
+      | H1 | 0.30     |
+      | H2 | 0.28     |
+      | H3 | 0.10     |
+      | H_other | 0.32 |
+    And epsilon = 0.05
+    And credits 1
+    When I run the engine for exactly 1 operation
+    Then the frontier contains exactly {"H1","H2"}
+    And the audit log records the leader and the frontier definition
+
+  Scenario: Within a cycle, frontier is iterated in canonical order, not input order
+    Given a hypothesis set with named roots:
+      | id   | statement       | exclusion_clause                |
+      | H9   | Zeta mechanism  | Not explained by any other root |
+      | H1   | Alpha mechanism | Not explained by any other root |
+    And the ledger is set to:
+      | id | p_ledger |
+      | H9 | 0.30     |
+      | H1 | 0.30     |
+      | H_other | 0.40 |
+    And credits 2
+    When I run the engine for exactly 2 operations
+    Then the operation order follows canonical_id order of statements, not the provided ids
+    And the audit log shows deterministic tie-breaking

@@ -1,0 +1,694 @@
+% Created 2025-12-19 Fri 09:58
+% Intended LaTeX compiler: pdflatex
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{wrapfig}
+\usepackage{rotating}
+\usepackage[normalem]{ulem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{capt-of}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\author{David Joseph (adaptable)}
+\date{December 19, 2025}
+\title{ABDUCTIO-Lite v3\\\medskip
+\large Symmetric, Credit-Bounded, Independence-Aware Hypothesis Evaluation}
+\hypersetup{
+ pdfauthor={David Joseph (adaptable)},
+ pdftitle={ABDUCTIO-Lite v3},
+ pdfkeywords={},
+ pdfsubject={},
+ pdfcreator={Emacs 30.2 (Org mode 9.7.11)}, 
+ pdflang={English}}
+\begin{document}
+
+\maketitle
+\setcounter{tocdepth}{2}
+\tableofcontents
+
+\section{Abstract}
+\label{sec:orgeaeef68}
+ABDUCTIO-Lite v3 is a lightweight, symmetric framework for evaluating a mutually exclusive set of hypotheses under strict resource limits. It addresses a common failure mode in controversial or “far-fetched” claims: evaluators often decompose and scrutinize the focal hypothesis while leaving rival hypotheses vague and atomic, allowing rivals to win by default.
+
+ABDUCTIO-Lite v3 fixes this by enforcing scrutiny parity across all leading hypotheses using a simple credit budget, and by adding two minimal but enforceable standards:
+
+\begin{enumerate}
+\item a reasoner-agnostic \textbf{confidence (k)} rubric that treats confidence as \textbf{stability of credence under reasonable re-checking}, and
+\item a simple \textbf{overlap (dependence)} heuristic for AND-decompositions.
+\end{enumerate}
+
+The result is a system that remains simple (no EVSI math), terminates naturally (credits), avoids probability blow-ups (via an explicit Other hypothesis), preserves conjunction penalties when independence is plausible, and gives each hypothesis a fair opportunity to rise or fall based on its own required structure.
+\section{1. Problem Statement}
+\label{sec:org0f2202d}
+When evaluating a claim against alternatives, a common pathology appears:
+
+\begin{itemize}
+\item The focal hypothesis is decomposed into multiple sub-claims.
+\item Rival hypotheses remain broad and underspecified.
+\item Evidence that weakens a focal sub-claim shifts probability mass to rivals.
+\item Rivals gain mass not because they were supported, but because they were never required to “pay” the explanatory cost of specificity.
+\end{itemize}
+
+This produces the argument-from-incredulity trap: a far-fetched hypothesis can be prematurely rejected because rivals are treated as catch-alls that absorb probability mass without being held to comparable explanatory standards.
+\section{2. Design Goals and Constraints}
+\label{sec:org3c0a903}
+ABDUCTIO-Lite v3 is built to satisfy:
+
+\begin{itemize}
+\item \textbf{Perfect symmetry:} No special treatment for focal vs rivals.
+\item \textbf{Credit-bounded recursion:} Termination is guaranteed by a simple credit budget.
+\item \textbf{No EVSI math:} No expected-value-of-information calculations.
+\item \textbf{MECE hypothesis set:} Hypotheses are treated as mutually exclusive; an explicit catch-all \textbf{Other} absorbs uncertainty.
+\item \textbf{Preserve conjunction penalty:} When a hypothesis truly requires multiple independent conditions, it should become less likely accordingly.
+\item \textbf{Avoid brittleness:} Do not let fragile independence assumptions or renormalization artifacts dominate outcomes.
+\item \textbf{Reasoner-agnostic:} Works for humans, AI agents, and hybrid panels using the same minimal interchange format.
+\end{itemize}
+\section{3. Key Concepts}
+\label{sec:orged3e220}
+\subsection{3.1 Hypotheses as First-Class Objects}
+\label{sec:org53bb483}
+Every hypothesis is a first-class object that can be decomposed, evaluated, and updated under identical rules.
+\subsection{3.2 Two Quantities per Node}
+\label{sec:orgec2ea1b}
+\begin{itemize}
+\item \textbf{Credence} \(p\): current probability-like support in \([0,1]\).
+\item \textbf{Confidence} \(k\): stability/robustness of the credence estimate; roughly, how much \(p\) would move under reasonable re-checking.
+\end{itemize}
+
+In Lite v3, \(k\) is scored via a simple, auditable rubric (Appendix B). No complex math is required.
+\subsection{3.3 Credits}
+\label{sec:org8876466}
+A \textbf{credit} is the unit of evaluation cost. Typical costs:
+
+\begin{itemize}
+\item Evaluate a node: 1 credit
+\item Decompose a node: 1 credit
+\end{itemize}
+
+Credits are the only mechanism needed to prevent infinite regress.
+\section{4. Data Model}
+\label{sec:org1890377}
+\subsection{4.1 Hypothesis Node}
+\label{sec:orgf281984}
+\begin{verbatim}
+class Hypothesis:
+    id: str
+    statement: str
+
+    # Scores
+    p: float          # credence in [0, 1]
+    k: float          # confidence in [0, 1]
+
+    # Tree
+    children: list["Hypothesis"] = []
+    decomp_type: str | None = None  # "AND" | "OR"
+
+    # Accounting
+    credits_spent: int = 0
+
+    # Lite v3 additions
+    child_role: str | None = None   # "NEC" (necessary) or "EVID" (supporting)
+    and_mode: str | None = None     # "PRODUCT" | "CONSERVATIVE" | "SOFT"
+
+    # Dependence / overlap estimate (Appendix C)
+    overlap: float | None = None    # one of {0.20, 0.50, 0.80, 0.95}; default 0.80 if unknown
+
+    # Confidence audit fields (Appendix B)
+    k_checks: dict[str, int] | None = None  # {"A":0..2,"B":0..2,"C":0..2,"D":0..2}
+    k_rationale: str | None = None
+\end{verbatim}
+\subsection{4.2 Hypothesis Set (MECE + Other)}
+\label{sec:orgcd18704}
+\begin{verbatim}
+class HypothesisSet:
+    hypotheses: dict[str, Hypothesis]  # includes "H_other"
+    p_ledger: dict[str, float]         # MECE distribution over hypotheses
+
+# Invariant: sum(p_ledger.values()) == 1.0
+# H_other is always present and absorbs unmodeled uncertainty.
+\end{verbatim}
+\section{5. Two Rules That Prevent the “Catch-All Rival” Failure Mode}
+\label{sec:orga483cf8}
+\subsection{Rule A: Dominant Rival Challenge}
+\label{sec:org428a9d5}
+If any hypothesis becomes a leader without comparable scrutiny, it must defend its position.
+
+\textbf{Trigger:} If a hypothesis becomes the leader (highest \(p\)) and is meaningfully under-scrutinized relative to the contender frontier, schedule it next until one of the stop conditions is met.
+
+\textbf{Intent:} Rivals cannot win by vagueness.
+\subsection{Rule B: Scrutiny Parity for the Contender Frontier}
+\label{sec:org0ae3355}
+Define the contender frontier:
+
+\[
+\text{frontier} = \{h : p(h) \ge \max_h p(h) - \varepsilon\} \cup \{\text{any user-designated focal}\}.
+\]
+
+\textbf{Parity condition:} No hypothesis in the frontier may lag far behind in credits spent.
+
+Example:
+
+\begin{itemize}
+\item Let \(M\) be the median \(\text{credits\_spent}[h]\) over \(h\in\) frontier.
+\item If any \(h\) has \(\text{credits\_spent}[h] < \rho\,M\) (e.g. \(\rho=0.8\)), schedule \(h\) next.
+\end{itemize}
+
+\textbf{Intent:} Ensure fair scrutiny among the hypotheses that actually matter.
+\section{6. Decomposition Standard}
+\label{sec:orgd19348c}
+A decomposer must output:
+
+\begin{itemize}
+\item a small set of children (2–7; hard capped),
+\item for each child, a role:
+\begin{itemize}
+\item \textbf{NEC} (necessary): if false, the parent becomes very unlikely,
+\item \textbf{EVID} (evidential): supports/undermines, but is not strictly required,
+\end{itemize}
+\item decomposition type: AND or OR,
+\item for AND with NEC children: an \textbf{and\textsubscript{mode}} and an \textbf{overlap} estimate (Appendix C).
+\end{itemize}
+\subsection{Guardrails}
+\label{sec:org2f87ccd}
+\begin{itemize}
+\item \textbf{Arity cap:} max 7 children (default 5 recommended).
+\item \textbf{Necessary test:} mark NEC only if the decomposer asserts: “If this child is false, the parent is substantially undermined.”
+\item \textbf{Underspecified penalty:} if a mechanism-like hypothesis cannot produce at least 2 NEC children, it is marked underspecified (see §8.2).
+\end{itemize}
+
+These guardrails keep the system simple while preventing tree-shaping attacks.
+\section{7. Aggregation Rules (Credence + Confidence)}
+\label{sec:org9e23ca8}
+Let:
+
+\begin{itemize}
+\item \(\text{NEC}\) = children with role == "NEC"
+\item \(\text{EVID}\) = children with role == "EVID"
+\end{itemize}
+\subsection{7.1 OR Aggregation (NEC children)}
+\label{sec:org3561c38}
+OR means “any route suffices.”
+
+\[
+p_{\mathrm{OR}} = 1 - \prod_{i\in\mathrm{NEC}} (1 - p_i).
+\]
+
+Confidence for OR:
+
+\[
+k_{\mathrm{OR}} = \max_{i\in\mathrm{NEC}} k_i.
+\]
+
+If no NEC children exist, keep parent \(p,k\) as-is (or require decomposition correction).
+\subsection{7.2 AND Aggregation: Three Modes}
+\label{sec:orgae340d0}
+AND means “all necessary conditions must hold.” Define:
+
+\[
+p_{\min} = \min_{i\in\mathrm{NEC}} p_i,\quad
+p_{\prod} = \prod_{i\in\mathrm{NEC}} p_i.
+\]
+
+Let \(o\) be the overlap estimate in \(\{0.20,0.50,0.80,0.95\}\) (Appendix C). Default \(o=0.80\) if unknown.
+\subsubsection{Mode 1: PRODUCT (full independence)}
+\label{sec:orgd696879}
+Use only when the decomposer explicitly certifies:
+
+\begin{itemize}
+\item NEC children are genuinely necessary, and
+\item overlap is low (e.g. \(o\le 0.20\) or \(o\le 0.50\) with strong justification).
+\end{itemize}
+
+Then:
+
+\[
+p_{\mathrm{AND}} = p_{\prod}.
+\]
+\subsubsection{Mode 2: CONSERVATIVE (high dependence / unknown)}
+\label{sec:orga8fe9c0}
+Use when overlap is high/unknown, evidence overlaps, or decomposition is interpretive.
+
+\[
+p_{\mathrm{AND}} = p_{\min}.
+\]
+\subsubsection{Mode 3: SOFT (recommended default)}
+\label{sec:org561446d}
+A simple blend that retains conjunction intuition without catastrophic brittleness:
+
+\[
+p_{\mathrm{AND}} = o\,p_{\min} + (1-o)\,p_{\prod}.
+\]
+
+With default \(o=0.80\), AND behaves mostly like bottlenecking but still penalizes multiple weak requirements.
+\subsection{7.3 EVID Handling (support without multiplication)}
+\label{sec:org4ea36df}
+EVID children should not be multiplied into \(p\) by default. They primarily affect confidence, and optionally provide a small \(p\) nudge.
+
+Confidence update (simple conservative rule):
+
+$\backslash$[
+k\textsubscript{\text{NEC}} =
+\begin{cases}
+\min_{i\in\mathrm{NEC}} k_i & \text{if NEC nonempty}\\
+k_{\text{parent prior}} & \text{otherwise}
+\end{cases}
+$\backslash$]
+
+$\backslash$[
+k\textsubscript{\text{EVID}} =
+\begin{cases}
+\max_{i\in\mathrm{EVID}} k_i & \text{if EVID nonempty}\\
+0 & \text{otherwise}
+\end{cases}
+$\backslash$]
+
+\[
+k_{\text{parent}} = \min(k_{\text{NEC}},\; \max(k_{\text{EVID}},\; k_{\text{parent prior}})).
+\]
+
+Optional small \(p\) nudge (only if EVID exists):
+
+\[
+p_{\text{parent}} = 0.9\,p_{\text{NEC-agg}} + 0.1\,\mathrm{mean}_{i\in\mathrm{EVID}}(p_i).
+\]
+
+This keeps supporting reasons from masquerading as hard prerequisites.
+\section{8. Confidence (k) Rules}
+\label{sec:org8e71e37}
+\subsection{8.1 Stopping Gate}
+\label{sec:orgf0c0553}
+Each hypothesis branch stops if:
+
+\begin{itemize}
+\item \(k_{\mathrm{eff}} \ge \tau\), or
+\item credits for that branch are exhausted, or
+\item decomposition is not possible.
+\end{itemize}
+\subsection{8.2 Underspecified Confidence Penalty}
+\label{sec:org92f9485}
+If \(k < \tau\) but the system cannot decompose the node into adequate structure, cap confidence:
+
+\[
+k \leftarrow \min(k, k_{\mathrm{cap}}),\quad k_{\mathrm{cap}}\approx 0.40.
+\]
+
+Interpretation: “I can’t specify what must be true for this to work” implies low robustness.
+\subsection{8.3 Scrutiny-Aware Effective Confidence (optional)}
+\label{sec:orgd6afa7f}
+To prevent high-\(p\) hypotheses from coasting on low scrutiny, define:
+
+\[
+k_{\mathrm{eff}}(h) = k(h)\cdot \min\Bigl(1, \frac{\mathrm{credits\_spent}[h]}{\mathrm{parity\_target}}\Bigr),
+\]
+
+where \(\mathrm{parity\_target}\) is the median credits in the current frontier (or the leader’s credits).
+
+This is optional but effective and simple.
+\section{9. Ledger Update Without Probability Blow-Ups}
+\label{sec:orgc44b8d7}
+A major source of instability in naive systems is renormalizing tiny totals upward, causing a hypothesis to explode to near certainty.
+
+ABDUCTIO-Lite v3 avoids this with an explicit Other absorber.
+\subsection{Update Rule}
+\label{sec:orgf2d8970}
+After producing new proposed probabilities \(p_i\) for all non-Other hypotheses:
+
+\begin{itemize}
+\item Let \(S = \sum p_i\) over non-Other hypotheses.
+\end{itemize}
+
+If \(S \le 1\):
+
+\begin{itemize}
+\item keep all \(p_i\) as is
+\item set \(p_{\mathrm{other}} = 1 - S\)
+\end{itemize}
+
+If \(S > 1\):
+
+\begin{itemize}
+\item renormalize only non-Other: \(p_i \leftarrow p_i/S\)
+\item set \(p_{\mathrm{other}} = 0\)
+\end{itemize}
+
+This ensures missing mass represents uncertainty rather than forced certainty.
+\section{10. Scheduling: The Core Loop (No EVSI)}
+\label{sec:org7afd734}
+ABDUCTIO-Lite v3 uses a simple prioritization policy:
+
+\begin{enumerate}
+\item Dominant Rival Challenge
+\item Scrutiny Parity within the contender frontier
+\item Otherwise, select the hypothesis with the highest unfinished business:
+\end{enumerate}
+
+\[
+\mathrm{score}(h) = p(h)\,(1-k_{\mathrm{eff}}(h)).
+\]
+\subsection{Pseudocode}
+\label{sec:org8df5666}
+\begin{verbatim}
+inputs:
+  hypotheses MECE + H_other
+  total_credits B
+  confidence_threshold τ
+  epsilon ε (frontier width)
+  parity_ratio ρ (e.g. 0.8)
+
+while B > 0:
+
+  leader = argmax p_ledger
+  frontier = {h : p_ledger[h] >= p_ledger[leader] - ε} ∪ {any user-designated focal}
+
+  if exists h in frontier where credits_spent[h] < ρ * median_credits(frontier):
+      target = argmin credits_spent in frontier  # Scrutiny Parity
+
+  else:
+      target = argmax over frontier of p_ledger[h] * (1 - k_eff[h])
+
+  spend a small credit slice on target:
+      evaluate(target)        # 1 credit
+      if k_eff(target) < τ and can_decompose(target):
+          decompose(target)   # 1 credit
+          evaluate children with remaining slice
+
+  aggregate target's local tree to update p/k
+  update p_ledger using the H_other absorber rule
+\end{verbatim}
+
+Notes:
+
+\begin{itemize}
+\item If a leader is under-scrutinized, it will naturally be pulled by Scrutiny Parity.
+\item In UIs that designate a “focal,” the frontier union with focal preserves user intent.
+\end{itemize}
+\section{11. Why Lite v3 Fixes the Common Failures}
+\label{sec:org8353b95}
+\subsection{11.1 Rivals cannot win by vagueness}
+\label{sec:org363389c}
+Leaders must pay scrutiny costs at parity. Broad catch-alls tend to weaken when forced to state NEC structure.
+\subsection{11.2 Independence is preserved where real—and contained where not}
+\label{sec:org3e1ffb7}
+PRODUCT-AND remains available and powerful, but only when overlap is credibly low. Otherwise, CONSERVATIVE or SOFT prevents fake collapses.
+\subsection{11.3 No renormalization explosions}
+\label{sec:orgbf1cb57}
+Uncertainty flows into \(H_{\mathrm{other}}\) instead of scaling tiny totals to 1.0.
+\subsection{11.4 Decomposition cannot be weaponized}
+\label{sec:orgb9142d5}
+Arity caps and NEC/EVID roles prevent arbitrary multiplication of weak subclaims to crush a hypothesis.
+\subsection{11.5 Confidence is reasoner-agnostic and auditable}
+\label{sec:org701e8b3}
+\(k\) is scored via a simple rubric and logged in a comparable way across humans and agents (Appendix B).
+\section{12. Implementation Notes (MVP Scope)}
+\label{sec:org69be7aa}
+A minimal implementation can be \textasciitilde{}300–600 lines:
+
+\begin{itemize}
+\item Hypothesis node + set/ledger
+\item Evaluator interface (human/LLM/manual)
+\item Decomposer interface (human/LLM/manual)
+\item Aggregator (AND/OR with modes)
+\item Scheduler (frontier parity + unfinished business)
+\item Audit trail: log every evaluation, decomposition, credits spent, and ledger update
+\end{itemize}
+\subsection{12.1 Interchange Card (Reasoner-Agnostic)}
+\label{sec:org052240a}
+This is the minimal schema humans and agents should produce.
+
+\begin{verbatim}
+{
+  "proposition": "<string>",
+  "assessment": {
+    "p": 0.58,
+    "k": 0.55,
+    "k_checks": {"A": 1, "B": 1, "C": 1, "D": 1},
+    "factors": [
+      "short factor 1",
+      "short factor 2",
+      "short factor 3"
+    ],
+    "mind_change": "What would most change my mind (one sentence)."
+  },
+  "assessor": {
+    "type": "human|ai|check",
+    "role": "<string>",
+    "id": "<string>"
+  },
+  "context": {
+    "evidence_refs": ["<ref1>", "<ref2>"],
+    "timestamp": "2025-12-19T12:00:00Z"
+  }
+}
+\end{verbatim}
+\subsection{12.2 Evaluator Contract}
+\label{sec:org5068c54}
+\begin{itemize}
+\item \texttt{evaluate(hypothesis)} returns: \((p,k)\), 1–3 short factors, and one “mind-change” sentence.
+\item For humans, Appendix B provides a one-minute worksheet.
+\end{itemize}
+\subsection{12.3 Decomposer Contract}
+\label{sec:orgc6b9ae8}
+\begin{itemize}
+\item \texttt{decompose(hypothesis)} returns:
+\begin{itemize}
+\item children[] (2–7)
+\item for each child: role NEC/EVID
+\item decomp\textsubscript{type} AND/OR
+\item for AND: and\textsubscript{mode} and overlap estimate via Appendix C
+\end{itemize}
+\end{itemize}
+\section{13. Example Walkthrough Pattern (High Level)}
+\label{sec:org6d5be1b}
+Given hypotheses:
+
+\begin{itemize}
+\item \(H_1\): Far-fetched explanation
+\item \(H_2\ldots H_n\): Conventional explanations
+\item \(H_{\mathrm{other}}\): Unknown/other
+\end{itemize}
+
+Typical run behavior:
+
+\begin{itemize}
+\item Early: equal credit across hypotheses \(\rightarrow\) everyone gets at least one evaluation.
+\item A conventional rival becomes leader by plausibility.
+\item Scrutiny Parity forces the leader to decompose and pay explanatory costs.
+\item If the rival is truly strong, it remains strong under structure; if it was a catch-all, it weakens.
+\item As vague rivals weaken, mass shifts to other explicit hypotheses or into Other, not into artificial certainty.
+\end{itemize}
+\section{14. Conclusion}
+\label{sec:org2beeb97}
+ABDUCTIO-Lite v3 keeps the core appeal of a Lite system—simplicity, symmetry, and credit-bounded recursion—while fixing the practical problems that cause unfair rejections or brittle outcomes.
+
+It ensures that every leading hypothesis earns its position through comparable scrutiny, preserves conjunction penalties when independence is warranted, avoids renormalization instability via an explicit Other absorber, and standardizes confidence as a reasoner-agnostic, auditable proxy for the stability of credence.
+\section{Appendix A: Default Parameter Suggestions (Pragmatic)}
+\label{sec:org43bf64f}
+\begin{itemize}
+\item \(\tau\) (confidence threshold): 0.70
+\item \(\varepsilon\) (frontier width): 0.05
+\item parity\textsubscript{ratio} \(\rho\): 0.80
+\item max\textsubscript{children}: 5 (or 7)
+\item overlap default \(o\): 0.80
+\item and\textsubscript{mode} default: SOFT
+\item \(k_{\mathrm{cap}}\) for underspecified: 0.40
+\end{itemize}
+
+These defaults bias toward robustness while preserving the ability for genuinely independent multi-requirement hypotheses to collapse appropriately.
+\section{Appendix B: Confidence (k) as Stability of Credence (Human + AI Rubric)}
+\label{sec:org2507acd}
+\subsection{B.1 Plain-language definition}
+\label{sec:orgdfd67f2}
+Credence \(p\) is your current best guess. Confidence \(k\) is how stable that guess is under reasonable re-checking.
+
+\begin{itemize}
+\item High \(k\): \(p\) would barely move without genuinely new evidence.
+\item Low \(k\): modest re-checks could move \(p\) a lot.
+\end{itemize}
+\subsection{B.2 The 4-Checks scorecard (0–2 each)}
+\label{sec:org037881d}
+Score each check as:
+
+\begin{itemize}
+\item 0 = Not yet
+\item 1 = Partly
+\item 2 = Yes, solidly
+\end{itemize}
+\subsubsection{Check A: Evidence Traceability}
+\label{sec:orgb27da26}
+Question: Can we point to specific evidence (or explicit premises) supporting this \(p\)?
+
+\begin{itemize}
+\item 0: mostly intuition / vague plausibility
+\item 1: some concrete evidence, but thin/indirect
+\item 2: clear, direct evidence (or crisp argument with explicit premises)
+\end{itemize}
+\subsubsection{Check B: Cross-Validation}
+\label{sec:org8aa7b72}
+Question: Would an independent re-check likely land near the same \(p\)?
+
+\begin{itemize}
+\item 0: one source/method
+\item 1: some triangulation, but not independent
+\item 2: strong triangulation across independent sources/methods
+\end{itemize}
+\subsubsection{Check C: Sensitivity to Assumptions}
+\label{sec:org1fbf786}
+Question: If reasonable assumptions change, does \(p\) swing?
+
+\begin{itemize}
+\item 0: very sensitive
+\item 1: moderately sensitive
+\item 2: robust
+\end{itemize}
+\subsubsection{Check D: Adversarial Resilience}
+\label{sec:org5dd33cc}
+Question: Have we faced the strongest plausible objections and rivals?
+
+\begin{itemize}
+\item 0: obvious defeaters not addressed
+\item 1: some addressed, gaps remain
+\item 2: main defeaters confronted
+\end{itemize}
+\subsection{B.3 Map total to \(k\)}
+\label{sec:org268803b}
+Let \(S=A+B+C+D\) (0–8):
+
+\begin{itemize}
+\item 0–1 \(\rightarrow\) \(k=0.15\)
+\item 2–3 \(\rightarrow\) \(k=0.35\)
+\item 4–5 \(\rightarrow\) \(k=0.55\)
+\item 6–7 \(\rightarrow\) \(k=0.75\)
+\item 8 \(\rightarrow\) \(k=0.90\)
+\end{itemize}
+\subsection{B.4 Recommended guardrails}
+\label{sec:org948f614}
+\begin{itemize}
+\item Weakest-link cap: if any check is 0, cap \(k\le 0.55\).
+\item Underspecified cap: if the hypothesis cannot state at least 2 NEC children when it should, cap \(k\le 0.40\).
+\end{itemize}
+\subsection{B.5 Logging requirements}
+\label{sec:org6d0dfd5}
+Each assessment records:
+
+\begin{itemize}
+\item \(p\), \(k\)
+\item the four check scores A–D
+\item 1 sentence: “What would most change my mind?”
+\item 1–3 short factors behind \(p\)
+\end{itemize}
+\subsection{B.6 One-minute human worksheet}
+\label{sec:org625169a}
+\begin{quote}
+Claim: \uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\_\_}}}}}}}}}}}}}}
+My current p: \uline{\_\_} /100 (or 0.00–1.00)
+
+A Evidence Traceability (0/1/2): \uline{\_
+B Cross-Validation (0/1/2): \_}
+C Sensitivity (0/1/2): \uline{\_
+D Adversarial Resilience (0/1/2): \_}
+Total S: \uline{\_ → k: \_}
+
+Top reasons (1–3 bullets):
+\begin{itemize}
+\item …
+\item …
+\item …
+\end{itemize}
+
+What would most change my mind (1 sentence):
+\begin{itemize}
+\item …
+\end{itemize}
+\end{quote}
+\section{Appendix C: Overlap (Dependence) Estimation for AND Nodes (Human + AI)}
+\label{sec:org8db89f4}
+\subsection{C.1 Purpose (plain language)}
+\label{sec:orgda3e0e0}
+For AND with NEC children, overlap \(o\) estimates how much the NEC conditions “share the same fate.”
+
+\begin{itemize}
+\item Low overlap: conditions are mostly independent.
+\item High overlap: conditions are coupled (shared evidence, mechanism, or failure mode).
+\end{itemize}
+\subsection{C.2 Bucket values (fixed for consistency)}
+\label{sec:org98b5339}
+Choose one of:$\backslash$
+\(0.20\) (low), \(0.50\) (medium), \(0.80\) (high), \(0.95\) (very high / near-duplicate).
+\subsection{C.3 The 3-layer method (take the maximum)}
+\label{sec:org7c4aa1c}
+Estimate:
+
+\begin{itemize}
+\item Evidence overlap \(E\)
+\item Mechanism overlap \(M\)
+\item Failure-mode overlap \(F\)
+\end{itemize}
+
+Then set:
+
+\[
+o = \max(E,M,F).
+\]
+\subsection{C.4 How to bucket each layer}
+\label{sec:org0dc6516}
+\subsubsection{Evidence overlap \(E\)}
+\label{sec:org8b5cdab}
+Ask: Do the NEC children rely on the same underlying observations?
+
+\begin{itemize}
+\item 0.95: essentially the same dataset/testimony/measurement
+\item 0.80: heavily overlapping sources
+\item 0.50: partial overlap
+\item 0.20: distinct evidence streams
+\end{itemize}
+\subsubsection{Mechanism overlap \(M\)}
+\label{sec:orga6a3e46}
+Ask: Are the NEC children basically the same mechanism split into parts?
+
+\begin{itemize}
+\item 0.95: near-restatement / one implies the other
+\item 0.80: hinge on one key mechanism assumption
+\item 0.50: related mechanisms
+\item 0.20: different mechanisms
+\end{itemize}
+\subsubsection{Failure-mode overlap \(F\)}
+\label{sec:orgd72bc18}
+Ask: Would one objection knock out multiple NEC children?
+
+\begin{itemize}
+\item 0.95: one debunk breaks most of them
+\item 0.80: shared key vulnerability
+\item 0.50: partial shared vulnerabilities
+\item 0.20: different vulnerabilities
+\end{itemize}
+\subsection{C.5 Defaults and guardrails}
+\label{sec:org716b283}
+\begin{itemize}
+\item Default: if unsure, set \(o=0.80\).
+\item Merge rule: if \(o\ge 0.95\), usually merge the NEC children (or demote one to EVID).
+\end{itemize}
+\subsection{C.6 Quick human worksheet}
+\label{sec:orgb01bab3}
+\begin{quote}
+Parent hypothesis: \uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\_\_}}}}}}}}}}}}
+NEC children: \uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\uline{\_}}}}}}}}}}}}}}}
+
+Evidence overlap E: 0.20 / 0.50 / 0.80 / 0.95
+Mechanism overlap M: 0.20 / 0.50 / 0.80 / 0.95
+Failure overlap F: 0.20 / 0.50 / 0.80 / 0.95
+
+o = max(E,M,F): \uline{\_\_}
+One-sentence justification:
+\begin{itemize}
+\item …
+\end{itemize}
+\end{quote}
+\end{document}
