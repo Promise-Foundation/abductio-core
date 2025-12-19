@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Protocol
 
-from domain.audit import AuditEvent
+from abductio_core.domain.audit import AuditEvent
 
 
 class EvaluatorPort(Protocol):

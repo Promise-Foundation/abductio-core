@@ -1,4 +1,4 @@
-# features/01_session_bootstrap.feature
+# tests/bdd/features/01_session_bootstrap.feature
 Feature: Session bootstrap and MECE initialization
   ABDUCTIO MVP must initialize a session deterministically and maintain a MECE ledger
   with an explicit H_other absorber.

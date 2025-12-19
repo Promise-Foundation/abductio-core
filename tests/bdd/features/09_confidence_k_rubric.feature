@@ -1,4 +1,4 @@
-# features/09_confidence_k_rubric.feature
+# tests/bdd/features/09_confidence_k_rubric.feature
 Feature: Confidence k rubric mapping and guardrails
   Confidence k must be derived from rubric A-D (0..2 each) using the specified mapping,
   with the guardrail: if any check = 0, cap k <= 0.55.

@@ -1,4 +1,4 @@
-# features/05_ledger_update_and_other_absorber.feature
+# tests/bdd/features/05_ledger_update_and_other_absorber.feature
 Feature: Ledger updates, damping, and Other absorber invariant
   Ledger updates must be auditable, deterministic, and keep probabilities summing to 1 with H_other absorbing slack.
 

@@ -1,4 +1,4 @@
-# features/06_deterministic_scheduling_and_frontier.feature
+# tests/bdd/features/06_deterministic_scheduling_and_frontier.feature
 Feature: Deterministic scheduling, frontier selection, and tie-breaking
   Scheduling must be seed-invariant: no focal injection, canonical ordering by hash(statement),
   and round-robin credit slices over the frontier.

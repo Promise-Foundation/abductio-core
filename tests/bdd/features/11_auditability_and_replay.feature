@@ -1,4 +1,4 @@
-# features/11_auditability_and_replay.feature
+# tests/bdd/features/11_auditability_and_replay.feature
 Feature: Full auditability and deterministic replay
   Every arithmetic update and invariant check must be logged so a run can be replayed to identical results.
 
