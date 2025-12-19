@@ -1,4 +1,4 @@
-# features/07_permutation_invariance_end_to_end.feature
+# tests/bdd/features/07_permutation_invariance_end_to_end.feature
 Feature: Permutation invariance (end-to-end)
   Given identical inputs, outputs must be identical (up to ordering) regardless of hypothesis list permutation.
 

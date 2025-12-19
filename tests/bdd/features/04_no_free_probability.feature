@@ -1,4 +1,4 @@
-# features/04_no_free_probability.feature
+# tests/bdd/features/04_no_free_probability.feature
 Feature: No-free-probability semantics
   Decomposition must not create or destroy ledger probability by itself.
   Unassessed NEC nodes must default to neutral p=1.0 so listing more requirements does not penalize.

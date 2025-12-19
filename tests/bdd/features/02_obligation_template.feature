@@ -1,4 +1,4 @@
-# features/02_obligation_template.feature
+# tests/bdd/features/02_obligation_template.feature
 Feature: Obligation template parity and scoping
   Every named root must instantiate the same obligation slots before being considered SCOPED.
   Failure to instantiate marks the root UNSCOPED and caps confidence.

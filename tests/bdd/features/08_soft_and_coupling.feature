@@ -1,4 +1,4 @@
-# features/08_soft_and_coupling.feature
+# tests/bdd/features/08_soft_and_coupling.feature
 Feature: Soft-AND aggregation with coupling buckets
   Within-slot AND of NEC children must use the coupling rule:
     m = c * p_min + (1-c) * p_prod

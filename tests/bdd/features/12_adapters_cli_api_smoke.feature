@@ -1,4 +1,4 @@
-# features/12_adapters_cli_api_smoke.feature
+# tests/bdd/features/12_adapters_cli_api_smoke.feature
 Feature: Presentation adapters (CLI/API) do not bypass the application layer
   The CLI and API are thin adapters. They must call the same application use case as library consumers.
   (This is a "contract" feature; you can implement adapter tests later, but keep the behavior specified now.)
