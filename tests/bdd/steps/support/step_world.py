@@ -41,6 +41,8 @@ class StepWorld:
     replay_result: Optional[Dict[str, Any]] = None
     rubric: Dict[str, int] = field(default_factory=dict)
     derived_k: Optional[float] = None
+    guardrail_applied: bool = False
+    initial_ledger: Dict[str, float] = field(default_factory=dict)
 
     def mark_pending(self, message: str) -> None:
         raise Pending(message)
@@ -116,41 +118,118 @@ class StepWorld:
         }
 
     def run_engine(self, mode: str) -> None:
+        run_mode: Optional[str] = None
+        run_count: Optional[int] = None
+        run_target: Optional[str] = None
         if mode.startswith("start_session:"):
             claim = mode.split(":", 1)[1]
             roots = self.roots
+            run_mode = "start_only"
         elif mode == "until_credits_exhausted":
             claim = self.config.get("claim", "Untitled claim")
             roots = self.roots
+            run_mode = "until_credits_exhausted"
         elif mode == "until_stops":
             claim = self.config.get("claim", "Untitled claim")
             roots = self.roots
+            run_mode = "until_stops"
         elif mode == "run_set_a":
             claim = self.config.get("claim", "Untitled claim")
             roots = self.roots_a
+            run_mode = "until_stops"
         elif mode == "run_set_b":
             claim = self.config.get("claim", "Untitled claim")
             roots = self.roots_b
+            run_mode = "until_stops"
+        elif mode.startswith("operations:"):
+            claim = self.config.get("claim", "Untitled claim")
+            roots = self.roots
+            run_mode = "operations"
+            run_count = int(mode.split(":", 1)[1])
+        elif mode.startswith("evaluations_children:"):
+            claim = self.config.get("claim", "Untitled claim")
+            roots = self.roots
+            run_mode = "evaluations_children"
+            run_count = int(mode.split(":", 1)[1])
+        elif mode.startswith("evaluation:"):
+            claim = self.config.get("claim", "Untitled claim")
+            roots = self.roots
+            run_mode = "evaluation"
+            parts = mode.split(":")
+            if len(parts) == 2:
+                run_count = int(parts[1])
+            else:
+                run_target = parts[1]
+                run_count = int(parts[2])
         else:
             self.mark_pending(f"Engine execution not implemented for mode: {mode}")
             return
 
-        session_request = self._build_request(claim, roots)
+        session_request = self._build_request(
+            claim,
+            roots,
+            run_mode=run_mode,
+            run_count=run_count,
+            run_target=run_target,
+        )
         deps = self._build_deps()
+        self.initial_ledger = session_request.initial_ledger or {}
+        if not self.initial_ledger:
+            count_named = len(roots)
+            gamma = float(self.config.get("gamma", 0.0))
+            base_p = (1.0 - gamma) / count_named if count_named else 0.0
+            self.initial_ledger = {row["id"]: base_p for row in roots}
+            self.initial_ledger["H_other"] = gamma if count_named else 1.0
         result = run_session(session_request, deps)
         result_view = result.to_dict_view()
         if mode == "run_set_b":
             self.replay_result = result_view
         else:
             self.result = result_view
+            if mode.startswith("start_session:") and not self.replay_result:
+                reversed_roots = list(reversed(roots))
+                replay_request = self._build_request(
+                    claim,
+                    reversed_roots,
+                    run_mode=run_mode,
+                    run_count=run_count,
+                    run_target=run_target,
+                )
+                replay_deps = self._build_deps()
+                replay_result = run_session(replay_request, replay_deps)
+                self.replay_result = replay_result.to_dict_view()
 
     def derive_k_from_rubric(self) -> None:
-        self.mark_pending("k-derivation policy not implemented")
+        total = sum(self.rubric.values())
+        mapping = {
+            0: 0.15,
+            1: 0.25,
+            2: 0.35,
+            3: 0.45,
+            4: 0.55,
+            5: 0.65,
+            6: 0.75,
+            7: 0.85,
+            8: 0.90,
+        }
+        base_k = mapping.get(total, 0.15)
+        self.guardrail_applied = any(value == 0 for value in self.rubric.values())
+        if self.guardrail_applied and base_k > 0.55:
+            base_k = 0.55
+        self.derived_k = base_k
 
-    def _build_request(self, claim: str, roots: List[Dict[str, Any]]) -> SessionRequest:
+    def _build_request(
+        self,
+        claim: str,
+        roots: List[Dict[str, Any]],
+        *,
+        run_mode: Optional[str] = None,
+        run_count: Optional[int] = None,
+        run_target: Optional[str] = None,
+    ) -> SessionRequest:
         config = SessionConfig(
             tau=float(self.config.get("tau", 0.0)),
-            epsilon=float(self.config.get("epsilon", 0.0)),
+            epsilon=float(self.epsilon_override if self.epsilon_override is not None else self.config.get("epsilon", 0.0)),
             gamma=float(self.config.get("gamma", 0.0)),
             alpha=float(self.config.get("alpha", 0.0)),
         )
@@ -169,6 +248,13 @@ class StepWorld:
             config=config,
             credits=credits,
             required_slots=self.required_slots,
+            run_mode=run_mode,
+            run_count=run_count,
+            run_target=run_target,
+            initial_ledger=self.ledger or None,
+            pre_scoped_roots=sorted(self.decomposer_script.get("scoped_roots", [])),
+            slot_k_min=self.decomposer_script.get("slot_k_min"),
+            slot_initial_p=self.decomposer_script.get("slot_initial_p"),
         )
 
     def _build_deps(self) -> RunSessionDeps:

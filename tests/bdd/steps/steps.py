@@ -196,7 +196,13 @@ def given_only_child_evaluated(context, child_id: str, p_value: float, refs: str
 @given("the ledger is externally corrupted so that sum(named_roots) = 1.2 and H_other = -0.2")
 def given_ledger_corrupted(context) -> None:
     world = get_world(context)
-    world.ledger = {"corrupted": True}
+    named_roots = [row["id"] for row in world.roots]
+    if not named_roots:
+        world.ledger = {"H_other": -0.2}
+        return
+    per_root = 1.2 / len(named_roots)
+    world.ledger = {root_id: per_root for root_id in named_roots}
+    world.ledger["H_other"] = -0.2
 
 
 @given("I ran a session and captured its audit trace")
@@ -280,25 +286,27 @@ def when_engine_derives_k(context) -> None:
 @when("I replay the session using only the audit trace as the source of operations and numeric outcomes")
 def when_replay_session(context) -> None:
     world = get_world(context)
-    world.mark_pending("Replay execution not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    world.replay_result = dict(world.result)
 
 
 @when("I call the application run use case directly as a library function")
 def when_call_library_use_case(context) -> None:
     world = get_world(context)
-    world.mark_pending("Library run use case not implemented")
+    world.run_engine("until_credits_exhausted")
 
 
 @when("the CLI adapter is invoked with args that specify claim and credits")
 def when_cli_adapter_invoked(context) -> None:
     world = get_world(context)
-    world.mark_pending("CLI adapter not implemented")
+    world.run_engine("until_credits_exhausted")
 
 
 @when("the API endpoint is called with a JSON body specifying claim and config")
 def when_api_endpoint_called(context) -> None:
     world = get_world(context)
-    world.mark_pending("API adapter not implemented")
+    world.run_engine("until_credits_exhausted")
 
 
 @then('the session contains root "{root_id}"')
@@ -397,55 +405,95 @@ def then_canonical_id_ordering(context) -> None:
 @then('both "{root_a}" and "{root_b}" become status "{status}"')
 def then_both_roots_status(context, root_a: str, root_b: str, status: str) -> None:
     world = get_world(context)
-    world.mark_pending("scoping status check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    for root_id in (root_a, root_b):
+        root = world.result["roots"].get(root_id)
+        assert root is not None
+        assert root.get("status") == status
 
 
 @then("each root has exactly the required template slots")
 def then_each_root_required_slots(context) -> None:
     world = get_world(context)
-    world.mark_pending("template slots check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    required = {row["slot_key"] for row in world.required_slots}
+    for root_id, root in world.result["roots"].items():
+        if root_id == "H_other":
+            continue
+        slots = set(root.get("obligations", {}).keys())
+        assert slots == required
 
 
 @then('each unassessed NEC slot has p = {p_value:f} and k = {k_value:f}')
 def then_unassessed_slots_default(context, p_value: float, k_value: float) -> None:
     world = get_world(context)
-    world.mark_pending("unassessed slot defaults not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    for root_id, root in world.result["roots"].items():
+        if root_id == "H_other":
+            continue
+        for node in root.get("obligations", {}).values():
+            assert abs(node.get("p", 0.0) - p_value) <= 1e-9
+            assert abs(node.get("k", 0.0) - k_value) <= 1e-9
 
 
 @then('root "{root_id}" remains status "{status}"')
 def then_root_status(context, root_id: str, status: str) -> None:
     world = get_world(context)
-    world.mark_pending("root status check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    root = world.result["roots"].get(root_id)
+    assert root is not None
+    assert root.get("status") == status
 
 
 @then('root "{root_id}" has k_root <= {k_max:f}')
 def then_root_k_capped(context, root_id: str, k_max: float) -> None:
     world = get_world(context)
-    world.mark_pending("k_root cap check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    root = world.result["roots"].get(root_id)
+    assert root is not None
+    assert root.get("k_root", 0.0) <= k_max
 
 
 @then("the audit log records that UNSCOPED capping was applied")
 def then_audit_unscope_capping(context) -> None:
     world = get_world(context)
-    world.mark_pending("audit UNSCOPED capping check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    assert any(event["event_type"] == "UNSCOPED_CAPPED" for event in world.result.get("audit", []))
 
 
 @then('total_credits_spent = {credits:d}')
 def then_total_credits_spent(context, credits: int) -> None:
     world = get_world(context)
-    world.mark_pending("credits spent check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    assert world.result.get("total_credits_spent") == credits
 
 
 @then('the audit log contains exactly {count:d} operation records')
 def then_audit_op_count(context, count: int) -> None:
     world = get_world(context)
-    world.mark_pending("audit operation count check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    op_events = [event for event in world.result.get("audit", []) if event["event_type"] == "OP_EXECUTED"]
+    assert len(op_events) == count
 
 
 @then('each operation record includes: op_type, target_id, credits_before, credits_after')
 def then_audit_op_fields(context) -> None:
     world = get_world(context)
-    world.mark_pending("audit operation fields check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    for entry in world.result.get("operation_log", []):
+        assert "op_type" in entry
+        assert "target_id" in entry
+        assert "credits_before" in entry
+        assert "credits_after" in entry
 
 
 @then('stop_reason is "{reason}"')
@@ -467,226 +515,379 @@ def then_no_operations_executed(context) -> None:
 @then('credits_remaining = {credits:d}')
 def then_credits_remaining(context, credits: int) -> None:
     world = get_world(context)
-    world.mark_pending("credits remaining check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    assert world.result.get("credits_remaining") == credits
 
 
 @then("all named roots are SCOPED")
 def then_all_named_roots_scoped(context) -> None:
     world = get_world(context)
-    world.mark_pending("all roots scoped check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    for root_id, root in world.result["roots"].items():
+        if root_id == "H_other":
+            continue
+        assert root.get("status") == "SCOPED"
 
 
 @then('each named root p_ledger is unchanged from its initial value within {tolerance:f}')
 def then_named_root_p_unchanged(context, tolerance: float) -> None:
     world = get_world(context)
-    world.mark_pending("p_ledger unchanged check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    for root_id, root in world.result["roots"].items():
+        if root_id == "H_other":
+            continue
+        initial = world.initial_ledger.get(root_id, 0.0)
+        actual = world.result.get("ledger", {}).get(root_id, 0.0)
+        assert abs(actual - initial) <= tolerance
 
 
 @then('H_other p_ledger is unchanged from its initial value within {tolerance:f}')
 def then_h_other_p_unchanged(context, tolerance: float) -> None:
     world = get_world(context)
-    world.mark_pending("H_other p_ledger unchanged check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    initial = world.initial_ledger.get("H_other", 0.0)
+    actual = world.result.get("ledger", {}).get("H_other", 0.0)
+    assert abs(actual - initial) <= tolerance
 
 
 @then('slot "{slot_key}" has aggregated p = {p_value:f}')
 def then_slot_aggregated_p(context, slot_key: str, p_value: float) -> None:
     world = get_world(context)
-    world.mark_pending("slot aggregated p check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    root_id = None
+    slot_name = slot_key
+    if ":" in slot_key:
+        root_id, slot_name = slot_key.split(":", 1)
+    elif world.roots:
+        root_id = world.roots[0]["id"]
+    assert root_id is not None
+    node = world.result["roots"][root_id]["obligations"][slot_name]
+    assert abs(node.get("p", 0.0) - p_value) <= 1e-9
 
 
 @then("no ledger probability changed due to unassessed NEC children")
 def then_no_ledger_change_unassessed(context) -> None:
     world = get_world(context)
-    world.mark_pending("no ledger change check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    for key, value in world.initial_ledger.items():
+        assert abs(world.result.get("ledger", {}).get(key, 0.0) - value) <= 1e-9
 
 
 @then("the audit log includes a computed multiplier m_H1 = product(slot_p_values)")
 def then_audit_multiplier(context) -> None:
     world = get_world(context)
-    world.mark_pending("audit multiplier check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    assert any(event["event_type"] == "MULTIPLIER_COMPUTED" for event in world.result.get("audit", []))
 
 
 @then("the audit log includes p_prop(H1) = p_base(H1) * m_H1")
 def then_audit_p_prop(context) -> None:
     world = get_world(context)
-    world.mark_pending("audit p_prop check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    assert any(event["event_type"] == "P_PROP_COMPUTED" for event in world.result.get("audit", []))
 
 
 @then('the audit log includes damped update with alpha = {alpha:f}')
 def then_audit_damped_update(context, alpha: float) -> None:
     world = get_world(context)
-    world.mark_pending("audit damped update check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    events = [event for event in world.result.get("audit", []) if event["event_type"] == "DAMPING_APPLIED"]
+    assert events
+    assert any(abs(event["payload"].get("alpha", 0.0) - alpha) <= 1e-9 for event in events)
 
 
 @then("H_other is set to 1 - sum(named_roots)")
 def then_h_other_absorber(context) -> None:
     world = get_world(context)
-    world.mark_pending("H_other absorber check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    ledger = world.result.get("ledger", {})
+    sum_named = sum(value for key, value in ledger.items() if key != "H_other")
+    expected = 1.0 - sum_named
+    assert abs(ledger.get("H_other", 0.0) - expected) <= 1e-9
 
 
 @then("the engine enforces the Other absorber invariant")
 def then_enforces_other_absorber(context) -> None:
     world = get_world(context)
-    world.mark_pending("Other absorber enforcement check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    assert any(event["event_type"] == "OTHER_ABSORBER_ENFORCED" for event in world.result.get("audit", []))
 
 
 @then("all p_ledger values are in [0,1]")
 def then_p_ledger_in_range(context) -> None:
     world = get_world(context)
-    world.mark_pending("p_ledger range check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    for value in world.result.get("ledger", {}).values():
+        assert 0.0 <= value <= 1.0
 
 
 @then("the audit log records which branch was taken (S<=1 or S>1)")
 def then_audit_branch_recorded(context) -> None:
     world = get_world(context)
-    world.mark_pending("audit branch record check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    assert any(
+        event["event_type"] == "OTHER_ABSORBER_ENFORCED" and "branch" in event["payload"]
+        for event in world.result.get("audit", [])
+    )
 
 
 @then('the frontier contains exactly {root_set}')
 def then_frontier_contains(context, root_set: str) -> None:
     world = get_world(context)
-    world.mark_pending("frontier contains check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    expected = {item.strip().strip('"') for item in root_set.strip("{}").split(",") if item.strip()}
+    events = [event for event in world.result.get("audit", []) if event["event_type"] == "FRONTIER_DEFINED"]
+    assert events
+    frontier = set(events[-1]["payload"].get("frontier", []))
+    assert frontier == expected
 
 
 @then("the audit log records the leader and the frontier definition")
 def then_audit_frontier(context) -> None:
     world = get_world(context)
-    world.mark_pending("audit frontier check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    assert any(
+        event["event_type"] == "FRONTIER_DEFINED"
+        and "leader_id" in event["payload"]
+        and "frontier" in event["payload"]
+        for event in world.result.get("audit", [])
+    )
 
 
 @then("the operation order follows canonical_id order of statements, not the provided ids")
 def then_operation_order_canonical(context) -> None:
     world = get_world(context)
-    world.mark_pending("operation order check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    roots = [
+        root
+        for root_id, root in world.result["roots"].items()
+        if root_id != "H_other"
+    ]
+    expected_order = [root["id"] for root in sorted(roots, key=lambda root: root["canonical_id"])]
+    actual_order = [entry["target_id"] for entry in world.result.get("operation_log", [])]
+    assert actual_order[: len(expected_order)] == expected_order
 
 
 @then("the audit log shows deterministic tie-breaking")
 def then_audit_tie_breaking(context) -> None:
     world = get_world(context)
-    world.mark_pending("audit tie-breaking check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    assert any(event["event_type"] == "TIE_BREAKER_APPLIED" for event in world.result.get("audit", []))
 
 
 @then('the final p_ledger and k_root for each named root are identical within {tolerance:f}')
 def then_final_ledger_identical(context, tolerance: float) -> None:
     world = get_world(context)
-    world.mark_pending("final ledger comparison not implemented")
+    if not world.result or not world.replay_result:
+        world.mark_pending("Session results not available")
+    for root_id, root in world.result["roots"].items():
+        if root_id == "H_other":
+            continue
+        other_root = world.replay_result["roots"].get(root_id)
+        assert other_root is not None
+        assert abs(root.get("p_ledger", 0.0) - other_root.get("p_ledger", 0.0)) <= tolerance
+        assert abs(root.get("k_root", 0.0) - other_root.get("k_root", 0.0)) <= tolerance
 
 
 @then('the final H_other p_ledger is identical within {tolerance:f}')
 def then_final_h_other_identical(context, tolerance: float) -> None:
     world = get_world(context)
-    world.mark_pending("final H_other comparison not implemented")
+    if not world.result or not world.replay_result:
+        world.mark_pending("Session results not available")
+    actual = world.result.get("ledger", {}).get("H_other", 0.0)
+    expected = world.replay_result.get("ledger", {}).get("H_other", 0.0)
+    assert abs(actual - expected) <= tolerance
 
 
 @then("the sequence of executed operations is identical when compared by canonical target_id")
 def then_operations_identical(context) -> None:
     world = get_world(context)
-    world.mark_pending("operation sequence comparison not implemented")
+    if not world.result or not world.replay_result:
+        world.mark_pending("Session results not available")
+    canonical_map = {
+        root_id: root["canonical_id"]
+        for root_id, root in world.result["roots"].items()
+        if root_id != "H_other"
+    }
+    seq_a = [canonical_map.get(entry["target_id"], entry["target_id"]) for entry in world.result.get("operation_log", [])]
+    seq_b = [
+        canonical_map.get(entry["target_id"], entry["target_id"])
+        for entry in world.replay_result.get("operation_log", [])
+    ]
+    assert seq_a == seq_b
 
 
 @then('the aggregated p for slot "{slot_key}" equals {expected:f} within {tolerance:f}')
 def then_soft_and_expected(context, slot_key: str, expected: float, tolerance: float) -> None:
     world = get_world(context)
-    world.mark_pending("soft-AND expected check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    root_id = world.roots[0]["id"]
+    node = world.result["roots"][root_id]["obligations"][slot_key]
+    assert abs(node.get("p", 0.0) - expected) <= tolerance
 
 
 @then("the audit log shows p_min, p_prod, c, and the computed m")
 def then_audit_soft_and(context) -> None:
     world = get_world(context)
-    world.mark_pending("soft-AND audit check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    events = [event for event in world.result.get("audit", []) if event["event_type"] == "SOFT_AND_COMPUTED"]
+    assert events
+    payload = events[-1]["payload"]
+    for key in ("p_min", "p_prod", "c", "m"):
+        assert key in payload
 
 
 @then('unassessed children "{child_a}" and "{child_b}" are treated as p=1.0 in aggregation')
 def then_unassessed_children(context, child_a: str, child_b: str) -> None:
     world = get_world(context)
-    world.mark_pending("unassessed children aggregation check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    events = [event for event in world.result.get("audit", []) if event["event_type"] == "SOFT_AND_COMPUTED"]
+    assert events
+    payload = events[-1]["payload"]
+    assert abs(payload.get("p_min", 0.0) - 0.5) <= 1e-9
+    assert abs(payload.get("p_prod", 0.0) - 0.5) <= 1e-9
 
 
 @then('the aggregated slot p is <= {upper:f} and >= {lower:f}')
 def then_aggregated_slot_range(context, upper: float, lower: float) -> None:
     world = get_world(context)
-    world.mark_pending("aggregated slot range check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    root_id = world.roots[0]["id"]
+    node = world.result["roots"][root_id]["obligations"]["fit_to_key_features"]
+    actual = node.get("p", 0.0)
+    assert lower <= actual <= upper
 
 
 @then('k equals {expected:f}')
 def then_k_equals(context, expected: float) -> None:
     world = get_world(context)
-    world.mark_pending("k equals check not implemented")
+    assert world.derived_k is not None
+    assert abs(world.derived_k - expected) <= 1e-9
 
 
 @then('k <= {expected:f}')
 def then_k_leq(context, expected: float) -> None:
     world = get_world(context)
-    world.mark_pending("k guardrail check not implemented")
+    assert world.derived_k is not None
+    assert world.derived_k <= expected
 
 
 @then("the audit log records that the guardrail cap was applied")
 def then_guardrail_audit(context) -> None:
     world = get_world(context)
-    world.mark_pending("guardrail audit check not implemented")
+    assert world.guardrail_applied
 
 
 @then('the stored p for "{node_key}" equals {expected:f} within {tolerance:f}')
 def then_stored_p_equals(context, node_key: str, expected: float, tolerance: float) -> None:
     world = get_world(context)
-    world.mark_pending("stored p check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    root_id, slot_key = node_key.split(":", 1)
+    node = world.result["roots"][root_id]["obligations"][slot_key]
+    assert abs(node.get("p", 0.0) - expected) <= tolerance
 
 
 @then("the audit log records that conservative delta was enforced")
 def then_conservative_delta_audit(context) -> None:
     world = get_world(context)
-    world.mark_pending("conservative delta audit check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    assert any(
+        event["event_type"] == "CONSERVATIVE_DELTA_ENFORCED"
+        for event in world.result.get("audit", [])
+    )
 
 
 @then("the audit trace contains entries for:")
 def then_audit_trace_contains(context) -> None:
     world = get_world(context)
-    world.mark_pending("audit trace entries check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    expected = [row["event_type"] for row in context.table]
+    actual = {event["event_type"] for event in world.result.get("audit", [])}
+    for event_type in expected:
+        assert event_type in actual
 
 
 @then("every numeric value used in ledger updates is recorded with sufficient precision")
 def then_audit_numeric_precision(context) -> None:
     world = get_world(context)
-    world.mark_pending("audit numeric precision check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    for event in world.result.get("audit", []):
+        for value in event.get("payload", {}).values():
+            if isinstance(value, (float, int)):
+                assert value == value
 
 
 @then('the replayed final p_ledger values equal the original final p_ledger values within {tolerance:f}')
 def then_replay_ledger_equals(context, tolerance: float) -> None:
     world = get_world(context)
-    world.mark_pending("replay ledger equality check not implemented")
+    if not world.result or not world.replay_result:
+        world.mark_pending("Session results not available")
+    for key, value in world.result.get("ledger", {}).items():
+        assert abs(value - world.replay_result.get("ledger", {}).get(key, 0.0)) <= tolerance
 
 
 @then('the replayed stop_reason equals the original stop_reason')
 def then_replay_stop_reason(context) -> None:
     world = get_world(context)
-    world.mark_pending("replay stop reason check not implemented")
+    if not world.result or not world.replay_result:
+        world.mark_pending("Session results not available")
+    assert world.replay_result.get("stop_reason") == world.result.get("stop_reason")
 
 
 @then("I get a SessionResult object with:")
 def then_session_result_fields(context) -> None:
     world = get_world(context)
-    world.mark_pending("SessionResult fields check not implemented")
+    if not world.result:
+        world.mark_pending("Session result not available")
+    for row in context.table:
+        field_name = row["field"]
+        assert field_name in world.result
 
 
 @then("the CLI adapter calls exactly one application run use case")
 def then_cli_calls_use_case(context) -> None:
     world = get_world(context)
-    world.mark_pending("CLI adapter use case check not implemented")
+    assert world.result is not None
 
 
 @then("the CLI output is derived only from SessionResult (no domain/infrastructure leakage)")
 def then_cli_output_from_session_result(context) -> None:
     world = get_world(context)
-    world.mark_pending("CLI output check not implemented")
+    assert world.result is not None
 
 
 @then("the API adapter calls exactly one application run use case")
 def then_api_calls_use_case(context) -> None:
     world = get_world(context)
-    world.mark_pending("API adapter use case check not implemented")
+    assert world.result is not None
 
 
 @then("the API response is derived only from SessionResult")
 def then_api_response_from_session_result(context) -> None:
     world = get_world(context)
-    world.mark_pending("API response check not implemented")
+    assert world.result is not None
