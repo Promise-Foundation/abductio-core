@@ -85,7 +85,8 @@ class StepWorld:
         }
 
     def set_evaluator_outcome(self, node_key: str, outcome: Dict[str, Any]) -> None:
-        self.evaluator_script.setdefault("outcomes", {})[node_key] = outcome
+        normalized = node_key.strip()
+        self.evaluator_script.setdefault("outcomes", {})[normalized] = outcome
 
     def set_evaluator_outcomes(self, table: List[Dict[str, str]]) -> None:
         outcomes: Dict[str, Dict[str, Any]] = {}
@@ -93,7 +94,7 @@ class StepWorld:
             node_key = row.get("node_key") or row.get("node")
             if not node_key:
                 continue
-            outcomes[node_key] = row
+            outcomes[str(node_key).strip()] = row
         self.evaluator_script["outcomes"] = outcomes
 
     def set_rubric(self, rubric: Dict[str, int]) -> None:
@@ -159,11 +160,15 @@ class StepWorld:
             if len(parts) == 2:
                 run_count = int(parts[1])
             else:
-                run_target = parts[1]
-                run_count = int(parts[2])
+                run_target = ":".join(parts[1:-1])
+                run_count = int(parts[-1])
         else:
             self.mark_pending(f"Engine execution not implemented for mode: {mode}")
             return
+
+        if roots:
+            for root in roots:
+                self._ensure_required_slots(root.get("id"))
 
         session_request = self._build_request(
             claim,
@@ -256,6 +261,21 @@ class StepWorld:
             slot_k_min=self.decomposer_script.get("slot_k_min"),
             slot_initial_p=self.decomposer_script.get("slot_initial_p"),
         )
+
+    def _ensure_required_slots(self, root_id: Optional[str]) -> None:
+        if not root_id:
+            return
+        if not self.required_slots:
+            return
+        scope = self.decomposer_script.setdefault("scope_roots", [])
+        if scope == "all":
+            return
+        if not isinstance(scope, list):
+            scope = []
+            self.decomposer_script["scope_roots"] = scope
+        if any(row.get("root_id") == root_id for row in scope):
+            return
+        scope.append({"root_id": root_id})
 
     def _build_deps(self) -> RunSessionDeps:
         evaluator = DeterministicEvaluator(self.evaluator_script)

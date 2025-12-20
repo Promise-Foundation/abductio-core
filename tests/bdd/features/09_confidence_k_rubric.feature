@@ -5,10 +5,11 @@ Feature: Confidence k rubric mapping and guardrails
 
   Scenario Outline: Rubric totals map to k as specified
     Given a deterministic evaluator that returns rubric:
-      | A | <A> |
-      | B | <B> |
-      | C | <C> |
-      | D | <D> |
+      | key | value |
+      | A   | <A>   |
+      | B   | <B>   |
+      | C   | <C>   |
+      | D   | <D>   |
     When the engine derives k from the rubric
     Then k equals <k_expected>
 
@@ -22,10 +23,11 @@ Feature: Confidence k rubric mapping and guardrails
 
   Scenario: Guardrail cap is applied when any check is zero
     Given a deterministic evaluator returns:
-      | A | 2 |
-      | B | 2 |
-      | C | 2 |
-      | D | 0 |
+      | key | value |
+      | A   | 2     |
+      | B   | 2     |
+      | C   | 2     |
+      | D   | 0     |
     When the engine derives k from the rubric
     Then k <= 0.55
     And the audit log records that the guardrail cap was applied

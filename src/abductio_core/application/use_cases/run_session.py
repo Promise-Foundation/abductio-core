@@ -341,7 +341,11 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
         previous_p = node.p
         proposed_p = float(outcome.get("p", previous_p))
         evidence_refs = outcome.get("evidence_refs", "")
-        refs = [ref for ref in str(evidence_refs).split(",") if ref] if evidence_refs != "(empty)" else []
+        refs_text = str(evidence_refs).strip()
+        if not refs_text or refs_text == "(empty)":
+            refs = []
+        else:
+            refs = [ref.strip() for ref in refs_text.split(",") if ref.strip()]
         if not refs:
             delta = max(min(proposed_p - previous_p, 0.05), -0.05)
             proposed_p = previous_p + delta

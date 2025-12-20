@@ -11,11 +11,12 @@ Feature: Evaluator contract enforcement (conservative update with no evidence_re
     Given a scoped root "H1"
     And slot node "H1:feasibility" has initial p = 1.0
     And a deterministic evaluator that attempts to set for node "H1:feasibility":
-      | p | 0.20 |
-      | A | 2    |
-      | B | 2    |
-      | C | 2    |
-      | D | 2    |
+      | key           | value   |
+      | p             | 0.20    |
+      | A             | 2       |
+      | B             | 2       |
+      | C             | 2       |
+      | D             | 2       |
       | evidence_refs | (empty) |
     And credits 1
     When I run the engine for exactly 1 evaluation targeting "H1:feasibility"
@@ -26,12 +27,13 @@ Feature: Evaluator contract enforcement (conservative update with no evidence_re
     Given a scoped root "H1"
     And slot node "H1:feasibility" has initial p = 1.0
     And a deterministic evaluator that returns for node "H1:feasibility":
-      | p | 0.20 |
-      | A | 2    |
-      | B | 2    |
-      | C | 2    |
-      | D | 2    |
-      | evidence_refs | ref1 |
+      | key           | value |
+      | p             | 0.20  |
+      | A             | 2     |
+      | B             | 2     |
+      | C             | 2     |
+      | D             | 2     |
+      | evidence_refs | ref1  |
     And credits 1
     When I run the engine for exactly 1 evaluation targeting "H1:feasibility"
     Then the stored p for "H1:feasibility" equals 0.20 within 1e-9

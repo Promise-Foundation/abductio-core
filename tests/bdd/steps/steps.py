@@ -17,14 +17,18 @@ def get_world(context) -> StepWorld:
 def table_key_values(table) -> Dict[str, str]:
     pairs: Dict[str, str] = {}
     for row in table:
-        key = row.cells[0]
-        value = row.cells[1]
+        key = row.cells[0].strip()
+        value = row.cells[1].strip()
         pairs[key] = value
     return pairs
 
 
 def table_rows(table) -> List[Dict[str, str]]:
-    return [dict(row.items()) for row in table]
+    rows = []
+    for row in table:
+        cleaned = {key.strip(): value.strip() for key, value in row.items()}
+        rows.append(cleaned)
+    return rows
 
 
 def _ensure_root(world: StepWorld, root_id: str) -> None:
@@ -63,6 +67,14 @@ def _parse_numeric_expr(value: str) -> float:
     for part in parts:
         result *= float(part)
     return result
+
+
+def _rubric_from_table(table) -> Dict[str, int]:
+    data = table_key_values(table)
+    headings = list(getattr(table, "headings", []) or [])
+    if len(headings) == 2 and headings[0] in {"A", "B", "C", "D"}:
+        data.setdefault(headings[0], headings[1])
+    return {key: int(value) for key, value in data.items() if key in {"A", "B", "C", "D"}}
 
 
 @given("default config")
@@ -155,12 +167,22 @@ def given_deterministic_evaluator_outcomes(context) -> None:
 @given("a deterministic evaluator that returns")
 def given_deterministic_evaluator_returns(context) -> None:
     world = get_world(context)
+    if all(len(row.cells) == 2 for row in context.table) and all(
+        row.cells[0] in {"A", "B", "C", "D"} for row in context.table
+    ):
+        world.set_rubric(_rubric_from_table(context.table))
+        return
     world.set_evaluator_outcomes(table_rows(context.table))
 
 
 @given("a deterministic evaluator returns")
 def given_deterministic_evaluator_returns_alt(context) -> None:
     world = get_world(context)
+    if all(len(row.cells) == 2 for row in context.table) and all(
+        row.cells[0] in {"A", "B", "C", "D"} for row in context.table
+    ):
+        world.set_rubric(_rubric_from_table(context.table))
+        return
     world.set_evaluator_outcomes(table_rows(context.table))
 
 
@@ -173,7 +195,7 @@ def given_deterministic_evaluator_attempts(context, node_key: str) -> None:
 @given("a deterministic evaluator that returns rubric")
 def given_deterministic_evaluator_rubric(context) -> None:
     world = get_world(context)
-    world.set_rubric({key: int(value) for key, value in table_key_values(context.table).items()})
+    world.set_rubric(_rubric_from_table(context.table))
 
 
 @given("a deterministic evaluator with at least one evaluation outcome")
@@ -884,14 +906,19 @@ def then_guardrail_audit(context) -> None:
     assert world.guardrail_applied
 
 
-@then('the stored p for "{node_key}" equals {expected:f} within {tolerance:f}')
-def then_stored_p_equals(context, node_key: str, expected: float, tolerance: float) -> None:
+@then('the stored p for "{node_key}" equals {expected} within {tolerance}')
+def then_stored_p_equals(context, node_key: str, expected: str, tolerance: str) -> None:
     world = get_world(context)
     if not world.result:
         world.mark_pending("Session result not available")
+    expected_value = float(expected)
+    tolerance_value = float(tolerance)
     root_id, slot_key = node_key.split(":", 1)
     node = world.result["roots"][root_id]["obligations"][slot_key]
-    assert abs(node.get("p", 0.0) - expected) <= tolerance
+    actual = node.get("p", 0.0)
+    assert abs(actual - expected_value) <= tolerance_value, (
+        f"expected p={expected_value} +/- {tolerance_value}, got {actual}"
+    )
 
 
 @then("the audit log records that conservative delta was enforced")
