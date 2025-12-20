@@ -23,10 +23,16 @@ def test_e2e_llm_integration_smoke_realistic_usage() -> None:
 
     model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
     client = OpenAIJsonClient(model=model, temperature=0.0)
+    root_statements = {"H1": "Mechanism A", "H2": "Mechanism B"}
 
     deps = RunSessionDeps(
-        evaluator=OpenAIEvaluatorPort(client),
-        decomposer=OpenAIDecomposerPort(client, required_slots_hint=["feasibility"]),
+        evaluator=OpenAIEvaluatorPort(client, claim="E2E smoke: abductio-core with real LLM ports", root_statements=root_statements),
+        decomposer=OpenAIDecomposerPort(
+            client,
+            required_slots_hint=["feasibility"],
+            claim="E2E smoke: abductio-core with real LLM ports",
+            root_statements=root_statements,
+        ),
         audit_sink=_InMemoryAuditSink(),
     )
 

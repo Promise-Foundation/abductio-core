@@ -1,12 +1,11 @@
 from __future__ import annotations
 
+import importlib
 import json
 import os
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
-
-from openai import OpenAI
+from typing import Any, Dict, List, Optional, Tuple
 
 
 def _first_text(response: Any) -> str:
@@ -46,7 +45,14 @@ class OpenAIJsonClient:
         key = self.api_key or os.getenv("OPENAI_API_KEY")
         if not key:
             raise RuntimeError("OPENAI_API_KEY is required")
-        self._client = OpenAI(api_key=key, timeout=self.timeout_s)
+        try:
+            openai_mod = importlib.import_module("openai")
+        except Exception as exc:
+            raise RuntimeError("openai package is required") from exc
+        openai_cls = getattr(openai_mod, "OpenAI", None)
+        if openai_cls is None:
+            raise RuntimeError("openai package is required")
+        self._client = openai_cls(api_key=key, timeout=self.timeout_s)
 
     def complete_json(self, *, system: str, user: str) -> Dict[str, Any]:
         last_exc: Optional[Exception] = None
@@ -155,9 +161,15 @@ def _validate_slot_decomposition(out: Dict[str, Any]) -> None:
 class OpenAIDecomposerPort:
     client: OpenAIJsonClient
     required_slots_hint: List[str]
+    claim: Optional[str] = None
+    root_statements: Optional[Dict[str, str]] = None
     default_coupling: float = 0.80
 
     def decompose(self, target_id: str) -> Dict[str, Any]:
+        root_id, slot_key, child_id = _parse_node_key(target_id)
+        root_statement = ""
+        if root_id and self.root_statements:
+            root_statement = self.root_statements.get(root_id, "")
         if ":" in target_id:
             system = (
                 "You are the ABDUCTIO MVP decomposer.\n"
@@ -174,10 +186,21 @@ class OpenAIDecomposerPort:
                 "  ]\n"
                 "}\n"
                 "Constraints:\n"
+                "- Use type AND unless explicitly instructed otherwise.\n"
                 "- Prefer NEC children.\n"
                 "- Keep statements concrete and necessary-condition-like.\n"
             )
-            user = json.dumps({"task": "decompose_slot", "target_id": target_id, "preferred_type": "AND"})
+            user = json.dumps(
+                {
+                    "task": "decompose_slot",
+                    "target_id": target_id,
+                    "root_id": root_id,
+                    "root_statement": root_statement,
+                    "slot_key": slot_key,
+                    "claim": self.claim or "",
+                    "preferred_type": "AND",
+                }
+            )
             out = self.client.complete_json(system=system, user=user)
 
             if not isinstance(out, dict):
@@ -202,7 +225,16 @@ class OpenAIDecomposerPort:
             "Task: scope a ROOT into required template slot statements.\n"
             "Return {\"ok\": true, <slot>_statement: <string>, ...}.\n"
         )
-        user = json.dumps({"task": "scope_root", "target_id": target_id, "required_slots": self.required_slots_hint})
+        user = json.dumps(
+            {
+                "task": "scope_root",
+                "target_id": target_id,
+                "root_id": root_id,
+                "root_statement": root_statement,
+                "claim": self.claim or "",
+                "required_slots": self.required_slots_hint,
+            }
+        )
         out = self.client.complete_json(system=system, user=user)
         if not isinstance(out, dict):
             out = {}
@@ -215,8 +247,14 @@ class OpenAIDecomposerPort:
 @dataclass
 class OpenAIEvaluatorPort:
     client: OpenAIJsonClient
+    claim: Optional[str] = None
+    root_statements: Optional[Dict[str, str]] = None
 
     def evaluate(self, node_key: str) -> Dict[str, Any]:
+        root_id, slot_key, child_id = _parse_node_key(node_key)
+        root_statement = ""
+        if root_id and self.root_statements:
+            root_statement = self.root_statements.get(root_id, "")
         system = (
             "You are an evaluator for ABDUCTIO MVP.\n"
             "Return ONLY a single JSON object matching:\n"
@@ -229,9 +267,28 @@ class OpenAIEvaluatorPort:
             "  \"evidence_refs\": \"ref1\" (non-empty)\n"
             "}\n"
         )
-        user = json.dumps({"task": "evaluate", "node_key": node_key})
+        user = json.dumps(
+            {
+                "task": "evaluate",
+                "node_key": node_key,
+                "root_id": root_id,
+                "root_statement": root_statement,
+                "slot_key": slot_key,
+                "child_id": child_id,
+                "claim": self.claim or "",
+            }
+        )
         out = self.client.complete_json(system=system, user=user)
         if not isinstance(out, dict):
             raise RuntimeError("LLM evaluation is not an object")
         _validate_evaluation(out)
         return out
+
+
+def _parse_node_key(node_key: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    parts = node_key.split(":")
+    if len(parts) == 1:
+        return node_key, None, None
+    if len(parts) == 2:
+        return parts[0], parts[1], None
+    return parts[0], parts[1], parts[2]

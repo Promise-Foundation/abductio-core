@@ -1,0 +1,587 @@
+<h1 id="abstract">Abstract</h1>
+<p>ABDUCTIO MVP is a lightweight methodology for evaluating a mutually
+exclusive, collectively exhaustive (MECE) set of hypotheses under strict
+resource constraints. It is designed for domains in which one hypothesis
+may appear "far-fetched" yet plausibly correct, and where common
+reasoning failures arise from asymmetric scrutiny: evaluators decompose
+the focal hypothesis into many requirements while leaving rivals vague
+and atomic, allowing rivals to win by default.</p>
+<p>ABDUCTIO MVP eliminates focal privilege and enforces
+<strong>permutation invariance</strong>: the output assigned to any
+hypothesis is independent of which hypothesis is chosen as a seed or
+listed first. The approach combines (i) stand-alone, well-defined
+hypotheses (no complement bundles), (ii) a fixed obligation template so
+each hypothesis must “pay the same kind of explanatory rent,” (iii) a
+deterministic, seed-invariant credit allocation policy, and (iv) an
+auditable ledger update rule with an explicit open-world “Other”
+absorber.</p>
+<p>The result is a publication-ready, implementation-ready framework
+that a software engineer can implement directly without EVSI
+calculations, Bayesian machinery, or complex statistical
+assumptions.</p>
+<h1 id="motivation-and-problem">1. Motivation and Problem</h1>
+<p>Many controversial evaluations fail for a structural reason:</p>
+<ul>
+<li>Hypothesis <span class="math inline"><em>H</em><sup>*</sup></span>
+(often “far-fetched”) is decomposed into multiple subclaims.</li>
+<li>Rival hypotheses <span
+class="math inline"><em>R</em><sub><em>i</em></sub></span> remain broad
+or underspecified.</li>
+<li>Evidence undermining one subclaim of <span
+class="math inline"><em>H</em><sup>*</sup></span> shifts weight to
+rivals.</li>
+<li>Rivals gain weight not because they are supported, but because they
+were not required to articulate necessary commitments.</li>
+</ul>
+<p>This is not merely a cognitive bias (“argument from incredulity”)—it
+is also a <strong>systems design</strong> failure. If the procedure
+taxes some hypotheses with specificity and not others, it bakes in
+unfairness.</p>
+<p>ABDUCTIO MVP addresses this by requiring:</p>
+<ol>
+<li>every hypothesis to be defined as a stand-alone mechanism, and</li>
+<li>every hypothesis to be evaluated under the same obligation template
+and the same credit schedule, independent of ordering.</li>
+</ol>
+<h1 id="core-requirement-permutation-invariance">2. Core Requirement:
+Permutation Invariance</h1>
+<h2 id="informal-statement">2.1 Informal statement</h2>
+<p>Given the same hypothesis set, the same evidence, and the same credit
+budget, the final <span
+class="math inline">(<em>p</em>, <em>k</em>)</span> assigned to any
+hypothesis must not depend on:</p>
+<ul>
+<li>which hypothesis was chosen as “focal,”</li>
+<li>the order hypotheses are listed,</li>
+<li>the order evaluation steps are printed.</li>
+</ul>
+<h2 id="formal-statement">2.2 Formal statement</h2>
+<p>Let <span
+class="math inline"><em>H</em> = {<em>h</em><sub>1</sub>, …, <em>h</em><sub><em>n</em></sub>, <em>h</em><sub>other</sub>}</span>
+be a MECE set (named hypotheses plus a catch-all Other). Let an engine
+<span class="math inline"><em>F</em></span> map: <span
+class="math display"><em>F</em>(<em>H</em>, <em>E</em>, <em>B</em>, <em>θ</em>) ↦ {(<em>p</em>(<em>h</em><sub><em>i</em></sub>), <em>k</em>(<em>h</em><sub><em>i</em></sub>))}<sub><em>i</em> = 1</sub><sup><em>n</em></sup> ∪ (<em>p</em>(<em>h</em><sub>other</sub>), <em>k</em>(<em>h</em><sub>other</sub>))</span>
+where <span class="math inline"><em>E</em></span> is evidence, <span
+class="math inline"><em>B</em></span> a credit budget, and <span
+class="math inline"><em>θ</em></span> configuration parameters.</p>
+<p>Permutation invariance requires that for any permutation <span
+class="math inline"><em>π</em></span> of the <strong>named</strong>
+hypotheses, <span
+class="math display"><em>F</em>(<em>H</em>, <em>E</em>, <em>B</em>, <em>θ</em>) = <em>F</em>(<em>π</em>(<em>H</em>), <em>E</em>, <em>B</em>, <em>θ</em>)</span>
+up to the same renaming/reordering of outputs.</p>
+<h2 id="design-implications">2.3 Design implications</h2>
+<p>Permutation invariance forces three conditions:</p>
+<ol>
+<li><strong>Semantic independence</strong>: each hypothesis must be
+meaningful without reference to a “seed.”</li>
+<li><strong>Procedural symmetry</strong>: credit allocation and stopping
+rules must not privilege any hypothesis.</li>
+<li><strong>Determinism</strong>: tie-breaking must not depend on
+presentation order.</li>
+</ol>
+<p>ABDUCTIO MVP implements all three.</p>
+<h1 id="design-principles">3. Design Principles</h1>
+<h2 id="p1.-stand-alone-hypotheses">P1. Stand-alone hypotheses</h2>
+<p>Each named hypothesis must be describable without mentioning any
+other hypothesis. Prohibited: “NOT H1,” “some mundane explanation,” “any
+other cause,” or umbrella OR-bundles as roots.</p>
+<h2 id="p2.-mece-explicit-other">P2. MECE + explicit Other</h2>
+<p>The set of named hypotheses is intended to be mutually exclusive (ME)
+and collectively exhaustive (CE). Collective exhaustiveness is
+implemented pragmatically by always including:</p>
+<ul>
+<li><span class="math inline"><em>H</em><sub>other</sub></span>:
+“Unknown/unmodeled explanation.”</li>
+</ul>
+<h2 id="p3.-no-free-probability">P3. No-free-probability</h2>
+<p>Listing more subcases must not increase a hypothesis’s probability.
+Decomposition clarifies structure; it does not create credence.</p>
+<h2 id="p4.-same-burdens-for-all">P4. Same burdens for all</h2>
+<p>Each hypothesis is evaluated through a fixed <strong>obligation
+template</strong> (Section 6). This prevents one hypothesis from being
+saddled with “cosmic feasibility” while rivals face only local
+plausibility checks.</p>
+<h2 id="p5.-credit-bounded-termination">P5. Credit-bounded
+termination</h2>
+<p>Only two operations exist (Evaluate, Decompose), each costing 1
+credit. The process halts by budget or by meeting confidence
+thresholds.</p>
+<h2 id="p6.-fully-auditable">P6. Fully auditable</h2>
+<p>Every update must be reproducible from logged arithmetic and rubric
+scoring. No “implicit” ledger shifts are allowed.</p>
+<h1 id="data-model">4. Data Model</h1>
+<h2 id="hypothesis-roots-and-nodes">4.1 Hypothesis roots and nodes</h2>
+<p>A hypothesis is represented as a root node with an obligation
+template and optional internal decomposition trees.</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dataclasses <span class="im">import</span> dataclass, field</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> typing <span class="im">import</span> Optional, Literal, Dict, List, Tuple</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>Role <span class="op">=</span> Literal[<span class="st">&quot;NEC&quot;</span>, <span class="st">&quot;EVID&quot;</span>]</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>DecompType <span class="op">=</span> Literal[<span class="st">&quot;AND&quot;</span>, <span class="st">&quot;OR&quot;</span>]</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>OrMode <span class="op">=</span> Literal[<span class="st">&quot;EXCLUSIVE&quot;</span>, <span class="st">&quot;INCLUSIVE&quot;</span>]</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>Scope <span class="op">=</span> Literal[<span class="st">&quot;LOCAL_ONLY&quot;</span>, <span class="st">&quot;GLOBAL_TO_TEMPLATE_SLOT&quot;</span>, <span class="st">&quot;GLOBAL_TO_ROOT&quot;</span>]</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> Node:</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    <span class="bu">id</span>: <span class="bu">str</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    statement: <span class="bu">str</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Local scores for this node (not necessarily ledger probability)</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    p: <span class="bu">float</span> <span class="op">=</span> <span class="fl">1.0</span>          <span class="co"># default neutral for NEC nodes (see §7)</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    k: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.15</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Audit</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>    k_rubric: Optional[Dict[<span class="bu">str</span>, <span class="bu">int</span>]] <span class="op">=</span> <span class="va">None</span>  <span class="co"># {&quot;A&quot;:0..2,&quot;B&quot;:0..2,&quot;C&quot;:0..2,&quot;D&quot;:0..2}</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>    factors: List[<span class="bu">str</span>] <span class="op">=</span> field(default_factory<span class="op">=</span><span class="bu">list</span>)</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>    mind_change: Optional[<span class="bu">str</span>] <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>    evidence_refs: List[<span class="bu">str</span>] <span class="op">=</span> field(default_factory<span class="op">=</span><span class="bu">list</span>)</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Decomposition</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>    role: Optional[Role] <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>    children: Dict[<span class="bu">str</span>, <span class="st">&quot;Node&quot;</span>] <span class="op">=</span> field(default_factory<span class="op">=</span><span class="bu">dict</span>)</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>    decomp_type: Optional[DecompType] <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>    or_mode: Optional[OrMode] <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>    <span class="co"># AND coupling for NEC children (pragmatic dependence weight)</span></span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>    coupling: Optional[<span class="bu">float</span>] <span class="op">=</span> <span class="va">None</span>  <span class="co"># one of {0.20, 0.50, 0.80, 0.95}</span></span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Accounting</span></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>    credits_spent: <span class="bu">int</span> <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>    status: Optional[<span class="bu">str</span>] <span class="op">=</span> <span class="va">None</span>      <span class="co"># &quot;SCOPED&quot;, &quot;UNSCOPED&quot;</span></span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span></span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> RootHypothesis:</span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a>    <span class="bu">id</span>: <span class="bu">str</span></span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a>    statement: <span class="bu">str</span></span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a>    exclusion_clause: <span class="bu">str</span>  <span class="co"># one line: what makes this not any other root</span></span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Ledger probability (MECE bookkeeping)</span></span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a>    p_ledger: <span class="bu">float</span></span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a>    k_root: <span class="bu">float</span> <span class="op">=</span> <span class="fl">0.15</span></span>
+<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Obligation slots (fixed template; §6)</span></span>
+<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a>    obligations: Dict[<span class="bu">str</span>, Node] <span class="op">=</span> field(default_factory<span class="op">=</span><span class="bu">dict</span>)</span>
+<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Audit</span></span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a>    credits_spent: <span class="bu">int</span> <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a><span class="at">@dataclass</span></span>
+<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> HypothesisSet:</span>
+<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a>    roots: Dict[<span class="bu">str</span>, RootHypothesis]  <span class="co"># includes &quot;H_other&quot;</span></span></code></pre></div>
+<h2 id="ledger-invariants">4.2 Ledger invariants</h2>
+<p>Let named roots be <span
+class="math inline"><em>H</em><sub>1</sub>..<em>H</em><sub><em>n</em></sub></span>
+and <span class="math inline"><em>H</em><sub>other</sub></span>.
+Maintain:</p>
+<ul>
+<li><span
+class="math inline"><em>p</em><sub>ledger</sub>(<em>h</em>) ∈ [0, 1]</span></li>
+<li><span class="math inline">$\sum_{i=1}^n p_{\text{ledger}}(H_i) +
+p_{\text{ledger}}(H_{\text{other}}) = 1$</span></li>
+</ul>
+<h1 id="cost-model">5. Cost Model</h1>
+<p>Only two operations exist.</p>
+<ul>
+<li><code class="verbatim">DECOMPOSE(target)</code> : 1 credit</li>
+<li><code class="verbatim">EVALUATE(target)</code> : 1 credit</li>
+</ul>
+<p>Everything else (aggregation, ledger enforcement, scheduling) is
+“free” but must be logged.</p>
+<h1 id="obligation-template-permutation-invariance-backbone">6.
+Obligation Template (Permutation-Invariance Backbone)</h1>
+<p>Every named root hypothesis must be evaluated through the same
+template of obligation slots. This guarantees that each hypothesis faces
+comparable explanatory burdens.</p>
+<h2 id="required-slots-default-mvp">6.1 Required slots (default
+MVP)</h2>
+<p>Each root <span
+class="math inline"><em>H</em><sub><em>i</em></sub></span> must define
+four slots:</p>
+<ol>
+<li><strong>Feasibility (general)</strong> [NEC]
+<ul>
+<li>The mechanism is possible in principle.</li>
+</ul></li>
+<li><strong>Availability (context)</strong> [NEC]
+<ul>
+<li>The mechanism is present/available in the specific
+time/place/context.</li>
+</ul></li>
+<li><strong>Fit to key features</strong> [NEC]
+<ul>
+<li>The mechanism explains the core reported observations better than at
+least one competitor.</li>
+</ul></li>
+<li><strong>Defeater resistance</strong> [NEC]
+<ul>
+<li>The strongest competitor-specific defeater does not apply.</li>
+</ul></li>
+</ol>
+<p>These are expressed as NEC nodes. Additional EVID nodes are allowed
+but may not be used to inflate probability.</p>
+<h2 id="template-customization">6.2 Template customization</h2>
+<p>Implementations may add slots, but must:</p>
+<ul>
+<li>apply the same slots to all named roots, and</li>
+<li>keep total slots small (4–7 recommended).</li>
+</ul>
+<h2 id="why-this-matters">6.3 Why this matters</h2>
+<p>Without a template, decomposition can be weaponized: one hypothesis
+can be loaded with “universal feasibility” while rivals get only vague
+local stories. Template parity removes this asymmetry.</p>
+<h1 id="semantics-of-p-within-trees-no-free-probability">7. Semantics of
+p within trees (“No-free-probability”)</h1>
+<p>ABDUCTIO MVP distinguishes <strong>ledger probability</strong> from
+<strong>internal node p</strong>:</p>
+<ul>
+<li><span
+class="math inline"><em>p</em><sub>ledger</sub>(<em>H</em><sub><em>i</em></sub>)</span>:
+MECE bookkeeping probability over roots.</li>
+<li><span class="math inline"><em>p</em>(NEC node)</span>: a
+<strong>requirement-satisfaction score</strong> for the obligation slot,
+interpreted as: “How likely is it that this necessary condition is
+satisfied, given current evidence and assumptions?”</li>
+</ul>
+<h2 id="neutral-defaults">7.1 Neutral defaults</h2>
+<p>To prevent “conjunction crushing by listing,” unassessed NEC nodes
+are neutral:</p>
+<ul>
+<li>NEC nodes initialize at <span
+class="math inline"><em>p</em> = 1.0</span> (neutral multiplier)</li>
+<li>with low confidence <span
+class="math inline"><em>k</em> = 0.15</span></li>
+</ul>
+<p>EVID nodes may initialize at <span
+class="math inline"><em>p</em> = 0.5</span> (uninformative) and <span
+class="math inline"><em>k</em> = 0.15</span>.</p>
+<h2 id="consequence">7.2 Consequence</h2>
+<p>Decomposition cannot lower a hypothesis merely by adding structure.
+Only evaluated requirements can reduce the multiplier.</p>
+<h1 id="confidence-k-rubric-and-mapping">8. Confidence k: Rubric and
+Mapping</h1>
+<p>Confidence <span class="math inline"><em>k</em></span> is the
+stability/robustness of a credence estimate under reasonable
+re-checking.</p>
+<h2 id="rubric-02-each">8.1 Rubric (0–2 each)</h2>
+<p>A: Evidence Traceability B: Cross-Validation C: Sensitivity to
+Assumptions D: Adversarial Resilience</p>
+<p>Total <span
+class="math inline"><em>T</em> = <em>A</em> + <em>B</em> + <em>C</em> + <em>D</em></span>
+maps to:</p>
+<ul>
+<li>0–1 → 0.15</li>
+<li>2–3 → 0.35</li>
+<li>4–5 → 0.55</li>
+<li>6–7 → 0.75</li>
+<li>8 → 0.90</li>
+</ul>
+<p>Guardrail: if any check = 0, cap <span
+class="math inline"><em>k</em> ≤ 0.55</span>.</p>
+<h2 id="root-confidence">8.2 Root confidence</h2>
+<p>Root confidence <span
+class="math inline"><em>k</em><sub>root</sub></span> is the minimum
+<span class="math inline"><em>k</em></span> over assessed NEC slots
+(conservative), optionally capped if UNSCOPED (Section 10).</p>
+<h1 id="decomposition-rules">9. Decomposition Rules</h1>
+<h2 id="root-scoping-is-mandatory">9.1 Root scoping is mandatory</h2>
+<p>All named roots must be decomposed into the obligation template
+before any root can be accepted as “well-scrutinized.”</p>
+<h2 id="additional-decomposition-within-slots-optional">9.2 Additional
+decomposition within slots (optional)</h2>
+<p>Each slot node may be decomposed further (2–5 children) when its
+confidence is below threshold and credits remain.</p>
+<h2 id="coupling-for-and-nodes-within-a-slot">9.3 Coupling for AND nodes
+(within a slot)</h2>
+<p>When decomposing a slot into an AND of NEC children, choose coupling
+<span class="math inline"><em>c</em> ∈ {0.20, 0.50, 0.80, 0.95}</span>.
+Interpretation: pragmatic weight toward bottlenecking (min) vs
+independence (product), not a statistical coefficient.</p>
+<p>Soft-AND for assessed children: <span
+class="math display"><em>m</em> = <em>c</em> ⋅ <em>p</em><sub>min</sub> + (1 − <em>c</em>) ⋅ <em>p</em><sub>∏</sub></span>
+where <span class="math inline"><em>p</em><sub>min</sub></span> and
+<span class="math inline"><em>p</em><sub>∏</sub></span> are computed
+over assessed NEC children (unassessed treated as 1.0).</p>
+<h1 id="anti-vagueness-unscoped-rule">10. Anti-Vagueness (UNSCOPED
+rule)</h1>
+<p>A mechanism-like hypothesis must be able to state concrete necessary
+commitments.</p>
+<h2 id="rule-root-level">Rule (root level)</h2>
+<p>If a named root cannot instantiate the obligation template with
+meaningful NEC statements, it is marked UNSCOPED and:</p>
+<ul>
+<li>cap <span
+class="math inline"><em>k</em><sub>root</sub> ≤ 0.40</span>,</li>
+<li>it remains in the evaluation schedule until it becomes SCOPED or
+credits exhaust.</li>
+</ul>
+<h2 id="rule-slot-level">Rule (slot level)</h2>
+<p>If a slot cannot be decomposed into at least 1 meaningful NEC
+statement, cap that slot’s <span
+class="math inline"><em>k</em> ≤ 0.40</span>.</p>
+<p>This prevents “winning by labels.”</p>
+<h1 id="aggregation-from-obligations-to-root-proposal">11. Aggregation:
+From obligations to root proposal</h1>
+<p>Let a root <span
+class="math inline"><em>H</em><sub><em>i</em></sub></span> have base
+ledger probability <span
+class="math inline"><em>p</em><sub>base</sub> = <em>p</em><sub>ledger</sub>(<em>H</em><sub><em>i</em></sub>)</span>
+at the time it is scoped (template instantiated).</p>
+<p>For each NEC slot <span class="math inline"><em>s</em></span>, let
+its current satisfaction score be <span
+class="math inline"><em>p</em><sub><em>s</em></sub> ∈ [0, 1]</span>.
+Compute a <strong>root multiplier</strong>: <span
+class="math display"><em>m</em><sub><em>i</em></sub> = ∏<sub><em>s</em> ∈ slots</sub><em>p</em><sub><em>s</em></sub></span>
+but crucially, because unassessed slots start at <span
+class="math inline"><em>p</em><sub><em>s</em></sub> = 1.0</span>, this
+multiplier only decreases when a slot is actually evaluated and found
+wanting.</p>
+<p>Then propose a new root probability: <span
+class="math display"><em>p</em><sub>prop</sub>(<em>H</em><sub><em>i</em></sub>) = clip(<em>p</em><sub>base</sub> ⋅ <em>m</em><sub><em>i</em></sub>, 0, 1)</span></p>
+<h2 id="notes">Notes</h2>
+<ul>
+<li>This is intentionally conservative: penalties arise from discovered
+weaknesses, not from the mere existence of multiple requirements.</li>
+<li>Alternative within-slot AND aggregation can be used to compute each
+<span class="math inline"><em>p</em><sub><em>s</em></sub></span>; the
+above treats the template as a product across slots (because these are
+distinct necessary obligations).</li>
+</ul>
+<h1 id="ledger-update-with-other-absorber">12. Ledger Update with Other
+Absorber</h1>
+<p>Ledger updates must be stable and auditable.</p>
+<h2 id="damping">12.1 Damping</h2>
+<p>After computing <span
+class="math inline"><em>p</em><sub>prop</sub>(<em>H</em><sub><em>i</em></sub>)</span>
+for any root, update: <span
+class="math display"><em>p</em><sub>ledger</sub><sup>′</sup>(<em>H</em><sub><em>i</em></sub>) = (1 − <em>α</em>) <em>p</em><sub>ledger</sub>(<em>H</em><sub><em>i</em></sub>) + <em>α</em> <em>p</em><sub>prop</sub>(<em>H</em><sub><em>i</em></sub>)</span>
+with <span class="math inline"><em>α</em> ∈ (0, 1]</span> (default
+0.4).</p>
+<h2 id="other-absorber-invariant">12.2 Other absorber invariant</h2>
+<p>Let <span class="math inline">$S=\sum_{i=1}^n
+p_{\text{ledger}}'(H_i)$</span> over named roots excluding Other.</p>
+<ul>
+<li>If <span class="math inline"><em>S</em> ≤ 1</span>: set <span
+class="math inline"><em>p</em><sub>ledger</sub>(<em>H</em><sub>other</sub>) = 1 − <em>S</em></span>.</li>
+<li>If <span class="math inline"><em>S</em> &gt; 1</span>: renormalize
+named roots only: <span
+class="math inline"><em>p</em><sub>ledger</sub>(<em>H</em><sub><em>i</em></sub>) = <em>p</em><sub>ledger</sub><sup>′</sup>(<em>H</em><sub><em>i</em></sub>)/<em>S</em></span>,
+set <span
+class="math inline"><em>p</em><sub>ledger</sub>(<em>H</em><sub>other</sub>) = 0</span>.</li>
+</ul>
+<p>Log <span class="math inline"><em>S</em></span> and which branch was
+taken each time.</p>
+<h1 id="scheduling-deterministic-seed-invariant-credit-allocation">13.
+Scheduling: Deterministic, Seed-Invariant Credit Allocation</h1>
+<p>Permutation invariance requires that, given identical inputs, the
+same multiset of operations be performed regardless of input
+ordering.</p>
+<p>ABDUCTIO MVP uses <strong>cycle scheduling</strong> over a
+<strong>frontier</strong> defined purely from the ledger state.</p>
+<h2 id="frontier-definition-no-focal-injection">13.1 Frontier definition
+(no focal injection)</h2>
+<p>Let leader be <span
+class="math inline"><em>H</em><sub><em>L</em></sub> = arg max <em>p</em><sub>ledger</sub>(<em>H</em>)</span>
+over named roots. Frontier: <span
+class="math display"><em>F</em> = {<em>H</em><sub><em>i</em></sub> : <em>p</em><sub>ledger</sub>(<em>H</em><sub><em>i</em></sub>) ≥ <em>p</em><sub>ledger</sub>(<em>H</em><sub><em>L</em></sub>) − <em>ε</em>}</span>
+with <span class="math inline"><em>ε</em></span> default 0.05.</p>
+<p>No “seed” or user-focal term may be unioned into frontier. (The UI
+may highlight a focal, but the engine must not change scheduling.)</p>
+<h2 id="round-robin-credit-slices">13.2 Round-robin credit slices</h2>
+<p>Within each cycle:</p>
+<ul>
+<li>iterate over hypotheses in frontier ordered by a canonical ID (e.g.,
+SHA256 of root.statement),</li>
+<li>for each hypothesis, perform exactly one operation chosen by the
+deterministic rule below,</li>
+<li>decrement credits, update ledger, continue.</li>
+</ul>
+<p>This round-robin is permutation-invariant because ordering is
+canonical, not input order.</p>
+<h2 id="deterministic-operation-choice-per-hypothesis">13.3
+Deterministic operation choice per hypothesis</h2>
+<p>For a root <span
+class="math inline"><em>H</em><sub><em>i</em></sub></span> in frontier,
+choose:</p>
+<ol>
+<li>If <span class="math inline"><em>H</em><sub><em>i</em></sub></span>
+is UNSCOPED: DECOMPOSE (attempt to scope template or slot).</li>
+<li>Else if any required slot is uninstantiated: DECOMPOSE to create
+missing slot node(s).</li>
+<li>Else pick the slot <span class="math inline"><em>s</em></span> with
+lowest <span class="math inline"><em>k</em></span> (tie-break
+canonically by node ID):
+<ul>
+<li>If slot can be decomposed and <span
+class="math inline"><em>k</em> &lt; <em>τ</em></span>:
+DECOMPOSE(slot)</li>
+<li>Else: EVALUATE(slot) or EVALUATE(slot’s most critical child)</li>
+</ul></li>
+</ol>
+<p>This ensures each frontier hypothesis is advanced comparably.</p>
+<h2 id="tie-breaking-mandatory">13.4 Tie-breaking (mandatory)</h2>
+<p>All ties are broken by canonical ID derived from the statement text
+(hash), never by input ordering.</p>
+<h1 id="stopping-conditions">14. Stopping Conditions</h1>
+<p>Stop when any holds:</p>
+<p>A) credits exhausted. B) For all hypotheses in the current
+frontier:</p>
+<ul>
+<li>root is SCOPED,</li>
+<li>all template NEC slots have <span
+class="math inline"><em>k</em> ≥ <em>τ</em></span> (or credit exhaustion
+prevents further improvement).</li>
+</ul>
+<p>C) No legal next operation exists (e.g., maximum decomposition depth
+reached and no evaluable nodes remain).</p>
+<h1
+id="evaluator-and-decomposer-interfaces-implementation-contracts">15.
+Evaluator and Decomposer Interfaces (Implementation Contracts)</h1>
+<h2 id="evaluator-contract-human-or-agent">15.1 Evaluator contract
+(human or agent)</h2>
+<p><code class="verbatim">evaluate(node, evidence)</code> returns:</p>
+<ul>
+<li>p in [0,1] (requirement-satisfaction for NEC; support score for
+EVID)</li>
+<li>rubric A–D scores and derived k</li>
+<li>1–3 short factors</li>
+<li>mind<sub>change</sub> sentence</li>
+<li>explicit assumption list if evidence is weak, each tagged with
+fragility (low/med/high)</li>
+<li>evidence<sub>refs</sub> used (may be empty)</li>
+</ul>
+<p>Constraints:</p>
+<ul>
+<li>If no evidence<sub>refs</sub>: enforce conservative p movement
+(implementation default: |Δp| &lt;= 0.05 from prior node.p)</li>
+<li>Evaluator must not reference “seed” or “focal” status.</li>
+</ul>
+<h2 id="decomposer-contract">15.2 Decomposer contract</h2>
+<p><code class="verbatim">decompose(node)</code> returns:</p>
+<ul>
+<li>2–5 children nodes, each labeled NEC or EVID</li>
+<li>decomp<sub>type</sub> AND/OR; for OR, mode EXCLUSIVE/INCLUSIVE</li>
+<li>for AND with NEC, coupling bucket c</li>
+</ul>
+<p>Constraints:</p>
+<ul>
+<li>For root hypotheses, decomposer must instantiate the obligation
+template.</li>
+<li>If cannot, mark UNSCOPED.</li>
+</ul>
+<h1 id="mvp-algorithm-pseudocode">16. MVP Algorithm (Pseudocode)</h1>
+<pre class="text"><code>inputs:
+  claim text
+  (optional) rivals list
+  credits B
+  tau, epsilon, gamma, alpha
+  canonical_id = hash(statement)
+
+initialize:
+  build named roots H1..Hn (claim + 3–5 single-mechanism rivals)
+  add H_other
+  set uniform priors: p_i=(1-gamma)/n ; p_other=gamma
+  set all k=0.15
+  set all status=UNSCOPED initially (until template instantiated)
+
+for cycle = 1.. while credits &gt; 0:
+  leader = argmax named roots by p_ledger (tie-break by canonical_id)
+  frontier F = {Hi : p_ledger(Hi) &gt;= p_ledger(leader)-epsilon}
+
+  order frontier by canonical_id
+  for Hi in F:
+    if credits == 0: break
+
+    choose operation deterministically:
+      if Hi is UNSCOPED or missing template slots:
+         DECOMPOSE(Hi)  # instantiate template if possible
+      else:
+         pick slot s with lowest k (tie-break by canonical_id)
+         if can_decompose(s) and k(s) &lt; tau:
+             DECOMPOSE(s)
+         else:
+             EVALUATE(s)
+
+    spend 1 credit
+    update credits_spent on Hi and node
+    recompute slot p_s and k_s via aggregation if needed
+    compute p_prop(Hi) = p_base(Hi) * Π_s p_s
+    apply damping to ledger p_ledger(Hi)
+    enforce Other absorber invariant
+    log every arithmetic step and invariant checks
+
+stop when stopping conditions met
+output full audit trace
+</code></pre>
+<h1 id="why-abductio-mvp-is-permutation-invariant">17. Why ABDUCTIO MVP
+is Permutation-Invariant</h1>
+<p>ABDUCTIO MVP achieves permutation invariance by construction:</p>
+<ol>
+<li>No focal injection: frontier depends only on ledger state.</li>
+<li>Canonical ordering: iteration order is defined by hash(statement),
+not by input list order.</li>
+<li>Round-robin slicing: each frontier hypothesis receives equal
+opportunity per cycle.</li>
+<li>No-free-probability semantics: decomposition cannot change ledger p;
+OR cannot inflate.</li>
+<li>Template parity: each hypothesis is evaluated under the same
+obligation slots.</li>
+<li>Deterministic tie-breaks everywhere.</li>
+</ol>
+<p>Given identical inputs, the engine performs the same operations in
+the same canonical order and produces identical outputs, independent of
+the seed.</p>
+<h1 id="practical-defaults">18. Practical Defaults</h1>
+<ul>
+<li>tau = 0.70</li>
+<li>epsilon = 0.05</li>
+<li>gamma = 0.20</li>
+<li>alpha = 0.40</li>
+<li>max<sub>children</sub> = 5</li>
+<li>coupling<sub>default</sub> = 0.80</li>
+<li>conservative delta p when no evidence: |Δp| &lt;= 0.05 per
+evaluation</li>
+</ul>
+<h1 id="limitations-and-extensions">19. Limitations and Extensions</h1>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li>This is not full Bayesian inference; it is a structured, auditable
+scoring-and-budgeting framework.</li>
+<li>Results depend on the evaluator’s discipline and evidence
+quality.</li>
+<li>MECE is approximated; <span
+class="math inline"><em>H</em><sub>other</sub></span> absorbs residual
+uncertainty.</li>
+</ul>
+<h2 id="extensions">Extensions</h2>
+<ul>
+<li>Multi-assessor panels with aggregation rules for p and k.</li>
+<li>Evidence objects with explicit likelihood impacts.</li>
+<li>Specialized decomposers per domain (medicine, security, historical
+events).</li>
+</ul>
+<h1 id="appendix-a-minimal-well-defined-hypothesis-checklist">Appendix
+A: Minimal “Well-Defined Hypothesis” Checklist</h1>
+<p>A root hypothesis must include:</p>
+<ul>
+<li>A mechanism statement (stand-alone).</li>
+<li>An exclusion clause distinguishing it from other roots.</li>
+<li>A template instantiation with NEC slots: feasibility, availability,
+fit, defeater resistance.</li>
+</ul>
+<p>If it cannot, mark UNSCOPED and cap k.</p>
+<h1 id="appendix-b-canonical-id">Appendix B: Canonical ID</h1>
+<p>Canonical ordering uses: <span
+class="math display">canonical_id(<em>h</em>) = SHA256(normalized_statement_text)</span>
+Normalization removes extra whitespace and lowercases text.</p>
+<p>This ensures permutation invariance even if input ordering
+changes.</p>
+<h1 id="appendix-c-coupling-buckets-within-slot-and">Appendix C:
+Coupling buckets (within-slot AND)</h1>
+<p>Choose c as max of:</p>
+<ul>
+<li>Evidence overlap</li>
+<li>Mechanism overlap</li>
+<li>Failure-mode overlap</li>
+</ul>
+<p>Buckets: 0.20, 0.50, 0.80, 0.95 Default 0.80 if unsure.</p>

@@ -91,24 +91,28 @@ def _rubric_from_table(table) -> Dict[str, int]:
 
 
 @given("default config")
+@given("default config:")
 def given_default_config(context) -> None:
     world = get_world(context)
     world.set_config(table_key_values(context.table))
 
 
 @given("required template slots")
+@given("required template slots:")
 def given_required_template_slots(context) -> None:
     world = get_world(context)
     world.set_required_slots(table_rows(context.table))
 
 
 @given("a hypothesis set with named roots")
+@given("a hypothesis set with named roots:")
 def given_named_roots(context) -> None:
     world = get_world(context)
     world.set_roots(table_rows(context.table))
 
 
 @given("hypothesis set A with named roots")
+@given("hypothesis set A with named roots:")
 def given_named_roots_a(context) -> None:
     world = get_world(context)
     world.set_roots_a(table_rows(context.table))
@@ -121,6 +125,7 @@ def given_named_roots_b(context) -> None:
 
 
 @given("a deterministic decomposer that will scope roots with")
+@given("a deterministic decomposer that will scope roots with:")
 def given_decomposer_scope_roots_with(context) -> None:
     world = get_world(context)
     world.set_decomposer_scope_roots(table_rows(context.table))
@@ -166,18 +171,21 @@ def given_decomposer_decompose_slot_no_coupling(context, slot_key: str, decomp_t
 
 
 @given('a deterministic evaluator that returns for node "{node_key}"')
+@given('a deterministic evaluator that returns for node "{node_key}":')
 def given_deterministic_evaluator_node(context, node_key: str) -> None:
     world = get_world(context)
     world.set_evaluator_outcome(node_key, table_key_values(context.table))
 
 
 @given("a deterministic evaluator with the following outcomes")
+@given("a deterministic evaluator with the following outcomes:")
 def given_deterministic_evaluator_outcomes(context) -> None:
     world = get_world(context)
     world.set_evaluator_outcomes(table_rows(context.table))
 
 
 @given("a deterministic evaluator that returns")
+@given("a deterministic evaluator that returns:")
 def given_deterministic_evaluator_returns(context) -> None:
     world = get_world(context)
     if all(len(row.cells) == 2 for row in context.table) and all(
@@ -189,6 +197,7 @@ def given_deterministic_evaluator_returns(context) -> None:
 
 
 @given("a deterministic evaluator returns")
+@given("a deterministic evaluator returns:")
 def given_deterministic_evaluator_returns_alt(context) -> None:
     world = get_world(context)
     if all(len(row.cells) == 2 for row in context.table) and all(
@@ -200,12 +209,14 @@ def given_deterministic_evaluator_returns_alt(context) -> None:
 
 
 @given('a deterministic evaluator that attempts to set for node "{node_key}"')
+@given('a deterministic evaluator that attempts to set for node "{node_key}":')
 def given_deterministic_evaluator_attempts(context, node_key: str) -> None:
     world = get_world(context)
     world.set_evaluator_outcome(node_key, table_key_values(context.table))
 
 
 @given("a deterministic evaluator that returns rubric")
+@given("a deterministic evaluator that returns rubric:")
 def given_deterministic_evaluator_rubric(context) -> None:
     world = get_world(context)
     world.set_rubric(_rubric_from_table(context.table))
@@ -245,6 +256,7 @@ def given_root_scoped_with_k(context, root_id: str, k_min: float) -> None:
 
 
 @given("the ledger is set to")
+@given("the ledger is set to:")
 def given_ledger_is_set(context) -> None:
     world = get_world(context)
     world.set_ledger(table_rows(context.table))
@@ -975,6 +987,7 @@ def then_conservative_delta_audit(context) -> None:
 
 
 @then("the audit trace contains entries for")
+@then("the audit trace contains entries for:")
 def then_audit_trace_contains(context) -> None:
     world = get_world(context)
     if not world.result:
@@ -1015,6 +1028,7 @@ def then_replay_stop_reason(context) -> None:
 
 
 @then("I get a SessionResult object with")
+@then("I get a SessionResult object with:")
 def then_session_result_fields(context) -> None:
     world = get_world(context)
     if not world.result:

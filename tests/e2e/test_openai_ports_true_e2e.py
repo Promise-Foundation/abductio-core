@@ -27,11 +27,17 @@ def test_e2e_openai_scopes_decomposes_evaluates_and_replays() -> None:
 
     model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
     client = OpenAIJsonClient(model=model, temperature=0.0)
+    root_statements = {"H1": "Mechanism A", "H2": "Mechanism B"}
 
     required_slots = [{"slot_key": "feasibility", "role": "NEC"}]
     deps = RunSessionDeps(
-        evaluator=OpenAIEvaluatorPort(client),
-        decomposer=OpenAIDecomposerPort(client, required_slots_hint=["feasibility"]),
+        evaluator=OpenAIEvaluatorPort(client, claim="E2E OpenAI ports", root_statements=root_statements),
+        decomposer=OpenAIDecomposerPort(
+            client,
+            required_slots_hint=["feasibility"],
+            claim="E2E OpenAI ports",
+            root_statements=root_statements,
+        ),
         audit_sink=InMemoryAudit(),
     )
 
@@ -57,6 +63,7 @@ def test_e2e_openai_scopes_decomposes_evaluates_and_replays() -> None:
     assert "ROOT_SCOPED" in event_types
     assert "SLOT_DECOMPOSED" in event_types
     assert "NODE_EVALUATED" in event_types
+    assert "SOFT_AND_COMPUTED" in event_types
     assert "DAMPING_APPLIED" in event_types
     assert "STOP_REASON_RECORDED" in event_types
 

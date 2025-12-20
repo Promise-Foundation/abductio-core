@@ -1,0 +1,29 @@
+[
+  {
+    "event_type": "SESSION_INITIALIZED",
+    "payload": {
+      "roots": ["H1", "H2", "H_other"],
+      "ledger": {"H1": 0.4, "H2": 0.4, "H_other": 0.2}
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {"op_type": "EVALUATE", "target_id": "H1:feasibility", "credits_before": 2, "credits_after": 1}
+  },
+  {
+    "event_type": "DAMPING_APPLIED",
+    "payload": {"root_id": "H1", "p_new": 0.35, "p_base": 0.4, "alpha": 0.4}
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {"op_type": "EVALUATE", "target_id": "H2:feasibility", "credits_before": 1, "credits_after": 0}
+  },
+  {
+    "event_type": "DAMPING_APPLIED",
+    "payload": {"root_id": "H2", "p_new": 0.45, "p_base": 0.4, "alpha": 0.4}
+  },
+  {
+    "event_type": "STOP_REASON_RECORDED",
+    "payload": {"stop_reason": "CREDITS_EXHAUSTED"}
+  }
+]

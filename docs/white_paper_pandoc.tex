@@ -1,0 +1,935 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\documentclass[
+]{article}
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\newenvironment{Shaded}{}{}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.49,0.56,0.16}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\BuiltInTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.53,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.56,0.13,0.00}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.73,0.13,0.13}{\textit{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.02,0.16,0.49}{#1}}
+\newcommand{\ImportTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{\textbf{#1}}}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.40,0.40,0.40}{#1}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.74,0.48,0.00}{#1}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.73,0.40,0.53}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.10,0.09,0.49}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={ABDUCTIO MVP},
+  pdfauthor={David Joseph (adaptable)},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\title{ABDUCTIO MVP}
+\usepackage{etoolbox}
+\makeatletter
+\providecommand{\subtitle}[1]{% add subtitle to \maketitle
+  \apptocmd{\@title}{\par {\large #1 \par}}{}{}
+}
+\makeatother
+\subtitle{A Permutation-Invariant, Credit-Bounded Framework for
+Symmetric Hypothesis Evaluation}
+\author{David Joseph (adaptable)}
+\date{December 19, 2025}
+
+\begin{document}
+\maketitle
+
+\section{Abstract}\label{abstract}
+
+ABDUCTIO MVP is a lightweight methodology for evaluating a mutually
+exclusive, collectively exhaustive (MECE) set of hypotheses under strict
+resource constraints. It is designed for domains in which one hypothesis
+may appear "far-fetched" yet plausibly correct, and where common
+reasoning failures arise from asymmetric scrutiny: evaluators decompose
+the focal hypothesis into many requirements while leaving rivals vague
+and atomic, allowing rivals to win by default.
+
+ABDUCTIO MVP eliminates focal privilege and enforces \textbf{permutation
+invariance}: the output assigned to any hypothesis is independent of
+which hypothesis is chosen as a seed or listed first. The approach
+combines (i) stand-alone, well-defined hypotheses (no complement
+bundles), (ii) a fixed obligation template so each hypothesis must ``pay
+the same kind of explanatory rent,'' (iii) a deterministic,
+seed-invariant credit allocation policy, and (iv) an auditable ledger
+update rule with an explicit open-world ``Other'' absorber.
+
+The result is a publication-ready, implementation-ready framework that a
+software engineer can implement directly without EVSI calculations,
+Bayesian machinery, or complex statistical assumptions.
+
+\section{1. Motivation and Problem}\label{motivation-and-problem}
+
+Many controversial evaluations fail for a structural reason:
+
+\begin{itemize}
+\tightlist
+\item
+  Hypothesis \(H^\*\) (often ``far-fetched'') is decomposed into
+  multiple subclaims.
+\item
+  Rival hypotheses \(R_i\) remain broad or underspecified.
+\item
+  Evidence undermining one subclaim of \(H^\*\) shifts weight to rivals.
+\item
+  Rivals gain weight not because they are supported, but because they
+  were not required to articulate necessary commitments.
+\end{itemize}
+
+This is not merely a cognitive bias (``argument from incredulity'')---it
+is also a \textbf{systems design} failure. If the procedure taxes some
+hypotheses with specificity and not others, it bakes in unfairness.
+
+ABDUCTIO MVP addresses this by requiring:
+
+\begin{enumerate}
+\tightlist
+\item
+  every hypothesis to be defined as a stand-alone mechanism, and
+\item
+  every hypothesis to be evaluated under the same obligation template
+  and the same credit schedule, independent of ordering.
+\end{enumerate}
+
+\section{2. Core Requirement: Permutation
+Invariance}\label{core-requirement-permutation-invariance}
+
+\subsection{2.1 Informal statement}\label{informal-statement}
+
+Given the same hypothesis set, the same evidence, and the same credit
+budget, the final \((p,k)\) assigned to any hypothesis must not depend
+on:
+
+\begin{itemize}
+\tightlist
+\item
+  which hypothesis was chosen as ``focal,''
+\item
+  the order hypotheses are listed,
+\item
+  the order evaluation steps are printed.
+\end{itemize}
+
+\subsection{2.2 Formal statement}\label{formal-statement}
+
+Let \(H=\{h_1,\dots,h_n,h_{\text{other}}\}\) be a MECE set (named
+hypotheses plus a catch-all Other). Let an engine \(F\) map: \[
+F(H,E,B,\theta) \mapsto \{(p(h_i),k(h_i))\}_{i=1}^n \cup (p(h_{\text{other}}),k(h_{\text{other}}))
+\] where \(E\) is evidence, \(B\) a credit budget, and \(\theta\)
+configuration parameters.
+
+Permutation invariance requires that for any permutation \(\pi\) of the
+\textbf{named} hypotheses, \[
+F(H,E,B,\theta) = F(\pi(H),E,B,\theta)
+\] up to the same renaming/reordering of outputs.
+
+\subsection{2.3 Design implications}\label{design-implications}
+
+Permutation invariance forces three conditions:
+
+\begin{enumerate}
+\tightlist
+\item
+  \textbf{Semantic independence}: each hypothesis must be meaningful
+  without reference to a ``seed.''
+\item
+  \textbf{Procedural symmetry}: credit allocation and stopping rules
+  must not privilege any hypothesis.
+\item
+  \textbf{Determinism}: tie-breaking must not depend on presentation
+  order.
+\end{enumerate}
+
+ABDUCTIO MVP implements all three.
+
+\section{3. Design Principles}\label{design-principles}
+
+\subsection{P1. Stand-alone
+hypotheses}\label{p1.-stand-alone-hypotheses}
+
+Each named hypothesis must be describable without mentioning any other
+hypothesis. Prohibited: ``NOT H1,'' ``some mundane explanation,'' ``any
+other cause,'' or umbrella OR-bundles as roots.
+
+\subsection{P2. MECE + explicit Other}\label{p2.-mece-explicit-other}
+
+The set of named hypotheses is intended to be mutually exclusive (ME)
+and collectively exhaustive (CE). Collective exhaustiveness is
+implemented pragmatically by always including:
+
+\begin{itemize}
+\tightlist
+\item
+  \(H_{\text{other}}\): ``Unknown/unmodeled explanation.''
+\end{itemize}
+
+\subsection{P3. No-free-probability}\label{p3.-no-free-probability}
+
+Listing more subcases must not increase a hypothesis's probability.
+Decomposition clarifies structure; it does not create credence.
+
+\subsection{P4. Same burdens for all}\label{p4.-same-burdens-for-all}
+
+Each hypothesis is evaluated through a fixed \textbf{obligation
+template} (Section 6). This prevents one hypothesis from being saddled
+with ``cosmic feasibility'' while rivals face only local plausibility
+checks.
+
+\subsection{P5. Credit-bounded
+termination}\label{p5.-credit-bounded-termination}
+
+Only two operations exist (Evaluate, Decompose), each costing 1 credit.
+The process halts by budget or by meeting confidence thresholds.
+
+\subsection{P6. Fully auditable}\label{p6.-fully-auditable}
+
+Every update must be reproducible from logged arithmetic and rubric
+scoring. No ``implicit'' ledger shifts are allowed.
+
+\section{4. Data Model}\label{data-model}
+
+\subsection{4.1 Hypothesis roots and
+nodes}\label{hypothesis-roots-and-nodes}
+
+A hypothesis is represented as a root node with an obligation template
+and optional internal decomposition trees.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{from}\NormalTok{ dataclasses }\ImportTok{import}\NormalTok{ dataclass, field}
+\ImportTok{from}\NormalTok{ typing }\ImportTok{import}\NormalTok{ Optional, Literal, Dict, List, Tuple}
+
+\NormalTok{Role }\OperatorTok{=}\NormalTok{ Literal[}\StringTok{"NEC"}\NormalTok{, }\StringTok{"EVID"}\NormalTok{]}
+\NormalTok{DecompType }\OperatorTok{=}\NormalTok{ Literal[}\StringTok{"AND"}\NormalTok{, }\StringTok{"OR"}\NormalTok{]}
+\NormalTok{OrMode }\OperatorTok{=}\NormalTok{ Literal[}\StringTok{"EXCLUSIVE"}\NormalTok{, }\StringTok{"INCLUSIVE"}\NormalTok{]}
+\NormalTok{Scope }\OperatorTok{=}\NormalTok{ Literal[}\StringTok{"LOCAL\_ONLY"}\NormalTok{, }\StringTok{"GLOBAL\_TO\_TEMPLATE\_SLOT"}\NormalTok{, }\StringTok{"GLOBAL\_TO\_ROOT"}\NormalTok{]}
+
+\AttributeTok{@dataclass}
+\KeywordTok{class}\NormalTok{ Node:}
+    \BuiltInTok{id}\NormalTok{: }\BuiltInTok{str}
+\NormalTok{    statement: }\BuiltInTok{str}
+
+    \CommentTok{\# Local scores for this node (not necessarily ledger probability)}
+\NormalTok{    p: }\BuiltInTok{float} \OperatorTok{=} \FloatTok{1.0}          \CommentTok{\# default neutral for NEC nodes (see §7)}
+\NormalTok{    k: }\BuiltInTok{float} \OperatorTok{=} \FloatTok{0.15}
+
+    \CommentTok{\# Audit}
+\NormalTok{    k\_rubric: Optional[Dict[}\BuiltInTok{str}\NormalTok{, }\BuiltInTok{int}\NormalTok{]] }\OperatorTok{=} \VariableTok{None}  \CommentTok{\# \{"A":0..2,"B":0..2,"C":0..2,"D":0..2\}}
+\NormalTok{    factors: List[}\BuiltInTok{str}\NormalTok{] }\OperatorTok{=}\NormalTok{ field(default\_factory}\OperatorTok{=}\BuiltInTok{list}\NormalTok{)}
+\NormalTok{    mind\_change: Optional[}\BuiltInTok{str}\NormalTok{] }\OperatorTok{=} \VariableTok{None}
+\NormalTok{    evidence\_refs: List[}\BuiltInTok{str}\NormalTok{] }\OperatorTok{=}\NormalTok{ field(default\_factory}\OperatorTok{=}\BuiltInTok{list}\NormalTok{)}
+
+    \CommentTok{\# Decomposition}
+\NormalTok{    role: Optional[Role] }\OperatorTok{=} \VariableTok{None}
+\NormalTok{    children: Dict[}\BuiltInTok{str}\NormalTok{, }\StringTok{"Node"}\NormalTok{] }\OperatorTok{=}\NormalTok{ field(default\_factory}\OperatorTok{=}\BuiltInTok{dict}\NormalTok{)}
+\NormalTok{    decomp\_type: Optional[DecompType] }\OperatorTok{=} \VariableTok{None}
+\NormalTok{    or\_mode: Optional[OrMode] }\OperatorTok{=} \VariableTok{None}
+
+    \CommentTok{\# AND coupling for NEC children (pragmatic dependence weight)}
+\NormalTok{    coupling: Optional[}\BuiltInTok{float}\NormalTok{] }\OperatorTok{=} \VariableTok{None}  \CommentTok{\# one of \{0.20, 0.50, 0.80, 0.95\}}
+
+    \CommentTok{\# Accounting}
+\NormalTok{    credits\_spent: }\BuiltInTok{int} \OperatorTok{=} \DecValTok{0}
+\NormalTok{    status: Optional[}\BuiltInTok{str}\NormalTok{] }\OperatorTok{=} \VariableTok{None}      \CommentTok{\# "SCOPED", "UNSCOPED"}
+
+\AttributeTok{@dataclass}
+\KeywordTok{class}\NormalTok{ RootHypothesis:}
+    \BuiltInTok{id}\NormalTok{: }\BuiltInTok{str}
+\NormalTok{    statement: }\BuiltInTok{str}
+\NormalTok{    exclusion\_clause: }\BuiltInTok{str}  \CommentTok{\# one line: what makes this not any other root}
+
+    \CommentTok{\# Ledger probability (MECE bookkeeping)}
+\NormalTok{    p\_ledger: }\BuiltInTok{float}
+\NormalTok{    k\_root: }\BuiltInTok{float} \OperatorTok{=} \FloatTok{0.15}
+
+    \CommentTok{\# Obligation slots (fixed template; §6)}
+\NormalTok{    obligations: Dict[}\BuiltInTok{str}\NormalTok{, Node] }\OperatorTok{=}\NormalTok{ field(default\_factory}\OperatorTok{=}\BuiltInTok{dict}\NormalTok{)}
+
+    \CommentTok{\# Audit}
+\NormalTok{    credits\_spent: }\BuiltInTok{int} \OperatorTok{=} \DecValTok{0}
+
+\AttributeTok{@dataclass}
+\KeywordTok{class}\NormalTok{ HypothesisSet:}
+\NormalTok{    roots: Dict[}\BuiltInTok{str}\NormalTok{, RootHypothesis]  }\CommentTok{\# includes "H\_other"}
+\end{Highlighting}
+\end{Shaded}
+
+\subsection{4.2 Ledger invariants}\label{ledger-invariants}
+
+Let named roots be \(H_1..H_n\) and \(H_{\text{other}}\). Maintain:
+
+\begin{itemize}
+\tightlist
+\item
+  \(p_{\text{ledger}}(h) \in [0,1]\)
+\item
+  \(\sum_{i=1}^n p_{\text{ledger}}(H_i) + p_{\text{ledger}}(H_{\text{other}}) = 1\)
+\end{itemize}
+
+\section{5. Cost Model}\label{cost-model}
+
+Only two operations exist.
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{DECOMPOSE(target)} : 1 credit
+\item
+  \texttt{EVALUATE(target)} : 1 credit
+\end{itemize}
+
+Everything else (aggregation, ledger enforcement, scheduling) is
+``free'' but must be logged.
+
+\section{6. Obligation Template (Permutation-Invariance
+Backbone)}\label{obligation-template-permutation-invariance-backbone}
+
+Every named root hypothesis must be evaluated through the same template
+of obligation slots. This guarantees that each hypothesis faces
+comparable explanatory burdens.
+
+\subsection{6.1 Required slots (default
+MVP)}\label{required-slots-default-mvp}
+
+Each root \(H_i\) must define four slots:
+
+\begin{enumerate}
+\tightlist
+\item
+  \textbf{Feasibility (general)} {[}NEC{]}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    The mechanism is possible in principle.
+  \end{itemize}
+\item
+  \textbf{Availability (context)} {[}NEC{]}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    The mechanism is present/available in the specific
+    time/place/context.
+  \end{itemize}
+\item
+  \textbf{Fit to key features} {[}NEC{]}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    The mechanism explains the core reported observations better than at
+    least one competitor.
+  \end{itemize}
+\item
+  \textbf{Defeater resistance} {[}NEC{]}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    The strongest competitor-specific defeater does not apply.
+  \end{itemize}
+\end{enumerate}
+
+These are expressed as NEC nodes. Additional EVID nodes are allowed but
+may not be used to inflate probability.
+
+\subsection{6.2 Template customization}\label{template-customization}
+
+Implementations may add slots, but must:
+
+\begin{itemize}
+\tightlist
+\item
+  apply the same slots to all named roots, and
+\item
+  keep total slots small (4--7 recommended).
+\end{itemize}
+
+\subsection{6.3 Why this matters}\label{why-this-matters}
+
+Without a template, decomposition can be weaponized: one hypothesis can
+be loaded with ``universal feasibility'' while rivals get only vague
+local stories. Template parity removes this asymmetry.
+
+\section{7. Semantics of p within trees
+(``No-free-probability'')}\label{semantics-of-p-within-trees-no-free-probability}
+
+ABDUCTIO MVP distinguishes \textbf{ledger probability} from
+\textbf{internal node p}:
+
+\begin{itemize}
+\tightlist
+\item
+  \(p_{\text{ledger}}(H_i)\): MECE bookkeeping probability over roots.
+\item
+  \(p(\text{NEC node})\): a \textbf{requirement-satisfaction score} for
+  the obligation slot, interpreted as: ``How likely is it that this
+  necessary condition is satisfied, given current evidence and
+  assumptions?''
+\end{itemize}
+
+\subsection{7.1 Neutral defaults}\label{neutral-defaults}
+
+To prevent ``conjunction crushing by listing,'' unassessed NEC nodes are
+neutral:
+
+\begin{itemize}
+\tightlist
+\item
+  NEC nodes initialize at \(p=1.0\) (neutral multiplier)
+\item
+  with low confidence \(k=0.15\)
+\end{itemize}
+
+EVID nodes may initialize at \(p=0.5\) (uninformative) and \(k=0.15\).
+
+\subsection{7.2 Consequence}\label{consequence}
+
+Decomposition cannot lower a hypothesis merely by adding structure. Only
+evaluated requirements can reduce the multiplier.
+
+\section{8. Confidence k: Rubric and
+Mapping}\label{confidence-k-rubric-and-mapping}
+
+Confidence \(k\) is the stability/robustness of a credence estimate
+under reasonable re-checking.
+
+\subsection{8.1 Rubric (0--2 each)}\label{rubric-02-each}
+
+A: Evidence Traceability B: Cross-Validation C: Sensitivity to
+Assumptions D: Adversarial Resilience
+
+Total \(T=A+B+C+D\) maps to:
+
+\begin{itemize}
+\tightlist
+\item
+  0--1 → 0.15
+\item
+  2--3 → 0.35
+\item
+  4--5 → 0.55
+\item
+  6--7 → 0.75
+\item
+  8 → 0.90
+\end{itemize}
+
+Guardrail: if any check = 0, cap \(k \le 0.55\).
+
+\subsection{8.2 Root confidence}\label{root-confidence}
+
+Root confidence \(k_{\text{root}}\) is the minimum \(k\) over assessed
+NEC slots (conservative), optionally capped if UNSCOPED (Section 10).
+
+\section{9. Decomposition Rules}\label{decomposition-rules}
+
+\subsection{9.1 Root scoping is
+mandatory}\label{root-scoping-is-mandatory}
+
+All named roots must be decomposed into the obligation template before
+any root can be accepted as ``well-scrutinized.''
+
+\subsection{9.2 Additional decomposition within slots
+(optional)}\label{additional-decomposition-within-slots-optional}
+
+Each slot node may be decomposed further (2--5 children) when its
+confidence is below threshold and credits remain.
+
+\subsection{9.3 Coupling for AND nodes (within a
+slot)}\label{coupling-for-and-nodes-within-a-slot}
+
+When decomposing a slot into an AND of NEC children, choose coupling
+\(c \in \{0.20,0.50,0.80,0.95\}\). Interpretation: pragmatic weight
+toward bottlenecking (min) vs independence (product), not a statistical
+coefficient.
+
+Soft-AND for assessed children: \[
+m = c \cdot p_{\min} + (1-c)\cdot p_{\prod}
+\] where \(p_{\min}\) and \(p_{\prod}\) are computed over assessed NEC
+children (unassessed treated as 1.0).
+
+\section{10. Anti-Vagueness (UNSCOPED
+rule)}\label{anti-vagueness-unscoped-rule}
+
+A mechanism-like hypothesis must be able to state concrete necessary
+commitments.
+
+\subsection{Rule (root level)}\label{rule-root-level}
+
+If a named root cannot instantiate the obligation template with
+meaningful NEC statements, it is marked UNSCOPED and:
+
+\begin{itemize}
+\tightlist
+\item
+  cap \(k_{\text{root}} \le 0.40\),
+\item
+  it remains in the evaluation schedule until it becomes SCOPED or
+  credits exhaust.
+\end{itemize}
+
+\subsection{Rule (slot level)}\label{rule-slot-level}
+
+If a slot cannot be decomposed into at least 1 meaningful NEC statement,
+cap that slot's \(k \le 0.40\).
+
+This prevents ``winning by labels.''
+
+\section{11. Aggregation: From obligations to root
+proposal}\label{aggregation-from-obligations-to-root-proposal}
+
+Let a root \(H_i\) have base ledger probability
+\(p_{\text{base}} = p_{\text{ledger}}(H_i)\) at the time it is scoped
+(template instantiated).
+
+For each NEC slot \(s\), let its current satisfaction score be
+\(p_s \in [0,1]\). Compute a \textbf{root multiplier}: \[
+m_i = \prod_{s \in \text{slots}} p_s
+\] but crucially, because unassessed slots start at \(p_s=1.0\), this
+multiplier only decreases when a slot is actually evaluated and found
+wanting.
+
+Then propose a new root probability: \[
+p_{\text{prop}}(H_i) = \mathrm{clip}(p_{\text{base}} \cdot m_i, 0, 1)
+\]
+
+\subsection{Notes}\label{notes}
+
+\begin{itemize}
+\tightlist
+\item
+  This is intentionally conservative: penalties arise from discovered
+  weaknesses, not from the mere existence of multiple requirements.
+\item
+  Alternative within-slot AND aggregation can be used to compute each
+  \(p_s\); the above treats the template as a product across slots
+  (because these are distinct necessary obligations).
+\end{itemize}
+
+\section{12. Ledger Update with Other
+Absorber}\label{ledger-update-with-other-absorber}
+
+Ledger updates must be stable and auditable.
+
+\subsection{12.1 Damping}\label{damping}
+
+After computing \(p_{\text{prop}}(H_i)\) for any root, update: \[
+p_{\text{ledger}}'(H_i) = (1-\alpha)\,p_{\text{ledger}}(H_i) + \alpha\,p_{\text{prop}}(H_i)
+\] with \(\alpha \in (0,1]\) (default 0.4).
+
+\subsection{12.2 Other absorber
+invariant}\label{other-absorber-invariant}
+
+Let \(S=\sum_{i=1}^n p_{\text{ledger}}'(H_i)\) over named roots
+excluding Other.
+
+\begin{itemize}
+\tightlist
+\item
+  If \(S \le 1\): set \(p_{\text{ledger}}(H_{\text{other}})=1-S\).
+\item
+  If \(S > 1\): renormalize named roots only:
+  \(p_{\text{ledger}}(H_i) = p_{\text{ledger}}'(H_i)/S\), set
+  \(p_{\text{ledger}}(H_{\text{other}})=0\).
+\end{itemize}
+
+Log \(S\) and which branch was taken each time.
+
+\section{13. Scheduling: Deterministic, Seed-Invariant Credit
+Allocation}\label{scheduling-deterministic-seed-invariant-credit-allocation}
+
+Permutation invariance requires that, given identical inputs, the same
+multiset of operations be performed regardless of input ordering.
+
+ABDUCTIO MVP uses \textbf{cycle scheduling} over a \textbf{frontier}
+defined purely from the ledger state.
+
+\subsection{13.1 Frontier definition (no focal
+injection)}\label{frontier-definition-no-focal-injection}
+
+Let leader be \(H_L = \arg\max p_{\text{ledger}}(H)\) over named roots.
+Frontier: \[
+F = \{H_i : p_{\text{ledger}}(H_i) \ge p_{\text{ledger}}(H_L) - \varepsilon\}
+\] with \(\varepsilon\) default 0.05.
+
+No ``seed'' or user-focal term may be unioned into frontier. (The UI may
+highlight a focal, but the engine must not change scheduling.)
+
+\subsection{13.2 Round-robin credit
+slices}\label{round-robin-credit-slices}
+
+Within each cycle:
+
+\begin{itemize}
+\tightlist
+\item
+  iterate over hypotheses in frontier ordered by a canonical ID (e.g.,
+  SHA256 of root.statement),
+\item
+  for each hypothesis, perform exactly one operation chosen by the
+  deterministic rule below,
+\item
+  decrement credits, update ledger, continue.
+\end{itemize}
+
+This round-robin is permutation-invariant because ordering is canonical,
+not input order.
+
+\subsection{13.3 Deterministic operation choice per
+hypothesis}\label{deterministic-operation-choice-per-hypothesis}
+
+For a root \(H_i\) in frontier, choose:
+
+\begin{enumerate}
+\tightlist
+\item
+  If \(H_i\) is UNSCOPED: DECOMPOSE (attempt to scope template or slot).
+\item
+  Else if any required slot is uninstantiated: DECOMPOSE to create
+  missing slot node(s).
+\item
+  Else pick the slot \(s\) with lowest \(k\) (tie-break canonically by
+  node ID):
+
+  \begin{itemize}
+  \tightlist
+  \item
+    If slot can be decomposed and \(k < \tau\): DECOMPOSE(slot)
+  \item
+    Else: EVALUATE(slot) or EVALUATE(slot's most critical child)
+  \end{itemize}
+\end{enumerate}
+
+This ensures each frontier hypothesis is advanced comparably.
+
+\subsection{13.4 Tie-breaking (mandatory)}\label{tie-breaking-mandatory}
+
+All ties are broken by canonical ID derived from the statement text
+(hash), never by input ordering.
+
+\section{14. Stopping Conditions}\label{stopping-conditions}
+
+Stop when any holds:
+
+A) credits exhausted. B) For all hypotheses in the current frontier:
+
+\begin{itemize}
+\tightlist
+\item
+  root is SCOPED,
+\item
+  all template NEC slots have \(k \ge \tau\) (or credit exhaustion
+  prevents further improvement).
+\end{itemize}
+
+C) No legal next operation exists (e.g., maximum decomposition depth
+reached and no evaluable nodes remain).
+
+\section{15. Evaluator and Decomposer Interfaces (Implementation
+Contracts)}\label{evaluator-and-decomposer-interfaces-implementation-contracts}
+
+\subsection{15.1 Evaluator contract (human or
+agent)}\label{evaluator-contract-human-or-agent}
+
+\texttt{evaluate(node,\ evidence)} returns:
+
+\begin{itemize}
+\tightlist
+\item
+  p in {[}0,1{]} (requirement-satisfaction for NEC; support score for
+  EVID)
+\item
+  rubric A--D scores and derived k
+\item
+  1--3 short factors
+\item
+  mind\textsubscript{change} sentence
+\item
+  explicit assumption list if evidence is weak, each tagged with
+  fragility (low/med/high)
+\item
+  evidence\textsubscript{refs} used (may be empty)
+\end{itemize}
+
+Constraints:
+
+\begin{itemize}
+\tightlist
+\item
+  If no evidence\textsubscript{refs}: enforce conservative p movement
+  (implementation default: \textbar Δp\textbar{} \textless= 0.05 from
+  prior node.p)
+\item
+  Evaluator must not reference ``seed'' or ``focal'' status.
+\end{itemize}
+
+\subsection{15.2 Decomposer contract}\label{decomposer-contract}
+
+\texttt{decompose(node)} returns:
+
+\begin{itemize}
+\tightlist
+\item
+  2--5 children nodes, each labeled NEC or EVID
+\item
+  decomp\textsubscript{type} AND/OR; for OR, mode EXCLUSIVE/INCLUSIVE
+\item
+  for AND with NEC, coupling bucket c
+\end{itemize}
+
+Constraints:
+
+\begin{itemize}
+\tightlist
+\item
+  For root hypotheses, decomposer must instantiate the obligation
+  template.
+\item
+  If cannot, mark UNSCOPED.
+\end{itemize}
+
+\section{16. MVP Algorithm (Pseudocode)}\label{mvp-algorithm-pseudocode}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{inputs:}
+\NormalTok{  claim text}
+\NormalTok{  (optional) rivals list}
+\NormalTok{  credits B}
+\NormalTok{  tau, epsilon, gamma, alpha}
+\NormalTok{  canonical\_id = hash(statement)}
+
+\NormalTok{initialize:}
+\NormalTok{  build named roots H1..Hn (claim + 3–5 single{-}mechanism rivals)}
+\NormalTok{  add H\_other}
+\NormalTok{  set uniform priors: p\_i=(1{-}gamma)/n ; p\_other=gamma}
+\NormalTok{  set all k=0.15}
+\NormalTok{  set all status=UNSCOPED initially (until template instantiated)}
+
+\NormalTok{for cycle = 1.. while credits \textgreater{} 0:}
+\NormalTok{  leader = argmax named roots by p\_ledger (tie{-}break by canonical\_id)}
+\NormalTok{  frontier F = \{Hi : p\_ledger(Hi) \textgreater{}= p\_ledger(leader){-}epsilon\}}
+
+\NormalTok{  order frontier by canonical\_id}
+\NormalTok{  for Hi in F:}
+\NormalTok{    if credits == 0: break}
+
+\NormalTok{    choose operation deterministically:}
+\NormalTok{      if Hi is UNSCOPED or missing template slots:}
+\NormalTok{         DECOMPOSE(Hi)  \# instantiate template if possible}
+\NormalTok{      else:}
+\NormalTok{         pick slot s with lowest k (tie{-}break by canonical\_id)}
+\NormalTok{         if can\_decompose(s) and k(s) \textless{} tau:}
+\NormalTok{             DECOMPOSE(s)}
+\NormalTok{         else:}
+\NormalTok{             EVALUATE(s)}
+
+\NormalTok{    spend 1 credit}
+\NormalTok{    update credits\_spent on Hi and node}
+\NormalTok{    recompute slot p\_s and k\_s via aggregation if needed}
+\NormalTok{    compute p\_prop(Hi) = p\_base(Hi) * Π\_s p\_s}
+\NormalTok{    apply damping to ledger p\_ledger(Hi)}
+\NormalTok{    enforce Other absorber invariant}
+\NormalTok{    log every arithmetic step and invariant checks}
+
+\NormalTok{stop when stopping conditions met}
+\NormalTok{output full audit trace}
+\end{Highlighting}
+\end{Shaded}
+
+\section{17. Why ABDUCTIO MVP is
+Permutation-Invariant}\label{why-abductio-mvp-is-permutation-invariant}
+
+ABDUCTIO MVP achieves permutation invariance by construction:
+
+\begin{enumerate}
+\tightlist
+\item
+  No focal injection: frontier depends only on ledger state.
+\item
+  Canonical ordering: iteration order is defined by hash(statement), not
+  by input list order.
+\item
+  Round-robin slicing: each frontier hypothesis receives equal
+  opportunity per cycle.
+\item
+  No-free-probability semantics: decomposition cannot change ledger p;
+  OR cannot inflate.
+\item
+  Template parity: each hypothesis is evaluated under the same
+  obligation slots.
+\item
+  Deterministic tie-breaks everywhere.
+\end{enumerate}
+
+Given identical inputs, the engine performs the same operations in the
+same canonical order and produces identical outputs, independent of the
+seed.
+
+\section{18. Practical Defaults}\label{practical-defaults}
+
+\begin{itemize}
+\tightlist
+\item
+  tau = 0.70
+\item
+  epsilon = 0.05
+\item
+  gamma = 0.20
+\item
+  alpha = 0.40
+\item
+  max\textsubscript{children} = 5
+\item
+  coupling\textsubscript{default} = 0.80
+\item
+  conservative delta p when no evidence: \textbar Δp\textbar{}
+  \textless= 0.05 per evaluation
+\end{itemize}
+
+\section{19. Limitations and
+Extensions}\label{limitations-and-extensions}
+
+\subsection{Limitations}\label{limitations}
+
+\begin{itemize}
+\tightlist
+\item
+  This is not full Bayesian inference; it is a structured, auditable
+  scoring-and-budgeting framework.
+\item
+  Results depend on the evaluator's discipline and evidence quality.
+\item
+  MECE is approximated; \(H_{\text{other}}\) absorbs residual
+  uncertainty.
+\end{itemize}
+
+\subsection{Extensions}\label{extensions}
+
+\begin{itemize}
+\tightlist
+\item
+  Multi-assessor panels with aggregation rules for p and k.
+\item
+  Evidence objects with explicit likelihood impacts.
+\item
+  Specialized decomposers per domain (medicine, security, historical
+  events).
+\end{itemize}
+
+\section{Appendix A: Minimal ``Well-Defined Hypothesis''
+Checklist}\label{appendix-a-minimal-well-defined-hypothesis-checklist}
+
+A root hypothesis must include:
+
+\begin{itemize}
+\tightlist
+\item
+  A mechanism statement (stand-alone).
+\item
+  An exclusion clause distinguishing it from other roots.
+\item
+  A template instantiation with NEC slots: feasibility, availability,
+  fit, defeater resistance.
+\end{itemize}
+
+If it cannot, mark UNSCOPED and cap k.
+
+\section{Appendix B: Canonical ID}\label{appendix-b-canonical-id}
+
+Canonical ordering uses: \[
+\text{canonical\_id}(h)=\text{SHA256}(\text{normalized\_statement\_text})
+\] Normalization removes extra whitespace and lowercases text.
+
+This ensures permutation invariance even if input ordering changes.
+
+\section{Appendix C: Coupling buckets (within-slot
+AND)}\label{appendix-c-coupling-buckets-within-slot-and}
+
+Choose c as max of:
+
+\begin{itemize}
+\tightlist
+\item
+  Evidence overlap
+\item
+  Mechanism overlap
+\item
+  Failure-mode overlap
+\end{itemize}
+
+Buckets: 0.20, 0.50, 0.80, 0.95 Default 0.80 if unsure.
+
+\end{document}
