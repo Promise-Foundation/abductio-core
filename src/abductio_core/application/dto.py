@@ -39,3 +39,4 @@ class SessionRequest:
     pre_scoped_roots: Optional[List[str]] = None
     slot_k_min: Optional[Dict[str, float]] = None
     slot_initial_p: Optional[Dict[str, float]] = None
+    force_scope_fail_root: Optional[str] = None

@@ -11,8 +11,9 @@ Feature: Presentation adapters (CLI/API) do not bypass the application layer
     When I call the application run use case directly as a library function
     Then I get a SessionResult object with:
       | field |
-      | final_hypothesis_set |
-      | audit_trace |
+      | roots |
+      | ledger |
+      | audit |
       | stop_reason |
       | credits_remaining |
 

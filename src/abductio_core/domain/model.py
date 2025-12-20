@@ -11,6 +11,7 @@ class Node:
     role: str
     p: float = 1.0
     k: float = 0.15
+    assessed: bool = False
     children: List[str] = field(default_factory=list)
     decomp_type: Optional[str] = None
     coupling: Optional[float] = None

@@ -69,7 +69,10 @@ class StepWorld:
         self.decomposer_script["scope_roots"] = table or "all"
 
     def set_decomposer_fail_root(self, root_id: str) -> None:
-        self.decomposer_script.setdefault("fail_roots", set()).add(root_id)
+        fail_roots = set(self.decomposer_script.get("fail_roots", set()))
+        fail_roots.add(root_id)
+        self.decomposer_script["fail_roots"] = fail_roots
+        self.decomposer_script["force_scope_fail_root"] = root_id
 
     def set_decomposer_slot_decomposition(
         self,
@@ -205,22 +208,10 @@ class StepWorld:
                 self.replay_result = replay_result.to_dict_view()
 
     def derive_k_from_rubric(self) -> None:
-        total = sum(self.rubric.values())
-        mapping = {
-            0: 0.15,
-            1: 0.25,
-            2: 0.35,
-            3: 0.45,
-            4: 0.55,
-            5: 0.65,
-            6: 0.75,
-            7: 0.85,
-            8: 0.90,
-        }
-        base_k = mapping.get(total, 0.15)
-        self.guardrail_applied = any(value == 0 for value in self.rubric.values())
-        if self.guardrail_applied and base_k > 0.55:
-            base_k = 0.55
+        from abductio_core.application.use_cases.run_session import _derive_k_from_rubric
+
+        base_k, guardrail = _derive_k_from_rubric(self.rubric)
+        self.guardrail_applied = guardrail
         self.derived_k = base_k
 
     def _build_request(
@@ -260,12 +251,16 @@ class StepWorld:
             pre_scoped_roots=sorted(self.decomposer_script.get("scoped_roots", [])),
             slot_k_min=self.decomposer_script.get("slot_k_min"),
             slot_initial_p=self.decomposer_script.get("slot_initial_p"),
+            force_scope_fail_root=self.decomposer_script.get("force_scope_fail_root"),
         )
 
     def _ensure_required_slots(self, root_id: Optional[str]) -> None:
         if not root_id:
             return
         if not self.required_slots:
+            return
+        fail_roots = self.decomposer_script.get("fail_roots", set())
+        if root_id in fail_roots:
             return
         scope = self.decomposer_script.setdefault("scope_roots", [])
         if scope == "all":

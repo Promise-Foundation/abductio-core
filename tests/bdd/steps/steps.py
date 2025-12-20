@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 from behave import given, then, when
 
 from abductio_core.application.canonical import canonical_id_for_statement
+from abductio_core.application.use_cases.replay_session import replay_session
 from tests.bdd.steps.support.step_world import StepWorld
 
 
@@ -398,9 +399,10 @@ def when_engine_derives_k(context) -> None:
 @when("I replay the session using only the audit trace as the source of operations and numeric outcomes")
 def when_replay_session(context) -> None:
     world = get_world(context)
-    if not world.result:
-        world.mark_pending("Session result not available")
-    world.replay_result = dict(world.result)
+    if not world.audit_trace:
+        world.mark_pending("Audit trace not available")
+    replayed = replay_session(world.audit_trace)
+    world.replay_result = replayed.to_dict_view()
 
 
 @when("I call the application run use case directly as a library function")

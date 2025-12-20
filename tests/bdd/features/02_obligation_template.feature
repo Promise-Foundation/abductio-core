@@ -37,7 +37,7 @@ Feature: Obligation template parity and scoping
       | H1   | Mechanism A                       | Not explained by any other root |
       | H2   | Vague umbrella explanation         | Not explained by any other root |
     And a deterministic decomposer that fails to scope root "H2"
-    And credits 1
+    And credits 2
     When I run the engine until credits exhausted
     Then root "H2" remains status "UNSCOPED"
     And root "H2" has k_root <= 0.40

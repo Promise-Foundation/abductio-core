@@ -8,6 +8,9 @@ from typing import Any, Dict, List, Optional
 class StopReason(str, Enum):
     CREDITS_EXHAUSTED = "CREDITS_EXHAUSTED"
     FRONTIER_CONFIDENT = "FRONTIER_CONFIDENT"
+    NO_HYPOTHESES = "NO_HYPOTHESES"
+    NO_LEGAL_OP = "NO_LEGAL_OP"
+    OP_LIMIT_REACHED = "OP_LIMIT_REACHED"
 
 
 @dataclass
