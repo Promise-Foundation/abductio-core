@@ -17,9 +17,21 @@ def get_world(context) -> StepWorld:
 def table_key_values(table) -> Dict[str, str]:
     pairs: Dict[str, str] = {}
     for row in table:
-        key = row.cells[0].strip()
-        value = row.cells[1].strip()
+        if len(row.cells) >= 2:
+            key = row.cells[0].strip()
+            value = row.cells[1].strip()
+        else:
+            items = list(row.items())
+            if len(items) < 2:
+                continue
+            key = str(items[0][1]).strip()
+            value = str(items[1][1]).strip()
         pairs[key] = value
+    headings = list(getattr(table, "headings", []) or [])
+    if len(headings) == 2 and headings[0] not in {"key", "field", "event_type"}:
+        key = str(headings[0]).strip()
+        value = str(headings[1]).strip()
+        pairs.setdefault(key, value)
     return pairs
 
 
@@ -201,7 +213,21 @@ def given_deterministic_evaluator_rubric(context) -> None:
 @given("a deterministic evaluator with at least one evaluation outcome")
 def given_deterministic_evaluator_one(context) -> None:
     world = get_world(context)
-    world.set_evaluator_outcomes([{"node_key": "placeholder", "p": "0.5"}])
+    roots = world.roots or [{"id": "H1"}]
+    slot_key = world.required_slots[0]["slot_key"] if world.required_slots else "feasibility"
+    outcomes = [
+        {
+            "node_key": f"{root['id']}:{slot_key}",
+            "p": "0.5",
+            "A": "2",
+            "B": "1",
+            "C": "1",
+            "D": "1",
+            "evidence_refs": "ref1",
+        }
+        for root in roots
+    ]
+    world.set_evaluator_outcomes(outcomes)
 
 
 @given('credits {credits:d}')
@@ -279,7 +305,21 @@ def given_ledger_corrupted(context) -> None:
 @given("I ran a session and captured its audit trace")
 def given_captured_audit_trace(context) -> None:
     world = get_world(context)
-    world.audit_trace = [{"event_type": "PLACEHOLDER"}]
+    if not world.roots:
+        world.set_roots(
+            [
+                {"id": "H1", "statement": "Mechanism A", "exclusion_clause": ""},
+                {"id": "H2", "statement": "Mechanism B", "exclusion_clause": ""},
+            ]
+        )
+    world.set_decomposer_scope_roots()
+    if not world.evaluator_script.get("outcomes"):
+        given_deterministic_evaluator_one(context)
+    if world.credits is None:
+        world.set_credits(3)
+    world.run_engine("until_stops")
+    if world.result:
+        world.audit_trace = list(world.result.get("audit", []))
 
 
 @given("the CLI adapter is configured with an application runner instance")
@@ -939,8 +979,8 @@ def then_audit_trace_contains(context) -> None:
         world.mark_pending("Session result not available")
     expected = [row["event_type"] for row in context.table]
     actual = {event["event_type"] for event in world.result.get("audit", [])}
-    for event_type in expected:
-        assert event_type in actual
+    missing = [event_type for event_type in expected if event_type not in actual]
+    assert not missing, f"missing events: {missing}; actual={sorted(actual)}"
 
 
 @then("every numeric value used in ledger updates is recorded with sufficient precision")
@@ -954,13 +994,14 @@ def then_audit_numeric_precision(context) -> None:
                 assert value == value
 
 
-@then('the replayed final p_ledger values equal the original final p_ledger values within {tolerance:f}')
-def then_replay_ledger_equals(context, tolerance: float) -> None:
+@then('the replayed final p_ledger values equal the original final p_ledger values within {tolerance}')
+def then_replay_ledger_equals(context, tolerance: str) -> None:
     world = get_world(context)
     if not world.result or not world.replay_result:
         world.mark_pending("Session results not available")
+    tolerance_value = float(tolerance)
     for key, value in world.result.get("ledger", {}).items():
-        assert abs(value - world.replay_result.get("ledger", {}).get(key, 0.0)) <= tolerance
+        assert abs(value - world.replay_result.get("ledger", {}).get(key, 0.0)) <= tolerance_value
 
 
 @then('the replayed stop_reason equals the original stop_reason')
