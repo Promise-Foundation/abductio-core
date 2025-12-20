@@ -391,11 +391,27 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
         if not root.obligations:
             return None
         order_map = {slot_key: index for index, slot_key in enumerate(required_slot_keys)}
+        child_candidates = []
+        for slot_key, slot_node in root.obligations.items():
+            if not slot_node.children:
+                continue
+            for child_key in slot_node.children:
+                child_node = child_nodes.get(child_key)
+                if not child_node:
+                    continue
+                child_candidates.append(
+                    (child_node.k, order_map.get(slot_key, len(order_map)), child_key)
+                )
+        if child_candidates:
+            return sorted(child_candidates)[0][2]
         ordered = sorted(
             root.obligations.items(),
             key=lambda item: (item[1].k, order_map.get(item[0], len(order_map)), item[1].node_key),
         )
-        return ordered[0][1].node_key
+        slot_key, slot_node = ordered[0]
+        if slot_node.children:
+            return sorted(slot_node.children)[0]
+        return slot_node.node_key
 
     def select_slot_for_decomposition(root: RootHypothesis) -> Optional[str]:
         for slot_key, node in root.obligations.items():

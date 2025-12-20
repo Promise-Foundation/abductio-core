@@ -27,6 +27,18 @@ def table_rows(table) -> List[Dict[str, str]]:
     return [dict(row.items()) for row in table]
 
 
+def _ensure_root(world: StepWorld, root_id: str) -> None:
+    if any(root.get("id") == root_id for root in world.roots):
+        return
+    world.roots.append(
+        {
+            "id": root_id,
+            "statement": f"{root_id} statement",
+            "exclusion_clause": "Not explained by any other root",
+        }
+    )
+
+
 def _expected_slot_statements(world: StepWorld, root_id: str) -> Dict[str, str]:
     scope_roots = world.decomposer_script.get("scope_roots")
     if not isinstance(scope_roots, list):
@@ -40,6 +52,17 @@ def _expected_slot_statements(world: StepWorld, root_id: str) -> Dict[str, str]:
                 "defeater_resistance": row.get("defeater_statement", ""),
             }
     return {}
+
+
+def _parse_numeric_expr(value: str) -> float:
+    expr = value.strip()
+    if "*" not in expr:
+        return float(expr)
+    parts = [part.strip() for part in expr.split("*") if part.strip()]
+    result = 1.0
+    for part in parts:
+        result *= float(part)
+    return result
 
 
 @given("default config")
@@ -186,17 +209,24 @@ def given_epsilon(context, epsilon: float) -> None:
 
 @given(
     'a scoped root "{root_id}" with slot "{slot_key}" decomposed as {decomp_type} coupling '
+    "{coupling:f} into NEC children"
+)
+@given(
+    'a scoped root "{root_id}" with slot "{slot_key}" decomposed as {decomp_type} coupling '
     "{coupling:f} into NEC children:"
 )
 def given_scoped_root_with_slot(context, root_id: str, slot_key: str, decomp_type: str, coupling: float) -> None:
     world = get_world(context)
+    _ensure_root(world, root_id)
     world.set_scoped_root(root_id)
-    world.set_decomposer_slot_decomposition(slot_key, decomp_type, coupling, table_rows(context.table))
+    slot_node_key = f"{root_id}:{slot_key}"
+    world.set_decomposer_slot_decomposition(slot_node_key, decomp_type, coupling, table_rows(context.table))
 
 
 @given('a scoped root "{root_id}"')
 def given_scoped_root(context, root_id: str) -> None:
     world = get_world(context)
+    _ensure_root(world, root_id)
     world.set_scoped_root(root_id)
 
 
@@ -738,28 +768,30 @@ def then_audit_tie_breaking(context) -> None:
     assert any(event["event_type"] == "TIE_BREAKER_APPLIED" for event in world.result.get("audit", []))
 
 
-@then('the final p_ledger and k_root for each named root are identical within {tolerance:f}')
-def then_final_ledger_identical(context, tolerance: float) -> None:
+@then('the final p_ledger and k_root for each named root are identical within {tolerance}')
+def then_final_ledger_identical(context, tolerance: str) -> None:
     world = get_world(context)
     if not world.result or not world.replay_result:
         world.mark_pending("Session results not available")
+    tolerance_value = float(tolerance)
     for root_id, root in world.result["roots"].items():
         if root_id == "H_other":
             continue
         other_root = world.replay_result["roots"].get(root_id)
         assert other_root is not None
-        assert abs(root.get("p_ledger", 0.0) - other_root.get("p_ledger", 0.0)) <= tolerance
-        assert abs(root.get("k_root", 0.0) - other_root.get("k_root", 0.0)) <= tolerance
+        assert abs(root.get("p_ledger", 0.0) - other_root.get("p_ledger", 0.0)) <= tolerance_value
+        assert abs(root.get("k_root", 0.0) - other_root.get("k_root", 0.0)) <= tolerance_value
 
 
-@then('the final H_other p_ledger is identical within {tolerance:f}')
-def then_final_h_other_identical(context, tolerance: float) -> None:
+@then('the final H_other p_ledger is identical within {tolerance}')
+def then_final_h_other_identical(context, tolerance: str) -> None:
     world = get_world(context)
     if not world.result or not world.replay_result:
         world.mark_pending("Session results not available")
+    tolerance_value = float(tolerance)
     actual = world.result.get("ledger", {}).get("H_other", 0.0)
     expected = world.replay_result.get("ledger", {}).get("H_other", 0.0)
-    assert abs(actual - expected) <= tolerance
+    assert abs(actual - expected) <= tolerance_value
 
 
 @then("the sequence of executed operations is identical when compared by canonical target_id")
@@ -780,14 +812,19 @@ def then_operations_identical(context) -> None:
     assert seq_a == seq_b
 
 
-@then('the aggregated p for slot "{slot_key}" equals {expected:f} within {tolerance:f}')
-def then_soft_and_expected(context, slot_key: str, expected: float, tolerance: float) -> None:
+@then('the aggregated p for slot "{slot_key}" equals {expected} within {tolerance}')
+def then_soft_and_expected(context, slot_key: str, expected: str, tolerance: str) -> None:
     world = get_world(context)
     if not world.result:
         world.mark_pending("Session result not available")
-    root_id = world.roots[0]["id"]
-    node = world.result["roots"][root_id]["obligations"][slot_key]
-    assert abs(node.get("p", 0.0) - expected) <= tolerance
+    expected_value = float(expected)
+    tolerance_value = float(tolerance)
+    root_id = world.roots[0]["id"] if world.roots else next(
+        root for root in world.result.get("roots", {}) if root != "H_other"
+    )
+    slot_name = slot_key.split(":", 1)[1] if ":" in slot_key else slot_key
+    node = world.result["roots"][root_id]["obligations"][slot_name]
+    assert abs(node.get("p", 0.0) - expected_value) <= tolerance_value
 
 
 @then("the audit log shows p_min, p_prod, c, and the computed m")
@@ -814,15 +851,17 @@ def then_unassessed_children(context, child_a: str, child_b: str) -> None:
     assert abs(payload.get("p_prod", 0.0) - 0.5) <= 1e-9
 
 
-@then('the aggregated slot p is <= {upper:f} and >= {lower:f}')
-def then_aggregated_slot_range(context, upper: float, lower: float) -> None:
+@then('the aggregated slot p is <= {upper} and >= {lower}')
+def then_aggregated_slot_range(context, upper: str, lower: str) -> None:
     world = get_world(context)
     if not world.result:
         world.mark_pending("Session result not available")
+    upper_value = _parse_numeric_expr(upper)
+    lower_value = _parse_numeric_expr(lower)
     root_id = world.roots[0]["id"]
     node = world.result["roots"][root_id]["obligations"]["fit_to_key_features"]
     actual = node.get("p", 0.0)
-    assert lower <= actual <= upper
+    assert lower_value <= actual <= upper_value
 
 
 @then('k equals {expected:f}')
