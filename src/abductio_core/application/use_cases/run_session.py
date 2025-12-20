@@ -390,8 +390,12 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
     def select_slot_for_evaluation(root: RootHypothesis) -> Optional[str]:
         if not root.obligations:
             return None
-        ordered = sorted(root.obligations.values(), key=lambda node: (node.k, node.node_key))
-        return ordered[0].node_key
+        order_map = {slot_key: index for index, slot_key in enumerate(required_slot_keys)}
+        ordered = sorted(
+            root.obligations.items(),
+            key=lambda item: (item[1].k, order_map.get(item[0], len(order_map)), item[1].node_key),
+        )
+        return ordered[0][1].node_key
 
     def select_slot_for_decomposition(root: RootHypothesis) -> Optional[str]:
         for slot_key, node in root.obligations.items():

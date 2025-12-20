@@ -27,25 +27,40 @@ def table_rows(table) -> List[Dict[str, str]]:
     return [dict(row.items()) for row in table]
 
 
-@given("default config:")
+def _expected_slot_statements(world: StepWorld, root_id: str) -> Dict[str, str]:
+    scope_roots = world.decomposer_script.get("scope_roots")
+    if not isinstance(scope_roots, list):
+        return {}
+    for row in scope_roots:
+        if row.get("root_id") == root_id:
+            return {
+                "feasibility": row.get("feasibility_statement", ""),
+                "availability": row.get("availability_statement", ""),
+                "fit_to_key_features": row.get("fit_statement", ""),
+                "defeater_resistance": row.get("defeater_statement", ""),
+            }
+    return {}
+
+
+@given("default config")
 def given_default_config(context) -> None:
     world = get_world(context)
     world.set_config(table_key_values(context.table))
 
 
-@given("required template slots:")
+@given("required template slots")
 def given_required_template_slots(context) -> None:
     world = get_world(context)
     world.set_required_slots(table_rows(context.table))
 
 
-@given("a hypothesis set with named roots:")
+@given("a hypothesis set with named roots")
 def given_named_roots(context) -> None:
     world = get_world(context)
     world.set_roots(table_rows(context.table))
 
 
-@given("hypothesis set A with named roots:")
+@given("hypothesis set A with named roots")
 def given_named_roots_a(context) -> None:
     world = get_world(context)
     world.set_roots_a(table_rows(context.table))
@@ -57,7 +72,7 @@ def given_named_roots_b(context) -> None:
     world.roots_b = list(reversed(world.roots_a))
 
 
-@given("a deterministic decomposer that will scope roots with:")
+@given("a deterministic decomposer that will scope roots with")
 def given_decomposer_scope_roots_with(context) -> None:
     world = get_world(context)
     world.set_decomposer_scope_roots(table_rows(context.table))
@@ -83,6 +98,10 @@ def given_decomposer_fail_root(context, root_id: str) -> None:
 
 @given(
     'a deterministic decomposer that will decompose slot "{slot_key}" as {decomp_type} '
+    "with coupling {coupling:f} into"
+)
+@given(
+    'a deterministic decomposer that will decompose slot "{slot_key}" as {decomp_type} '
     "with coupling {coupling:f} into:"
 )
 def given_decomposer_decompose_slot(context, slot_key: str, decomp_type: str, coupling: float) -> None:
@@ -98,37 +117,37 @@ def given_decomposer_decompose_slot_no_coupling(context, slot_key: str, decomp_t
     world.set_decomposer_slot_decomposition(slot_key, decomp_type, None, table_rows(context.table))
 
 
-@given('a deterministic evaluator that returns for node "{node_key}":')
+@given('a deterministic evaluator that returns for node "{node_key}"')
 def given_deterministic_evaluator_node(context, node_key: str) -> None:
     world = get_world(context)
     world.set_evaluator_outcome(node_key, table_key_values(context.table))
 
 
-@given("a deterministic evaluator with the following outcomes:")
+@given("a deterministic evaluator with the following outcomes")
 def given_deterministic_evaluator_outcomes(context) -> None:
     world = get_world(context)
     world.set_evaluator_outcomes(table_rows(context.table))
 
 
-@given("a deterministic evaluator that returns:")
+@given("a deterministic evaluator that returns")
 def given_deterministic_evaluator_returns(context) -> None:
     world = get_world(context)
     world.set_evaluator_outcomes(table_rows(context.table))
 
 
-@given("a deterministic evaluator returns:")
+@given("a deterministic evaluator returns")
 def given_deterministic_evaluator_returns_alt(context) -> None:
     world = get_world(context)
     world.set_evaluator_outcomes(table_rows(context.table))
 
 
-@given('a deterministic evaluator that attempts to set for node "{node_key}":')
+@given('a deterministic evaluator that attempts to set for node "{node_key}"')
 def given_deterministic_evaluator_attempts(context, node_key: str) -> None:
     world = get_world(context)
     world.set_evaluator_outcome(node_key, table_key_values(context.table))
 
 
-@given("a deterministic evaluator that returns rubric:")
+@given("a deterministic evaluator that returns rubric")
 def given_deterministic_evaluator_rubric(context) -> None:
     world = get_world(context)
     world.set_rubric({key: int(value) for key, value in table_key_values(context.table).items()})
@@ -153,7 +172,7 @@ def given_root_scoped_with_k(context, root_id: str, k_min: float) -> None:
     world.decomposer_script.setdefault("slot_k_min", {})[root_id] = k_min
 
 
-@given("the ledger is set to:")
+@given("the ledger is set to")
 def given_ledger_is_set(context) -> None:
     world = get_world(context)
     world.set_ledger(table_rows(context.table))
@@ -242,6 +261,7 @@ def when_run_until_stops(context) -> None:
 
 
 @when('I run the engine for exactly {count:d} operations')
+@when('I run the engine for exactly {count:d} operation')
 def when_run_exact_operations(context, count: int) -> None:
     world = get_world(context)
     world.run_engine(f"operations:{count}")
@@ -315,15 +335,20 @@ def then_session_contains_root(context, root_id: str) -> None:
     if not world.result:
         world.mark_pending("Session result not available")
     assert root_id in world.result.get("roots", {})
+    if root_id == "H_other":
+        named_ids = {row["id"] for row in world.roots}
+        assert "H_other" not in named_ids
+        assert len(world.result.get("roots", {})) == len(named_ids) + 1
 
 
-@then('the ledger probabilities sum to 1.0 within {tolerance:f}')
-def then_ledger_sum(context, tolerance: float) -> None:
+@then('the ledger probabilities sum to 1.0 within {tolerance}')
+def then_ledger_sum(context, tolerance: str) -> None:
     world = get_world(context)
     if not world.result:
         world.mark_pending("Session result not available")
+    tolerance_value = float(tolerance)
     total = sum(world.result.get("ledger", {}).values())
-    assert abs(total - 1.0) <= tolerance
+    assert abs(total - 1.0) <= tolerance_value
 
 
 @then('each named root has p_ledger = (1 - gamma) / N where N is count(named_roots)')
@@ -359,6 +384,9 @@ def then_every_root_k_root(context) -> None:
         world.mark_pending("Session result not available")
     for root in world.result.get("roots", {}).values():
         assert abs(root.get("k_root", 0.0) - 0.15) <= 1e-12
+        if root.get("obligations"):
+            expected = min(node.get("k", 0.0) for node in root["obligations"].values())
+            assert abs(root.get("k_root", 0.0) - expected) <= 1e-12
 
 
 @then('every named root starts with status "{status}"')
@@ -370,6 +398,8 @@ def then_named_root_status(context, status: str) -> None:
         if root_id == "H_other":
             continue
         assert root.get("status") == status
+        if status == "UNSCOPED":
+            assert not root.get("obligations")
 
 
 @then("the engine records a canonical_id for every root derived from normalized statement text")
@@ -419,11 +449,18 @@ def then_each_root_required_slots(context) -> None:
     if not world.result:
         world.mark_pending("Session result not available")
     required = {row["slot_key"] for row in world.required_slots}
+    required_roles = {row["slot_key"]: row.get("role", "NEC") for row in world.required_slots}
     for root_id, root in world.result["roots"].items():
         if root_id == "H_other":
             continue
         slots = set(root.get("obligations", {}).keys())
         assert slots == required
+        expected_statements = _expected_slot_statements(world, root_id)
+        for slot_key, node in root.get("obligations", {}).items():
+            assert node.get("role") == required_roles.get(slot_key, "NEC")
+            expected_statement = expected_statements.get(slot_key)
+            if expected_statement:
+                assert node.get("statement") == expected_statement
 
 
 @then('each unassessed NEC slot has p = {p_value:f} and k = {k_value:f}')
@@ -447,6 +484,8 @@ def then_root_status(context, root_id: str, status: str) -> None:
     root = world.result["roots"].get(root_id)
     assert root is not None
     assert root.get("status") == status
+    if status == "UNSCOPED":
+        assert not root.get("obligations")
 
 
 @then('root "{root_id}" has k_root <= {k_max:f}')
@@ -473,6 +512,7 @@ def then_total_credits_spent(context, credits: int) -> None:
     if not world.result:
         world.mark_pending("Session result not available")
     assert world.result.get("total_credits_spent") == credits
+    assert len(world.result.get("operation_log", [])) == credits
 
 
 @then('the audit log contains exactly {count:d} operation records')
@@ -494,6 +534,10 @@ def then_audit_op_fields(context) -> None:
         assert "target_id" in entry
         assert "credits_before" in entry
         assert "credits_after" in entry
+        assert entry["op_type"] in {"DECOMPOSE", "EVALUATE"}
+        assert isinstance(entry["credits_before"], int)
+        assert isinstance(entry["credits_after"], int)
+        assert entry["credits_before"] - entry["credits_after"] == 1
 
 
 @then('stop_reason is "{reason}"')
@@ -531,27 +575,29 @@ def then_all_named_roots_scoped(context) -> None:
         assert root.get("status") == "SCOPED"
 
 
-@then('each named root p_ledger is unchanged from its initial value within {tolerance:f}')
-def then_named_root_p_unchanged(context, tolerance: float) -> None:
+@then('each named root p_ledger is unchanged from its initial value within {tolerance}')
+def then_named_root_p_unchanged(context, tolerance: str) -> None:
     world = get_world(context)
     if not world.result:
         world.mark_pending("Session result not available")
+    tolerance_value = float(tolerance)
     for root_id, root in world.result["roots"].items():
         if root_id == "H_other":
             continue
         initial = world.initial_ledger.get(root_id, 0.0)
         actual = world.result.get("ledger", {}).get(root_id, 0.0)
-        assert abs(actual - initial) <= tolerance
+        assert abs(actual - initial) <= tolerance_value
 
 
-@then('H_other p_ledger is unchanged from its initial value within {tolerance:f}')
-def then_h_other_p_unchanged(context, tolerance: float) -> None:
+@then('H_other p_ledger is unchanged from its initial value within {tolerance}')
+def then_h_other_p_unchanged(context, tolerance: str) -> None:
     world = get_world(context)
     if not world.result:
         world.mark_pending("Session result not available")
+    tolerance_value = float(tolerance)
     initial = world.initial_ledger.get("H_other", 0.0)
     actual = world.result.get("ledger", {}).get("H_other", 0.0)
-    assert abs(actual - initial) <= tolerance
+    assert abs(actual - initial) <= tolerance_value
 
 
 @then('slot "{slot_key}" has aggregated p = {p_value:f}')
@@ -820,7 +866,7 @@ def then_conservative_delta_audit(context) -> None:
     )
 
 
-@then("the audit trace contains entries for:")
+@then("the audit trace contains entries for")
 def then_audit_trace_contains(context) -> None:
     world = get_world(context)
     if not world.result:
@@ -859,7 +905,7 @@ def then_replay_stop_reason(context) -> None:
     assert world.replay_result.get("stop_reason") == world.result.get("stop_reason")
 
 
-@then("I get a SessionResult object with:")
+@then("I get a SessionResult object with")
 def then_session_result_fields(context) -> None:
     world = get_world(context)
     if not world.result:
