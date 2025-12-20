@@ -115,18 +115,38 @@ pytest
 
 ## Release (PyPI)
 
+Recommended: automated publish on tags via GitHub Actions + PyPI trusted publishing.
+
+One-time setup (PyPI):
+
+1. Go to https://pypi.org/manage/account/publishing/
+2. Add a trusted publisher for `Promise-Foundation/abductio-core`
+3. Select workflow: `.github/workflows/publish.yml`
+
+Release flow:
+
+1. Update `version` in `pyproject.toml`
+2. Ensure tests pass: `pytest`
+3. Commit changes
+4. Tag + push: `git tag vX.Y.Z && git push --tags`
+
+The GitHub Action publishes the build to PyPI on tag push.
+
+Helper script:
+
+```bash
+scripts/release.sh X.Y.Z
+git push
+git push --tags
+```
+
+Manual fallback:
+
 ```bash
 python -m pip install --upgrade build twine
 python -m build
 twine upload dist/*
 ```
-
-Release checklist:
-
-1. Update `version` in `pyproject.toml`
-2. Ensure tests pass: `pytest`
-3. Commit changes
-4. Tag: `git tag vX.Y.Z && git push --tags`
 
 Token-based auth:
 
