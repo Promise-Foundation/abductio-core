@@ -26,18 +26,18 @@ def test_e2e_llm_integration_smoke_realistic_usage() -> None:
     root_statements = {"H1": "Mechanism A", "H2": "Mechanism B"}
 
     deps = RunSessionDeps(
-        evaluator=OpenAIEvaluatorPort(client, claim="E2E smoke: abductio-core with real LLM ports", root_statements=root_statements),
+        evaluator=OpenAIEvaluatorPort(client, scope="E2E smoke: abductio-core with real LLM ports", root_statements=root_statements),
         decomposer=OpenAIDecomposerPort(
             client,
             required_slots_hint=["feasibility"],
-            claim="E2E smoke: abductio-core with real LLM ports",
+            scope="E2E smoke: abductio-core with real LLM ports",
             root_statements=root_statements,
         ),
         audit_sink=_InMemoryAuditSink(),
     )
 
     request = SessionRequest(
-        claim="E2E smoke: abductio-core with real LLM ports",
+        scope="E2E smoke: abductio-core with real LLM ports",
         roots=[
             RootSpec(root_id="H1", statement="Mechanism A", exclusion_clause="Not explained by any other root"),
             RootSpec(root_id="H2", statement="Mechanism B", exclusion_clause="Not explained by any other root"),

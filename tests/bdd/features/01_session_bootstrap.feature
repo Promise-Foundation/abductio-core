@@ -18,7 +18,7 @@ Feature: Session bootstrap and MECE initialization
       | H3   | Misinterpretation of mundane stimuli      | Not explained by any other root      |
       | H4   | Coordinated hoax by humans                | Not explained by any other root      |
     And credits 5
-    When I start a session for claim "Ariel School incident"
+    When I start a session for scope "Ariel School incident"
     Then the session contains root "H_other"
     And the ledger probabilities sum to 1.0 within 1e-9
     And each named root has p_ledger = (1 - gamma) / N where N is count(named_roots)
@@ -33,6 +33,6 @@ Feature: Session bootstrap and MECE initialization
       | H2   | Beta mechanism             | Not explained by any other root |
       | H3   | Gamma mechanism            | Not explained by any other root |
     And credits 1
-    When I start a session for claim "Test claim"
+    When I start a session for scope "Test scope"
     Then the engine records a canonical_id for every root derived from normalized statement text
     And canonical_id does not depend on the input ordering of roots

@@ -19,8 +19,8 @@ Feature: Soft-AND aggregation with coupling buckets
       | c2       | Part 2    |
     And a deterministic evaluator that returns:
       | node_key | p   | A | B | C | D | evidence_refs |
-      | H1:fit:c1| <p1>| 2 | 1 | 1 | 1 | refX         |
-      | H1:fit:c2| <p2>| 2 | 1 | 1 | 1 | refX         |
+      | H1:fit_to_key_features:c1| <p1>| 2 | 1 | 1 | 1 | refX         |
+      | H1:fit_to_key_features:c2| <p2>| 2 | 1 | 1 | 1 | refX         |
     And credits 2
     When I run the engine for exactly 2 evaluations targeting those children
     Then the aggregated p for slot "H1:fit_to_key_features" equals <expected> within 1e-9

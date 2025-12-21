@@ -17,6 +17,7 @@ class StopReason(str, Enum):
 class SessionResult:
     roots: Dict[str, Dict[str, Any]]
     ledger: Dict[str, float]
+    nodes: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     audit: List[Dict[str, Any]] = field(default_factory=list)
     stop_reason: Optional[StopReason] = None
     credits_remaining: int = 0
@@ -27,6 +28,7 @@ class SessionResult:
         return {
             "roots": self.roots,
             "ledger": self.ledger,
+            "nodes": self.nodes,
             "audit": list(self.audit),
             "stop_reason": self.stop_reason.value if self.stop_reason else None,
             "credits_remaining": self.credits_remaining,

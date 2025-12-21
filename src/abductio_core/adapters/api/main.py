@@ -53,7 +53,8 @@ class RootSpecIn(BaseModel):
 
 
 class SessionRequestIn(BaseModel):
-    claim: str = Field(..., min_length=1)
+    scope: Optional[str] = Field(None, min_length=1)
+    claim: Optional[str] = Field(None, min_length=1)
     roots: List[RootSpecIn] = Field(..., min_length=1)
     config: SessionConfigIn
     credits: int = Field(..., ge=0)
@@ -93,12 +94,12 @@ def _build_deps(req: SessionRequest) -> RunSessionDeps:
     client = _build_openai_client()
 
     evaluator = OpenAIEvaluatorPort(
-        client=client, claim=req.claim, root_statements=root_statements
+        client=client, scope=req.scope, root_statements=root_statements
     )
     decomposer = OpenAIDecomposerPort(
         client=client,
         required_slots_hint=required_slots_hint,
-        claim=req.claim,
+        scope=req.scope,
         root_statements=root_statements,
     )
 
@@ -123,8 +124,11 @@ def healthz() -> Dict[str, str]:
 
 @app.post("/v1/sessions/run")
 def run_session_endpoint(body: SessionRequestIn) -> Dict[str, Any]:
+    scope = body.scope or body.claim
+    if not scope:
+        raise HTTPException(status_code=400, detail="scope is required")
     req = SessionRequest(
-        claim=body.claim,
+        scope=scope,
         roots=[RootSpec(r.root_id, r.statement, r.exclusion_clause) for r in body.roots],
         config=SessionConfig(
             tau=body.config.tau,
@@ -147,7 +151,12 @@ def run_session_endpoint(body: SessionRequestIn) -> Dict[str, Any]:
     try:
         deps = _build_deps(req)
         result = run_session(req, deps)
-        return result.to_dict_view()
+        payload = result.to_dict_view()
+        if body.claim and not body.scope:
+            payload.setdefault("meta", {}).setdefault("warnings", []).append(
+                "claim is deprecated; use scope"
+            )
+        return payload
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:

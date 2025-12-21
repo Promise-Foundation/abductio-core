@@ -75,7 +75,7 @@ class SimpleEvaluator:
 
 
 request = SessionRequest(
-    claim="Example claim",
+    scope="Example scope",
     roots=[RootSpec("H1", "Mechanism A", "x")],
     config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40),
     credits=5,

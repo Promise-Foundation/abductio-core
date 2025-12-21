@@ -43,7 +43,7 @@ def _run(roots: List[RootSpec]) -> Dict[str, Any]:
     audit = MemAudit()
     deps = RunSessionDeps(evaluator=ScriptEvaluator(), decomposer=ScriptDecomposer(), audit_sink=audit)
     req = SessionRequest(
-        claim="determinism strict",
+        scope="determinism strict",
         roots=roots,
         config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40),
         credits=8,

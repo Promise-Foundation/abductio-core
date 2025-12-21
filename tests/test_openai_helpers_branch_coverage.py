@@ -41,7 +41,7 @@ def test_chat_text_handles_exceptions() -> None:
 def test_parse_node_key_variants() -> None:
     assert m._parse_node_key("H1") == ("H1", None, None)
     assert m._parse_node_key("H1:feasibility") == ("H1", "feasibility", None)
-    assert m._parse_node_key("H1:fit:c1") == ("H1", "fit", "c1")
+    assert m._parse_node_key("H1:fit_to_key_features:c1") == ("H1", "fit_to_key_features", "c1")
 
 
 class _FakeResponses:

@@ -122,33 +122,28 @@ def _derive_k_from_rubric(rubric: Dict[str, int]) -> Tuple[float, bool]:
     return base_k, guardrail
 
 
-def _slot_alias(slot_key: str) -> str:
-    return "fit" if slot_key == "fit_to_key_features" else slot_key
-
-
-def _aggregate_soft_and(slot_node: Node, child_nodes: Dict[str, Node]) -> Tuple[float, Dict[str, float]]:
-    children = [child_nodes[k] for k in slot_node.children if k in child_nodes]
+def _aggregate_soft_and(node: Node, nodes: Dict[str, Node]) -> Tuple[float, Dict[str, float]]:
+    children = [nodes[k] for k in node.children if k in nodes]
     assessed = [c for c in children if c.assessed]
     if not assessed:
-        return 1.0, {"p_min": 1.0, "p_prod": 1.0, "c": float(slot_node.coupling or 0.0)}
+        return 1.0, {"p_min": 1.0, "p_prod": 1.0, "c": float(node.coupling or 0.0)}
     p_values = [c.p for c in assessed]
     p_min = min(p_values)
     p_prod = 1.0
     for v in p_values:
         p_prod *= v
-    c = float(slot_node.coupling or 0.0)
+    c = float(node.coupling or 0.0)
     m = c * p_min + (1.0 - c) * p_prod
     return m, {"p_min": p_min, "p_prod": p_prod, "c": c}
 
 
-def _apply_slot_decomposition(
+def _apply_node_decomposition(
     deps: RunSessionDeps,
-    root: RootHypothesis,
-    slot_key: str,
+    node_key: str,
     decomposition: Dict[str, object],
-    child_nodes: Dict[str, Node],
+    nodes: Dict[str, Node],
 ) -> bool:
-    node = root.obligations.get(slot_key)
+    node = nodes.get(node_key)
     if not node:
         return False
     if not decomposition or not decomposition.get("children"):
@@ -156,9 +151,9 @@ def _apply_slot_decomposition(
             node.decomp_type = "NONE"
             deps.audit_sink.append(
                 AuditEvent(
-                    event_type="SLOT_DECOMPOSED",
+                    event_type="NODE_REFINED_REQUIREMENTS",
                     payload={
-                        "slot_node_key": f"{root.root_id}:{slot_key}",
+                        "node_key": node_key,
                         "type": node.decomp_type,
                         "coupling": node.coupling,
                         "children": [],
@@ -171,29 +166,29 @@ def _apply_slot_decomposition(
     node.coupling = decomposition.get("coupling")
     node.children = []
 
-    alias = _slot_alias(slot_key)
     for child in decomposition.get("children", []):
         if not isinstance(child, dict):
             continue
         child_id = child.get("child_id") or child.get("id")
         if not child_id:
             continue
-        node_key = f"{root.root_id}:{alias}:{child_id}"
-        child_nodes[node_key] = Node(
-            node_key=node_key,
+        child_node_key = f"{node_key}:{child_id}"
+        nodes[child_node_key] = Node(
+            node_key=child_node_key,
             statement=str(child.get("statement", "")),
             role=str(child.get("role", "NEC")),
             p=1.0,
             k=0.15,
             assessed=False,
         )
-        node.children.append(node_key)
+        node.children.append(child_node_key)
 
+    node.children.sort()
     deps.audit_sink.append(
         AuditEvent(
-            event_type="SLOT_DECOMPOSED",
+            event_type="NODE_REFINED_REQUIREMENTS",
             payload={
-                "slot_node_key": f"{root.root_id}:{slot_key}",
+                "node_key": node_key,
                 "type": node.decomp_type,
                 "coupling": node.coupling,
                 "children": list(node.children),
@@ -211,6 +206,7 @@ def _decompose_root(
     decomposition: Dict[str, str],
     slot_k_min: Optional[float],
     slot_initial_p: Dict[str, float],
+    nodes: Dict[str, Node],
 ) -> None:
     ok = bool(decomposition) and decomposition.get("ok", True)
     if not ok:
@@ -227,7 +223,7 @@ def _decompose_root(
         role = required_slot_roles.get(slot_key, "NEC")
         initial_p = float(slot_initial_p.get(node_key, 1.0))
         node_k = float(slot_k_min) if slot_k_min is not None else 0.15
-        root.obligations[slot_key] = Node(
+        nodes[node_key] = Node(
             node_key=node_key,
             statement=statement,
             role=role,
@@ -235,10 +231,13 @@ def _decompose_root(
             k=node_k,
             assessed=False,
         )
+        root.obligations[slot_key] = node_key
 
     root.status = "SCOPED"
     if root.obligations:
-        root.k_root = min(n.k for n in root.obligations.values())
+        slot_nodes = [nodes[k] for k in root.obligations.values() if k in nodes]
+        if slot_nodes:
+            root.k_root = min(n.k for n in slot_nodes)
 
     deps.audit_sink.append(
         AuditEvent(
@@ -252,25 +251,48 @@ def _slot_order_map(required_slot_keys: List[str]) -> Dict[str, int]:
     return {k: i for i, k in enumerate(required_slot_keys)}
 
 
+def _sorted_children(node: Node, nodes: Dict[str, Node]) -> List[str]:
+    return sorted([ck for ck in node.children if ck in nodes])
+
+
+def _flatten_subtree(node: Node, nodes: Dict[str, Node]) -> List[str]:
+    ordered: List[str] = []
+    for child_key in _sorted_children(node, nodes):
+        ordered.append(child_key)
+        child = nodes.get(child_key)
+        if child:
+            ordered.extend(_flatten_subtree(child, nodes))
+    return ordered
+
+
 def _select_slot_lowest_k(
     root: RootHypothesis,
     required_slot_keys: List[str],
+    nodes: Dict[str, Node],
     tau: float,
 ) -> Optional[str]:
     order = _slot_order_map(required_slot_keys)
-    candidates = [(root.obligations[k].k, order.get(k, 10_000), k) for k in required_slot_keys if k in root.obligations]
+    candidates = []
+    for slot_key in required_slot_keys:
+        node_key = root.obligations.get(slot_key)
+        if not node_key:
+            continue
+        node = nodes.get(node_key)
+        if not node:
+            continue
+        candidates.append((node.k, order.get(slot_key, 10_000), slot_key))
     if not candidates:
         return None
     _, _, slot_key = sorted(candidates)[0]
     return slot_key
 
 
-def _select_child_to_evaluate(slot_node: Node, child_nodes: Dict[str, Node]) -> Optional[str]:
-    if not slot_node.children:
+def _select_child_to_evaluate(node: Node, nodes: Dict[str, Node]) -> Optional[str]:
+    if not node.children:
         return None
     candidates = []
-    for ck in slot_node.children:
-        cn = child_nodes.get(ck)
+    for ck in node.children:
+        cn = nodes.get(ck)
         if not cn:
             continue
         candidates.append((cn.assessed, cn.k, cn.node_key))
@@ -283,8 +305,43 @@ def _select_child_to_evaluate(slot_node: Node, child_nodes: Dict[str, Node]) -> 
     return node_key
 
 
+def _node_needs_decomposition(node: Node, tau: float, credits_left: int) -> bool:
+    return node.decomp_type is None and not node.children and float(node.k) < float(tau) and credits_left > 1
+
+
+def _select_decompose_in_subtree(
+    node: Node,
+    nodes: Dict[str, Node],
+    tau: float,
+    credits_left: int,
+) -> Optional[str]:
+    for child_key in _sorted_children(node, nodes):
+        child = nodes.get(child_key)
+        if not child:
+            continue
+        if _node_needs_decomposition(child, tau, credits_left):
+            return child.node_key
+        nested = _select_decompose_in_subtree(child, nodes, tau, credits_left)
+        if nested:
+            return nested
+    return None
+
+
+def _select_unassessed_in_subtree(node: Node, nodes: Dict[str, Node]) -> Optional[str]:
+    for child_key in _sorted_children(node, nodes):
+        child = nodes.get(child_key)
+        if not child:
+            continue
+        if not child.assessed:
+            return child.node_key
+        nested = _select_unassessed_in_subtree(child, nodes)
+        if nested:
+            return nested
+    return None
+
+
 def _select_child_for_evaluation(
-    root: RootHypothesis, required_slot_keys: List[str], child_nodes: Dict[str, Node]
+    root: RootHypothesis, required_slot_keys: List[str], nodes: Dict[str, Node]
 ) -> Optional[str]:
     if not required_slot_keys:
         return None
@@ -292,27 +349,27 @@ def _select_child_for_evaluation(
     slots_with_children = [
         (slot_order.get(k, 10_000), k)
         for k in required_slot_keys
-        if k in root.obligations and root.obligations[k].children
+        if k in root.obligations and nodes.get(root.obligations[k]) and nodes[root.obligations[k]].children
     ]
     for _, slot_key in sorted(slots_with_children):
-        slot_node = root.obligations[slot_key]
-        child_key = _select_child_to_evaluate(slot_node, child_nodes)
+        slot_node = nodes[root.obligations[slot_key]]
+        child_key = _select_unassessed_in_subtree(slot_node, nodes)
         if child_key:
             return child_key
     return None
 
-def _select_slot_for_evaluation(root: RootHypothesis, required_slot_keys: List[str]) -> Optional[str]:
+def _select_slot_for_evaluation(root: RootHypothesis, required_slot_keys: List[str], nodes: Dict[str, Node]) -> Optional[str]:
     if not required_slot_keys:
         return None
     available = [k for k in required_slot_keys if k in root.obligations]
     if not available:
         return None
-    slot_key = _select_slot_lowest_k(root, required_slot_keys, 0.0)
-    return root.obligations[slot_key].node_key if slot_key else None
+    slot_key = _select_slot_lowest_k(root, required_slot_keys, nodes, 0.0)
+    return root.obligations[slot_key] if slot_key else None
 
 
 def _frontier_confident(
-    frontier: List[RootHypothesis], required_slot_keys: List[str], tau: float
+    frontier: List[RootHypothesis], required_slot_keys: List[str], nodes: Dict[str, Node], tau: float
 ) -> bool:
     if not frontier:
         return False
@@ -320,9 +377,13 @@ def _frontier_confident(
         if root.status != "SCOPED":
             return False
         for slot_key in required_slot_keys:
-            if slot_key not in root.obligations:
+            node_key = root.obligations.get(slot_key)
+            if not node_key:
                 return False
-            if float(root.obligations[slot_key].k) < float(tau):
+            node = nodes.get(node_key)
+            if not node:
+                return False
+            if float(node.k) < float(tau):
                 return False
     return True
 
@@ -331,7 +392,7 @@ def _legal_next_for_root(
     root: RootHypothesis,
     required_slot_keys: List[str],
     tau: float,
-    child_nodes: Dict[str, Node],
+    nodes: Dict[str, Node],
     credits_left: int,
 ) -> Optional[Tuple[str, str]]:
     if root.status == "UNSCOPED":
@@ -339,15 +400,22 @@ def _legal_next_for_root(
     if any(k not in root.obligations for k in required_slot_keys):
         return ("DECOMPOSE", root.root_id)
 
-    slot_key = _select_slot_lowest_k(root, required_slot_keys, tau)
+    slot_key = _select_slot_lowest_k(root, required_slot_keys, nodes, tau)
     if not slot_key:
         return None
-    slot = root.obligations[slot_key]
+    slot_key_node = root.obligations[slot_key]
+    slot = nodes.get(slot_key_node)
+    if not slot:
+        return None
 
-    if not slot.children and slot.decomp_type is None and float(slot.k) < float(tau) and credits_left > 1:
-        return ("DECOMPOSE", f"{root.root_id}:{slot_key}")
+    if _node_needs_decomposition(slot, tau, credits_left):
+        return ("DECOMPOSE", slot.node_key)
 
-    child_key = _select_child_to_evaluate(slot, child_nodes)
+    child_decompose = _select_decompose_in_subtree(slot, nodes, tau, credits_left)
+    if child_decompose:
+        return ("DECOMPOSE", child_decompose)
+
+    child_key = _select_unassessed_in_subtree(slot, nodes)
     if child_key:
         return ("EVALUATE", child_key)
 
@@ -387,14 +455,23 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
     slot_initial_p = request.slot_initial_p or {}
     force_scope_fail_root = request.force_scope_fail_root
 
-    child_nodes: Dict[str, Node] = {}
+    nodes: Dict[str, Node] = {}
 
     def record_op(op_type: str, target_id: str, before: int, after: int) -> None:
         operation_log.append({"op_type": op_type, "target_id": target_id, "credits_before": before, "credits_after": after})
         deps.audit_sink.append(AuditEvent("OP_EXECUTED", {"op_type": op_type, "target_id": target_id, "credits_before": before, "credits_after": after}))
 
     def apply_ledger_update(root: RootHypothesis) -> None:
-        slot_p_values = [root.obligations[k].p for k in required_slot_keys if k in root.obligations] or [1.0]
+        slot_p_values = []
+        for slot_key in required_slot_keys:
+            node_key = root.obligations.get(slot_key)
+            if not node_key:
+                continue
+            node = nodes.get(node_key)
+            if node:
+                slot_p_values.append(node.p)
+        if not slot_p_values:
+            slot_p_values = [1.0]
         m = 1.0
         for v in slot_p_values:
             m *= float(v)
@@ -417,12 +494,7 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
         deps.audit_sink.append(AuditEvent("INVARIANT_SUM_TO_ONE_CHECK", {"total": sum(hypothesis_set.ledger.values())}))
 
     def evaluate_node(root: RootHypothesis, node_key: str) -> None:
-        node: Optional[Node] = child_nodes.get(node_key)
-        if node is None:
-            for slot_node in root.obligations.values():
-                if slot_node.node_key == node_key:
-                    node = slot_node
-                    break
+        node = nodes.get(node_key)
         if node is None:
             return
 
@@ -448,14 +520,22 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
 
         deps.audit_sink.append(AuditEvent("NODE_EVALUATED", {"node_key": node_key, "p": node.p, "k": node.k}))
 
-        if node_key in child_nodes:
-            for slot_key, slot_node in root.obligations.items():
-                if node_key in slot_node.children and slot_node.decomp_type == "AND":
-                    aggregated, details = _aggregate_soft_and(slot_node, child_nodes)
-                    slot_node.p = _clamp_probability(float(aggregated))
-                    deps.audit_sink.append(AuditEvent("SOFT_AND_COMPUTED", {"slot_key": slot_key, **details, "m": slot_node.p}))
+        for parent in nodes.values():
+            if parent.decomp_type == "AND" and node_key in parent.children:
+                aggregated, details = _aggregate_soft_and(parent, nodes)
+                parent.p = _clamp_probability(float(aggregated))
+                deps.audit_sink.append(
+                    AuditEvent("SOFT_AND_COMPUTED", {"node_key": parent.node_key, **details, "m": parent.p})
+                )
 
-        assessed_slots = [root.obligations[k] for k in required_slot_keys if k in root.obligations and root.obligations[k].assessed]
+        assessed_slots = []
+        for slot_key in required_slot_keys:
+            node_key_for_slot = root.obligations.get(slot_key)
+            if not node_key_for_slot:
+                continue
+            slot_node = nodes.get(node_key_for_slot)
+            if slot_node and slot_node.assessed:
+                assessed_slots.append(slot_node)
         if assessed_slots:
             root.k_root = min(n.k for n in assessed_slots)
 
@@ -466,10 +546,22 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
         if not r:
             continue
         decomp = deps.decomposer.decompose(rid)
-        _decompose_root(deps, r, required_slot_keys, required_slot_roles, decomp, slot_k_min.get(rid), slot_initial_p)
+        _decompose_root(
+            deps,
+            r,
+            required_slot_keys,
+            required_slot_roles,
+            decomp,
+            slot_k_min.get(rid),
+            slot_initial_p,
+            nodes,
+        )
         for slot_key in list(r.obligations.keys()):
-            slot_decomp = deps.decomposer.decompose(f"{r.root_id}:{slot_key}")
-            _apply_slot_decomposition(deps, r, slot_key, slot_decomp, child_nodes)
+            slot_node_key = r.obligations.get(slot_key)
+            if not slot_node_key:
+                continue
+            slot_decomp = deps.decomposer.decompose(slot_node_key)
+            _apply_node_decomposition(deps, slot_node_key, slot_decomp, nodes)
 
     def frontier_ids() -> Tuple[Optional[str], List[RootHypothesis]]:
         return _compute_frontier([root for root_id, root in hypothesis_set.roots.items() if root_id != H_OTHER_ID], hypothesis_set.ledger, request.config.epsilon)
@@ -511,7 +603,7 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
             if (
                 run_mode in {"until_stops", "operations"}
                 and not force_scope_fail_root
-                and _frontier_confident(frontier, required_slot_keys, request.config.tau)
+                and _frontier_confident(frontier, required_slot_keys, nodes, request.config.tau)
             ):
                 stop_reason = StopReason.FRONTIER_CONFIDENT
                 break
@@ -521,11 +613,11 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
                 rr_index += 1
                 node_key = request.run_target
                 if not node_key:
-                    node_key = _select_child_for_evaluation(target_root, required_slot_keys, child_nodes)
+                    node_key = _select_child_for_evaluation(target_root, required_slot_keys, nodes)
                 if not node_key:
-                    node_key = _select_slot_for_evaluation(target_root, required_slot_keys)
+                    node_key = _select_slot_for_evaluation(target_root, required_slot_keys, nodes)
                 if not node_key:
-                    if all(_select_slot_for_evaluation(r, required_slot_keys) is None for r in frontier):
+                    if all(_select_slot_for_evaluation(r, required_slot_keys, nodes) is None for r in frontier):
                         stop_reason = StopReason.NO_LEGAL_OP
                         break
                     continue
@@ -541,15 +633,16 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
             if run_mode == "evaluations_children":
                 target_root = frontier[rr_index % len(frontier)]
                 rr_index += 1
-                child_slots = [
-                    k
-                    for k in required_slot_keys
-                    if k in target_root.obligations and target_root.obligations[k].children
-                ]
+                child_slots = []
+                for k in required_slot_keys:
+                    node_key = target_root.obligations.get(k)
+                    node = nodes.get(node_key) if node_key else None
+                    if node and node.children:
+                        child_slots.append(k)
                 if child_slots:
                     slot_order = _slot_order_map(required_slot_keys)
                     child_slots.sort(key=lambda k: slot_order.get(k, 10_000))
-                    slot = target_root.obligations[child_slots[0]]
+                    slot = nodes.get(target_root.obligations[child_slots[0]])
                 else:
                     available = [k for k in required_slot_keys if k in target_root.obligations]
                     if not available:
@@ -557,18 +650,19 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
                             stop_reason = StopReason.NO_LEGAL_OP
                             break
                         continue
-                    selected_slot = _select_slot_lowest_k(target_root, required_slot_keys, request.config.tau)
+                    selected_slot = _select_slot_lowest_k(target_root, required_slot_keys, nodes, request.config.tau)
                     if not selected_slot:
                         stop_reason = StopReason.NO_LEGAL_OP
                         break
-                    slot = target_root.obligations.get(selected_slot)
+                    slot_key_node = target_root.obligations.get(selected_slot)
+                    slot = nodes.get(slot_key_node) if slot_key_node else None
                 if not slot:
                     if all(not any(k in r.obligations for k in required_slot_keys) for r in frontier):
                         stop_reason = StopReason.NO_LEGAL_OP
                         break
                     continue
                 if slot.children:
-                    for child_key in sorted(slot.children):
+                    for child_key in _flatten_subtree(slot, nodes):
                         if credits_remaining <= 0:
                             stop_reason = StopReason.CREDITS_EXHAUSTED
                             break
@@ -595,10 +689,10 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
             target_root = frontier[rr_index % len(frontier)]
             rr_index += 1
 
-            nxt = _legal_next_for_root(target_root, required_slot_keys, request.config.tau, child_nodes, credits_remaining)
+            nxt = _legal_next_for_root(target_root, required_slot_keys, request.config.tau, nodes, credits_remaining)
             if nxt is None:
                 if all(
-                    _legal_next_for_root(r, required_slot_keys, request.config.tau, child_nodes, credits_remaining)
+                    _legal_next_for_root(r, required_slot_keys, request.config.tau, nodes, credits_remaining)
                     is None
                     for r in frontier
                 ):
@@ -615,9 +709,8 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
 
             if op_type == "DECOMPOSE":
                 if ":" in target_id:
-                    root_id, slot_key = target_id.split(":", 1)
                     slot_decomp = deps.decomposer.decompose(target_id)
-                    _apply_slot_decomposition(deps, target_root, slot_key, slot_decomp, child_nodes)
+                    _apply_node_decomposition(deps, target_id, slot_decomp, nodes)
                 else:
                     if force_scope_fail_root and target_root.root_id == force_scope_fail_root:
                         decomp = {"ok": False}
@@ -631,6 +724,7 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
                         decomp,
                         slot_k_min.get(target_root.root_id),
                         slot_initial_p,
+                        nodes,
                     )
                 record_op("DECOMPOSE", target_id, before, credits_remaining)
             else:
@@ -671,15 +765,32 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
                     "decomp_type": node.decomp_type,
                     "coupling": node.coupling,
                 }
-                for slot_key, node in root.obligations.items()
+                for slot_key, node_key in root.obligations.items()
+                if (node := nodes.get(node_key))
             },
         }
         for root_id, root in hypothesis_set.roots.items()
     }
 
+    nodes_view = {
+        node_key: {
+            "node_key": node.node_key,
+            "statement": node.statement,
+            "role": node.role,
+            "p": node.p,
+            "k": node.k,
+            "assessed": node.assessed,
+            "children": list(node.children),
+            "decomp_type": node.decomp_type,
+            "coupling": node.coupling,
+        }
+        for node_key, node in nodes.items()
+    }
+
     return SessionResult(
         roots=roots_view,
         ledger=dict(hypothesis_set.ledger),
+        nodes=nodes_view,
         audit=[{"event_type": e.event_type, "payload": e.payload} for e in deps.audit_sink.events],
         stop_reason=stop_reason,
         credits_remaining=credits_remaining,

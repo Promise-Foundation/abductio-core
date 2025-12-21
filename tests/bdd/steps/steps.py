@@ -347,10 +347,10 @@ def given_api_adapter_configured(context) -> None:
     world.decomposer_script["api_configured"] = True
 
 
-@when('I start a session for claim "{claim}"')
-def when_start_session(context, claim: str) -> None:
+@when('I start a session for scope "{scope}"')
+def when_start_session(context, scope: str) -> None:
     world = get_world(context)
-    world.run_engine(f"start_session:{claim}")
+    world.run_engine(f"start_session:{scope}")
 
 
 @when("I run the engine until credits exhausted")
@@ -423,13 +423,13 @@ def when_call_library_use_case(context) -> None:
     world.run_engine("until_credits_exhausted")
 
 
-@when("the CLI adapter is invoked with args that specify claim and credits")
+@when("the CLI adapter is invoked with args that specify scope and credits")
 def when_cli_adapter_invoked(context) -> None:
     world = get_world(context)
     world.run_engine("until_credits_exhausted")
 
 
-@when("the API endpoint is called with a JSON body specifying claim and config")
+@when("the API endpoint is called with a JSON body specifying scope and config")
 def when_api_endpoint_called(context) -> None:
     world = get_world(context)
     world.run_engine("until_credits_exhausted")

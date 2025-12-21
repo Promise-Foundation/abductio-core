@@ -25,7 +25,7 @@ class RootHypothesis:
     canonical_id: str
     status: str = "UNSCOPED"
     k_root: float = 0.15
-    obligations: Dict[str, Node] = field(default_factory=dict)
+    obligations: Dict[str, str] = field(default_factory=dict)
     credits_spent: int = 0
 
 

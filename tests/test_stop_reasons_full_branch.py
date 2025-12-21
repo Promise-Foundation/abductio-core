@@ -44,7 +44,7 @@ def _deps() -> RunSessionDeps:
 
 def test_stop_reason_no_hypotheses_when_no_named_roots() -> None:
     req = SessionRequest(
-        claim="no hypotheses",
+        scope="no hypotheses",
         roots=[],
         config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40),
         credits=5,
@@ -57,7 +57,7 @@ def test_stop_reason_no_hypotheses_when_no_named_roots() -> None:
 
 def test_stop_reason_op_limit_reached() -> None:
     req = SessionRequest(
-        claim="op limit",
+        scope="op limit",
         roots=[RootSpec("H1", "Mechanism A", "x")],
         config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40),
         credits=10,
@@ -72,7 +72,7 @@ def test_stop_reason_op_limit_reached() -> None:
 
 def test_stop_reason_no_legal_op_after_decomp_and_eval() -> None:
     req = SessionRequest(
-        claim="no legal op",
+        scope="no legal op",
         roots=[RootSpec("H1", "Mechanism A", "x")],
         config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40),
         credits=10,

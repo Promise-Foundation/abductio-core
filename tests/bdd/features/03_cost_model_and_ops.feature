@@ -36,7 +36,7 @@ Feature: Cost model and operation legality
       | H1   | Mechanism A        | Not explained by any other root |
       | H2   | Mechanism B        | Not explained by any other root |
     And credits 0
-    When I start a session for claim "Test claim"
+    When I start a session for scope "Test scope"
     Then stop_reason is "CREDITS_EXHAUSTED"
     And no operations were executed
 

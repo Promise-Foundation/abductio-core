@@ -39,13 +39,15 @@ def replay_session(audit_trace: Iterable[Dict[str, object]]) -> SessionResult:
                 roots.setdefault(rid, {"id": rid})
                 roots[rid]["status"] = "SCOPED"
                 roots[rid].setdefault("obligations", {})
-        elif et == "SLOT_DECOMPOSED":
-            slot_node_key = payload.get("slot_node_key")
+        elif et in {"SLOT_DECOMPOSED", "NODE_REFINED_REQUIREMENTS"}:
+            slot_node_key = payload.get("slot_node_key") or payload.get("node_key")
             if isinstance(slot_node_key, str) and ":" in slot_node_key:
-                rid, slot_key = slot_node_key.split(":", 1)
+                parts = slot_node_key.split(":")
+                rid = parts[0]
+                slot_key = parts[1] if len(parts) > 1 else ""
                 roots.setdefault(rid, {"id": rid, "status": "SCOPED", "obligations": {}})
                 obligations = roots[rid].setdefault("obligations", {})
-                if isinstance(obligations, dict):
+                if isinstance(obligations, dict) and slot_key:
                     obligations.setdefault(slot_key, {})
                     if isinstance(obligations[slot_key], dict):
                         obligations[slot_key]["children"] = list(payload.get("children", []))
@@ -80,6 +82,7 @@ def replay_session(audit_trace: Iterable[Dict[str, object]]) -> SessionResult:
     return SessionResult(
         roots={k: dict(v) for k, v in roots.items()},
         ledger=dict(ledger),
+        nodes={},
         audit=list(audit_trace),
         stop_reason=stop_reason,
         credits_remaining=0,

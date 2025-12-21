@@ -19,12 +19,12 @@ Feature: Presentation adapters (CLI/API) do not bypass the application layer
 
   Scenario: CLI adapter uses the same application use case (integration seam)
     Given the CLI adapter is configured with an application runner instance
-    When the CLI adapter is invoked with args that specify claim and credits
+    When the CLI adapter is invoked with args that specify scope and credits
     Then the CLI adapter calls exactly one application run use case
     And the CLI output is derived only from SessionResult (no domain/infrastructure leakage)
 
   Scenario: API adapter uses the same application use case (integration seam)
     Given the API adapter is configured with an application runner instance
-    When the API endpoint is called with a JSON body specifying claim and config
+    When the API endpoint is called with a JSON body specifying scope and config
     Then the API adapter calls exactly one application run use case
     And the API response is derived only from SessionResult

@@ -126,37 +126,37 @@ class StepWorld:
         run_count: Optional[int] = None
         run_target: Optional[str] = None
         if mode.startswith("start_session:"):
-            claim = mode.split(":", 1)[1]
+            scope = mode.split(":", 1)[1]
             roots = self.roots
             run_mode = "start_only"
         elif mode == "until_credits_exhausted":
-            claim = self.config.get("claim", "Untitled claim")
+            scope = self.config.get("scope", "Untitled scope")
             roots = self.roots
             run_mode = "until_credits_exhausted"
         elif mode == "until_stops":
-            claim = self.config.get("claim", "Untitled claim")
+            scope = self.config.get("scope", "Untitled scope")
             roots = self.roots
             run_mode = "until_stops"
         elif mode == "run_set_a":
-            claim = self.config.get("claim", "Untitled claim")
+            scope = self.config.get("scope", "Untitled scope")
             roots = self.roots_a
             run_mode = "until_stops"
         elif mode == "run_set_b":
-            claim = self.config.get("claim", "Untitled claim")
+            scope = self.config.get("scope", "Untitled scope")
             roots = self.roots_b
             run_mode = "until_stops"
         elif mode.startswith("operations:"):
-            claim = self.config.get("claim", "Untitled claim")
+            scope = self.config.get("scope", "Untitled scope")
             roots = self.roots
             run_mode = "operations"
             run_count = int(mode.split(":", 1)[1])
         elif mode.startswith("evaluations_children:"):
-            claim = self.config.get("claim", "Untitled claim")
+            scope = self.config.get("scope", "Untitled scope")
             roots = self.roots
             run_mode = "evaluations_children"
             run_count = int(mode.split(":", 1)[1])
         elif mode.startswith("evaluation:"):
-            claim = self.config.get("claim", "Untitled claim")
+            scope = self.config.get("scope", "Untitled scope")
             roots = self.roots
             run_mode = "evaluation"
             parts = mode.split(":")
@@ -174,7 +174,7 @@ class StepWorld:
                 self._ensure_required_slots(root.get("id"))
 
         session_request = self._build_request(
-            claim,
+            scope,
             roots,
             run_mode=run_mode,
             run_count=run_count,
@@ -197,7 +197,7 @@ class StepWorld:
             if mode.startswith("start_session:") and not self.replay_result:
                 reversed_roots = list(reversed(roots))
                 replay_request = self._build_request(
-                    claim,
+                    scope,
                     reversed_roots,
                     run_mode=run_mode,
                     run_count=run_count,
@@ -216,7 +216,7 @@ class StepWorld:
 
     def _build_request(
         self,
-        claim: str,
+        scope: str,
         roots: List[Dict[str, Any]],
         *,
         run_mode: Optional[str] = None,
@@ -239,7 +239,7 @@ class StepWorld:
         ]
         credits = int(self.credits or 0)
         return SessionRequest(
-            claim=claim,
+            scope=scope,
             roots=root_specs,
             config=config,
             credits=credits,

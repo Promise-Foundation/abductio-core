@@ -27,7 +27,7 @@ class EvidenceBundle:
 
 @dataclass(frozen=True)
 class SessionRequest:
-    claim: str
+    scope: str
     roots: List[RootSpec]
     config: SessionConfig
     credits: int

@@ -161,7 +161,7 @@ def _validate_slot_decomposition(out: Dict[str, Any]) -> None:
 class OpenAIDecomposerPort:
     client: OpenAIJsonClient
     required_slots_hint: List[str]
-    claim: Optional[str] = None
+    scope: Optional[str] = None
     root_statements: Optional[Dict[str, str]] = None
     default_coupling: float = 0.80
 
@@ -197,7 +197,7 @@ class OpenAIDecomposerPort:
                     "root_id": root_id,
                     "root_statement": root_statement,
                     "slot_key": slot_key,
-                    "claim": self.claim or "",
+                    "scope": self.scope or "",
                     "preferred_type": "AND",
                 }
             )
@@ -231,7 +231,7 @@ class OpenAIDecomposerPort:
                 "target_id": target_id,
                 "root_id": root_id,
                 "root_statement": root_statement,
-                "claim": self.claim or "",
+                "scope": self.scope or "",
                 "required_slots": self.required_slots_hint,
             }
         )
@@ -247,7 +247,7 @@ class OpenAIDecomposerPort:
 @dataclass
 class OpenAIEvaluatorPort:
     client: OpenAIJsonClient
-    claim: Optional[str] = None
+    scope: Optional[str] = None
     root_statements: Optional[Dict[str, str]] = None
 
     def evaluate(self, node_key: str) -> Dict[str, Any]:
@@ -275,7 +275,7 @@ class OpenAIEvaluatorPort:
                 "root_statement": root_statement,
                 "slot_key": slot_key,
                 "child_id": child_id,
-                "claim": self.claim or "",
+                "scope": self.scope or "",
             }
         )
         out = self.client.complete_json(system=system, user=user)
@@ -291,4 +291,4 @@ def _parse_node_key(node_key: str) -> Tuple[Optional[str], Optional[str], Option
         return node_key, None, None
     if len(parts) == 2:
         return parts[0], parts[1], None
-    return parts[0], parts[1], parts[2]
+    return parts[0], parts[1], ":".join(parts[2:])

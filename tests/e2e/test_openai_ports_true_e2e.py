@@ -31,18 +31,18 @@ def test_e2e_openai_scopes_decomposes_evaluates_and_replays() -> None:
 
     required_slots = [{"slot_key": "feasibility", "role": "NEC"}]
     deps = RunSessionDeps(
-        evaluator=OpenAIEvaluatorPort(client, claim="E2E OpenAI ports", root_statements=root_statements),
+        evaluator=OpenAIEvaluatorPort(client, scope="E2E OpenAI ports", root_statements=root_statements),
         decomposer=OpenAIDecomposerPort(
             client,
             required_slots_hint=["feasibility"],
-            claim="E2E OpenAI ports",
+            scope="E2E OpenAI ports",
             root_statements=root_statements,
         ),
         audit_sink=InMemoryAudit(),
     )
 
     req = SessionRequest(
-        claim="E2E OpenAI ports",
+        scope="E2E OpenAI ports",
         roots=[
             RootSpec("H1", "Mechanism A", "x"),
             RootSpec("H2", "Mechanism B", "x"),
@@ -61,7 +61,7 @@ def test_e2e_openai_scopes_decomposes_evaluates_and_replays() -> None:
 
     event_types = [event["event_type"] for event in res["audit"]]
     assert "ROOT_SCOPED" in event_types
-    assert "SLOT_DECOMPOSED" in event_types
+    assert "NODE_REFINED_REQUIREMENTS" in event_types
     assert "NODE_EVALUATED" in event_types
     assert "SOFT_AND_COMPUTED" in event_types
     assert "DAMPING_APPLIED" in event_types

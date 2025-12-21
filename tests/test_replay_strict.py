@@ -48,7 +48,7 @@ def test_replay_matches_final_ledger_and_stop_reason() -> None:
     deps = RunSessionDeps(evaluator=ScriptEvaluator(), decomposer=ScriptDecomposer(), audit_sink=audit)
 
     req = SessionRequest(
-        claim="replay strict",
+        scope="replay strict",
         roots=[
             RootSpec("H1", "Mechanism A", "x"),
             RootSpec("H2", "Mechanism B", "x"),

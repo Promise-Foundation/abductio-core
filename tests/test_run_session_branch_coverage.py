@@ -58,7 +58,7 @@ def _deps() -> RunSessionDeps:
 
 def _base_request() -> SessionRequest:
     return SessionRequest(
-        claim="test",
+        scope="test",
         roots=[RootSpec("H1", "Mechanism A", "x")],
         config=SessionConfig(tau=0.7, epsilon=0.05, gamma=0.2, alpha=0.4),
         credits=1,
@@ -88,25 +88,26 @@ def test_validate_request_errors() -> None:
 
 
 def test_aggregate_soft_and_no_assessed_children() -> None:
-    slot = Node(node_key="H1:fit", statement="fit", role="NEC", coupling=0.5)
-    slot.children = ["c1"]
-    child_nodes = {"c1": Node(node_key="c1", statement="child", role="NEC", assessed=False)}
-    value, details = rs._aggregate_soft_and(slot, child_nodes)
+    slot = Node(node_key="H1:fit_to_key_features", statement="fit", role="NEC", coupling=0.5)
+    child_key = "H1:fit_to_key_features:c1"
+    slot.children = [child_key]
+    nodes = {child_key: Node(node_key=child_key, statement="child", role="NEC", assessed=False)}
+    value, details = rs._aggregate_soft_and(slot, nodes)
     assert value == 1.0
     assert details["p_min"] == 1.0
     assert details["p_prod"] == 1.0
 
 
-def test_apply_slot_decomposition_branches() -> None:
+def test_apply_node_decomposition_branches() -> None:
     audit = MemAudit()
     deps = RunSessionDeps(evaluator=NoopEvaluator(), decomposer=NoopDecomposer(), audit_sink=audit)
-    root = RootHypothesis(root_id="H1", statement="S", exclusion_clause="x", canonical_id="cid")
-    assert rs._apply_slot_decomposition(deps, root, "missing", {}, {}) is False
+    nodes: Dict[str, Node] = {}
+    assert rs._apply_node_decomposition(deps, "missing", {}, nodes) is False
 
-    root.obligations["slot"] = Node(node_key="H1:slot", statement="", role="NEC")
-    assert rs._apply_slot_decomposition(deps, root, "slot", {}, {}) is False
-    assert root.obligations["slot"].decomp_type == "NONE"
-    assert any(e.event_type == "SLOT_DECOMPOSED" for e in audit.events)
+    nodes["H1:slot"] = Node(node_key="H1:slot", statement="", role="NEC")
+    assert rs._apply_node_decomposition(deps, "H1:slot", {}, nodes) is False
+    assert nodes["H1:slot"].decomp_type == "NONE"
+    assert any(e.event_type == "NODE_REFINED_REQUIREMENTS" for e in audit.events)
 
     audit.events.clear()
     decomp = {
@@ -114,14 +115,13 @@ def test_apply_slot_decomposition_branches() -> None:
         "coupling": 0.8,
         "children": ["bad", {"id": ""}, {"child_id": "c1", "statement": "ok"}],
     }
-    child_nodes: Dict[str, Node] = {}
-    assert rs._apply_slot_decomposition(deps, root, "slot", decomp, child_nodes) is True
-    assert "H1:slot:c1" in child_nodes
+    assert rs._apply_node_decomposition(deps, "H1:slot", decomp, nodes) is True
+    assert "H1:slot:c1" in nodes
 
 
 def test_select_helpers_cover_empty_and_assessed() -> None:
     root = RootHypothesis(root_id="H1", statement="S", exclusion_clause="x", canonical_id="cid")
-    assert rs._select_slot_lowest_k(root, ["feasibility"], 0.7) is None
+    assert rs._select_slot_lowest_k(root, ["feasibility"], {}, 0.7) is None
 
     slot = Node(node_key="H1:slot", statement="", role="NEC")
     slot.children = ["c_missing"]
@@ -131,12 +131,13 @@ def test_select_helpers_cover_empty_and_assessed() -> None:
     slot.children = ["c1"]
     assert rs._select_child_to_evaluate(slot, child_nodes) is None
 
-    root.obligations["slot"] = slot
-    assert rs._select_child_for_evaluation(root, [], child_nodes) is None
-    assert rs._select_child_for_evaluation(root, ["slot"], child_nodes) is None
+    nodes = {"H1:slot": slot}
+    root.obligations["slot"] = "H1:slot"
+    assert rs._select_child_for_evaluation(root, [], nodes) is None
+    assert rs._select_child_for_evaluation(root, ["slot"], nodes) is None
 
-    assert rs._select_slot_for_evaluation(root, []) is None
-    assert rs._select_slot_for_evaluation(RootHypothesis("H2", "S", "x", "cid2"), ["slot"]) is None
+    assert rs._select_slot_for_evaluation(root, [], nodes) is None
+    assert rs._select_slot_for_evaluation(RootHypothesis("H2", "S", "x", "cid2"), ["slot"], nodes) is None
 
 
 def test_run_session_evaluation_with_missing_node() -> None:
@@ -177,31 +178,34 @@ def test_evaluation_mode_no_slots_no_legal_op() -> None:
 
 def test_frontier_confident_and_legal_next_helpers() -> None:
     root = RootHypothesis(root_id="H1", statement="S", exclusion_clause="x", canonical_id="cid", status="SCOPED")
-    assert rs._frontier_confident([], ["slot"], 0.7) is False
-    assert rs._frontier_confident([root], ["slot"], 0.7) is False
-    root.obligations["slot"] = Node(node_key="H1:slot", statement="", role="NEC", k=0.5, assessed=True)
-    assert rs._frontier_confident([root], ["slot"], 0.7) is False
-    root.obligations["slot"].k = 0.8
-    assert rs._frontier_confident([root], ["slot"], 0.7) is True
+    nodes: Dict[str, Node] = {}
+    assert rs._frontier_confident([], ["slot"], nodes, 0.7) is False
+    assert rs._frontier_confident([root], ["slot"], nodes, 0.7) is False
+    nodes["H1:slot"] = Node(node_key="H1:slot", statement="", role="NEC", k=0.5, assessed=True)
+    root.obligations["slot"] = "H1:slot"
+    assert rs._frontier_confident([root], ["slot"], nodes, 0.7) is False
+    nodes["H1:slot"].k = 0.8
+    assert rs._frontier_confident([root], ["slot"], nodes, 0.7) is True
 
     root.status = "UNSCOPED"
-    nxt = rs._legal_next_for_root(root, ["slot"], 0.7, {}, credits_left=2)
+    nxt = rs._legal_next_for_root(root, ["slot"], 0.7, nodes, credits_left=2)
     assert nxt == ("DECOMPOSE", "H1")
 
     root.status = "SCOPED"
     root.obligations.clear()
-    nxt = rs._legal_next_for_root(root, ["slot"], 0.7, {}, credits_left=2)
+    nxt = rs._legal_next_for_root(root, ["slot"], 0.7, nodes, credits_left=2)
     assert nxt == ("DECOMPOSE", "H1")
 
-    nxt = rs._legal_next_for_root(root, [], 0.7, {}, credits_left=2)
+    nxt = rs._legal_next_for_root(root, [], 0.7, nodes, credits_left=2)
     assert nxt is None
 
-    root.obligations["slot"] = Node(node_key="H1:slot", statement="", role="NEC", k=0.1, assessed=False)
-    nxt = rs._legal_next_for_root(root, ["slot"], 0.7, {}, credits_left=2)
+    nodes["H1:slot"] = Node(node_key="H1:slot", statement="", role="NEC", k=0.1, assessed=False)
+    root.obligations["slot"] = "H1:slot"
+    nxt = rs._legal_next_for_root(root, ["slot"], 0.7, nodes, credits_left=2)
     assert nxt == ("DECOMPOSE", "H1:slot")
 
-    root.obligations["slot"].decomp_type = "NONE"
-    nxt = rs._legal_next_for_root(root, ["slot"], 0.7, {}, credits_left=1)
+    nodes["H1:slot"].decomp_type = "NONE"
+    nxt = rs._legal_next_for_root(root, ["slot"], 0.7, nodes, credits_left=1)
     assert nxt == ("EVALUATE", "H1:slot")
 
 
@@ -209,7 +213,8 @@ def test_decompose_root_skips_existing_slot() -> None:
     audit = MemAudit()
     deps = RunSessionDeps(evaluator=NoopEvaluator(), decomposer=NoopDecomposer(), audit_sink=audit)
     root = RootHypothesis(root_id="H1", statement="S", exclusion_clause="x", canonical_id="cid")
-    root.obligations["feasibility"] = Node(node_key="H1:feasibility", statement="existing", role="NEC")
+    nodes: Dict[str, Node] = {"H1:feasibility": Node(node_key="H1:feasibility", statement="existing", role="NEC")}
+    root.obligations["feasibility"] = "H1:feasibility"
     rs._decompose_root(
         deps,
         root,
@@ -218,14 +223,16 @@ def test_decompose_root_skips_existing_slot() -> None:
         {"ok": True, "feasibility_statement": "new"},
         None,
         {},
+        nodes,
     )
-    assert root.obligations["feasibility"].statement == "existing"
+    assert nodes["H1:feasibility"].statement == "existing"
 
 
 def test_select_slot_for_evaluation_returns_node_key() -> None:
     root = RootHypothesis(root_id="H1", statement="S", exclusion_clause="x", canonical_id="cid", status="SCOPED")
-    root.obligations["feasibility"] = Node(node_key="H1:feasibility", statement="", role="NEC", assessed=False)
-    assert rs._select_slot_for_evaluation(root, ["feasibility"]) == "H1:feasibility"
+    nodes = {"H1:feasibility": Node(node_key="H1:feasibility", statement="", role="NEC", assessed=False)}
+    root.obligations["feasibility"] = "H1:feasibility"
+    assert rs._select_slot_for_evaluation(root, ["feasibility"], nodes) == "H1:feasibility"
 
 
 def test_evaluation_mode_continues_to_next_root() -> None:
@@ -323,8 +330,8 @@ def test_evaluations_children_slot_missing_continues(monkeypatch) -> None:
 
 def test_evaluations_children_slot_missing_all_roots_stop(monkeypatch) -> None:
     class FlakyObligations:
-        def __init__(self, node: Node) -> None:
-            self._node = node
+        def __init__(self, node_key: str) -> None:
+            self._node_key = node_key
             self._count = 0
 
         def __contains__(self, key: object) -> bool:
@@ -333,10 +340,10 @@ def test_evaluations_children_slot_missing_all_roots_stop(monkeypatch) -> None:
             self._count += 1
             return self._count <= 2
 
-        def __getitem__(self, key: str) -> Node:
-            return self._node
+        def __getitem__(self, key: str) -> str:
+            return self._node_key
 
-        def get(self, key: str, default=None) -> Optional[Node]:
+        def get(self, key: str, default=None) -> Optional[str]:
             return None
         def items(self):
             return []
@@ -347,7 +354,7 @@ def test_evaluations_children_slot_missing_all_roots_stop(monkeypatch) -> None:
     monkeypatch.setattr(rs, "_select_slot_lowest_k", _missing_slot)
 
     root = RootHypothesis(root_id="H1", statement="S", exclusion_clause="x", canonical_id="cid", status="SCOPED")
-    root.obligations = FlakyObligations(Node(node_key="H1:feasibility", statement="", role="NEC"))  # type: ignore[assignment]
+    root.obligations = FlakyObligations("H1:feasibility")  # type: ignore[assignment]
     hset = rs.HypothesisSet(roots={"H1": root, "H_other": RootHypothesis("H_other", "Other", "", "cid2")}, ledger={"H1": 1.0, "H_other": 0.0})
 
     def _fake_init(_request):

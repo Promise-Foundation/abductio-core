@@ -75,7 +75,7 @@ def test_validate_slot_decomposition_error_branches() -> None:
 
 def test_decomposer_slot_and_root_paths() -> None:
     client = DummyClient({"ok": True, "type": "AND", "coupling": 0.8, "children": [{"child_id": "c1", "statement": "s"}, {"child_id": "c2", "statement": "s"}]})
-    port = m.OpenAIDecomposerPort(client=client, required_slots_hint=["feasibility"], claim="c", root_statements={"H1": "root"})
+    port = m.OpenAIDecomposerPort(client=client, required_slots_hint=["feasibility"], scope="c", root_statements={"H1": "root"})
     slot_out = port.decompose("H1:feasibility")
     assert slot_out["children"]
 
@@ -93,7 +93,7 @@ def test_decomposer_slot_and_root_paths() -> None:
 
 def test_evaluator_paths_and_non_dict_response() -> None:
     client = DummyClient({"p": 0.6, "A": 1, "B": 1, "C": 1, "D": 1, "evidence_refs": "ref"})
-    port = m.OpenAIEvaluatorPort(client=client, claim="c", root_statements={"H1": "root"})
+    port = m.OpenAIEvaluatorPort(client=client, scope="c", root_statements={"H1": "root"})
     out = port.evaluate("H1:feasibility")
     assert out["p"] == 0.6
 

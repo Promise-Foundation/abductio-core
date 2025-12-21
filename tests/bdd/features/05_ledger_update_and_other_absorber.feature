@@ -42,7 +42,7 @@ Feature: Ledger updates, damping, and Other absorber invariant
       | H2   | Mechanism B     | Not explained by any other root |
     And the ledger is externally corrupted so that sum(named_roots) = 1.2 and H_other = -0.2
     And credits 0
-    When I start a session for claim "Invariant repair"
+    When I start a session for scope "Invariant repair"
     Then the engine enforces the Other absorber invariant
     And all p_ledger values are in [0,1]
     And the ledger probabilities sum to 1.0 within 1e-9
