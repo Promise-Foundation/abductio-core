@@ -2,7 +2,7 @@
 Feature: Soft-AND aggregation with coupling buckets
   Within-slot AND of NEC children must use the coupling rule:
     m = c * p_min + (1-c) * p_prod
-  treating unassessed NEC children as p=1.0.
+  treating unassessed NEC children as neutral.
 
   Background:
     Given required template slots:
@@ -11,6 +11,14 @@ Feature: Soft-AND aggregation with coupling buckets
       | availability        | NEC  |
       | fit_to_key_features | NEC  |
       | defeater_resistance | NEC  |
+    And default config:
+      | tau     | 0.70 |
+      | epsilon | 0.05 |
+      | gamma   | 0.20 |
+      | alpha   | 0.40 |
+      | beta    | 1.00 |
+      | W       | 3.00 |
+      | lambda_voi | 0.10 |
 
   Scenario Outline: Soft-AND matches the specified formula for assessed children
     Given a scoped root "H1" with slot "fit_to_key_features" decomposed as AND coupling <c> into NEC children:
@@ -18,7 +26,7 @@ Feature: Soft-AND aggregation with coupling buckets
       | c1       | Part 1    |
       | c2       | Part 2    |
     And a deterministic evaluator that returns:
-      | node_key | p   | A | B | C | D | evidence_refs |
+      | node_key | p   | A | B | C | D | evidence_ids |
       | H1:fit_to_key_features:c1| <p1>| 2 | 1 | 1 | 1 | refX         |
       | H1:fit_to_key_features:c2| <p2>| 2 | 1 | 1 | 1 | refX         |
     And credits 2
@@ -32,14 +40,14 @@ Feature: Soft-AND aggregation with coupling buckets
       | 0.20 | 0.5 | 0.5 | 0.30     |
       | 0.80 | 0.7 | 0.9 | 0.686    |
 
-  Scenario: Unassessed NEC children are treated as p=1.0
+  Scenario: Unassessed NEC children are neutral to aggregation
     Given a scoped root "H1" with slot "fit_to_key_features" decomposed as AND coupling 0.80 into NEC children:
       | child_id | statement |
       | c1       | Part 1    |
       | c2       | Part 2    |
       | c3       | Part 3    |
-    And only child "c1" is evaluated with p=0.5 and evidence_refs "ref1"
+    And only child "c1" is evaluated with p=0.5 and evidence_ids "ref1"
     And credits 1
     When I run the engine for exactly 1 evaluation
-    Then unassessed children "c2" and "c3" are treated as p=1.0 in aggregation
-    And the aggregated slot p is <= 0.5 and >= 0.5 * 1.0 * 1.0
+    Then unassessed children "c2" and "c3" are treated as neutral in aggregation
+    And slot "H1:fit_to_key_features" has aggregated p = 0.5

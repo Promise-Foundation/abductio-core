@@ -34,15 +34,84 @@ def test_openai_client_import_error(monkeypatch) -> None:
 
 def test_validate_evaluation_error_branches() -> None:
     with pytest.raises(RuntimeError):
-        m._validate_evaluation({"p": "x", "A": 1, "B": 1, "C": 1, "D": 1, "evidence_refs": "r"})
+        m._validate_evaluation(
+            {
+                "p": "x",
+                "A": 1,
+                "B": 1,
+                "C": 1,
+                "D": 1,
+                "evidence_ids": ["EV-1"],
+                "evidence_quality": "direct",
+                "reasoning_summary": "Supported by EV-1.",
+                "defeaters": ["None."],
+                "uncertainty_source": "Limited evidence.",
+                "assumptions": [],
+            }
+        )
     with pytest.raises(RuntimeError):
-        m._validate_evaluation({"p": 0.1, "A": True, "B": 1, "C": 1, "D": 1, "evidence_refs": "r"})
+        m._validate_evaluation(
+            {
+                "p": 0.1,
+                "A": True,
+                "B": 1,
+                "C": 1,
+                "D": 1,
+                "evidence_ids": ["EV-1"],
+                "evidence_quality": "direct",
+                "reasoning_summary": "Supported by EV-1.",
+                "defeaters": ["None."],
+                "uncertainty_source": "Limited evidence.",
+                "assumptions": [],
+            }
+        )
     with pytest.raises(RuntimeError):
-        m._validate_evaluation({"p": 0.1, "A": "x", "B": 1, "C": 1, "D": 1, "evidence_refs": "r"})
+        m._validate_evaluation(
+            {
+                "p": 0.1,
+                "A": "x",
+                "B": 1,
+                "C": 1,
+                "D": 1,
+                "evidence_ids": ["EV-1"],
+                "evidence_quality": "direct",
+                "reasoning_summary": "Supported by EV-1.",
+                "defeaters": ["None."],
+                "uncertainty_source": "Limited evidence.",
+                "assumptions": [],
+            }
+        )
     with pytest.raises(RuntimeError):
-        m._validate_evaluation({"p": 0.1, "A": 3, "B": 1, "C": 1, "D": 1, "evidence_refs": "r"})
-    with pytest.raises(RuntimeError):
-        m._validate_evaluation({"p": 0.1, "A": 1, "B": 1, "C": 1, "D": 1, "evidence_refs": "(empty)"})
+        m._validate_evaluation(
+            {
+                "p": 0.1,
+                "A": 3,
+                "B": 1,
+                "C": 1,
+                "D": 1,
+                "evidence_ids": ["EV-1"],
+                "evidence_quality": "direct",
+                "reasoning_summary": "Supported by EV-1.",
+                "defeaters": ["None."],
+                "uncertainty_source": "Limited evidence.",
+                "assumptions": [],
+            }
+        )
+    m._validate_evaluation(
+        {
+            "p": 0.1,
+            "A": 1,
+            "B": 1,
+            "C": 1,
+            "D": 1,
+            "evidence_ids": [],
+            "evidence_quality": "none",
+            "reasoning_summary": "No supporting evidence.",
+            "defeaters": ["Would change with new evidence."],
+            "uncertainty_source": "No evidence packet.",
+            "assumptions": [],
+        }
+    )
 
 
 def test_validate_slot_decomposition_error_branches() -> None:
@@ -74,7 +143,29 @@ def test_validate_slot_decomposition_error_branches() -> None:
 
 
 def test_decomposer_slot_and_root_paths() -> None:
-    client = DummyClient({"ok": True, "type": "AND", "coupling": 0.8, "children": [{"child_id": "c1", "statement": "s"}, {"child_id": "c2", "statement": "s"}]})
+    client = DummyClient(
+        {
+            "ok": True,
+            "type": "AND",
+            "coupling": 0.8,
+            "children": [
+                {
+                    "child_id": "c1",
+                    "statement": "s",
+                    "falsifiable": True,
+                    "test_procedure": "Check s",
+                    "overlap_with_siblings": [],
+                },
+                {
+                    "child_id": "c2",
+                    "statement": "s",
+                    "falsifiable": True,
+                    "test_procedure": "Check s",
+                    "overlap_with_siblings": [],
+                },
+            ],
+        }
+    )
     port = m.OpenAIDecomposerPort(client=client, required_slots_hint=["feasibility"], scope="c", root_statements={"H1": "root"})
     slot_out = port.decompose("H1:feasibility")
     assert slot_out["children"]
@@ -92,7 +183,21 @@ def test_decomposer_slot_and_root_paths() -> None:
 
 
 def test_evaluator_paths_and_non_dict_response() -> None:
-    client = DummyClient({"p": 0.6, "A": 1, "B": 1, "C": 1, "D": 1, "evidence_refs": "ref"})
+    client = DummyClient(
+        {
+            "p": 0.6,
+            "A": 1,
+            "B": 1,
+            "C": 1,
+            "D": 1,
+            "evidence_ids": ["EV-1"],
+            "evidence_quality": "direct",
+            "reasoning_summary": "Supported by EV-1.",
+            "defeaters": ["None."],
+            "uncertainty_source": "Limited evidence.",
+            "assumptions": [],
+        }
+    )
     port = m.OpenAIEvaluatorPort(client=client, scope="c", root_statements={"H1": "root"})
     out = port.evaluate("H1:feasibility")
     assert out["p"] == 0.6

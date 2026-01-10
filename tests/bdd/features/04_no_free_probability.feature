@@ -1,7 +1,7 @@
 # tests/bdd/features/04_no_free_probability.feature
 Feature: No-free-probability semantics
   Decomposition must not create or destroy ledger probability by itself.
-  Unassessed NEC nodes must default to neutral p=1.0 so listing more requirements does not penalize.
+  Unassessed NEC nodes must default to neutral p=0.5 so listing more requirements does not penalize.
 
   Background:
     Given default config:
@@ -9,6 +9,9 @@ Feature: No-free-probability semantics
       | epsilon | 0.05 |
       | gamma   | 0.20 |
       | alpha   | 0.40 |
+      | beta    | 1.00 |
+      | W       | 3.00 |
+      | lambda_voi | 0.10 |
     And required template slots:
       | slot_key            | role |
       | feasibility         | NEC  |
@@ -40,5 +43,5 @@ Feature: No-free-probability semantics
       | c3       | Fits physical traces      | NEC  |
     And credits 2
     When I run the engine for exactly 2 operations
-    Then slot "H1:fit_to_key_features" has aggregated p = 1.0
+    Then slot "H1:fit_to_key_features" has aggregated p = 0.5
     And no ledger probability changed due to unassessed NEC children

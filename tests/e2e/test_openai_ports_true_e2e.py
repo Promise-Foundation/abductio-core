@@ -47,7 +47,7 @@ def test_e2e_openai_scopes_decomposes_evaluates_and_replays() -> None:
             RootSpec("H1", "Mechanism A", "x"),
             RootSpec("H2", "Mechanism B", "x"),
         ],
-        config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40),
+        config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open"),
         credits=6,
         required_slots=required_slots,
         run_mode="until_credits_exhausted",

@@ -25,8 +25,22 @@ class ScriptDecomposer:
                 "type": "AND",
                 "coupling": 0.80,
                 "children": [
-                    {"child_id": "c1", "statement": f"{target_id} part1", "role": "NEC"},
-                    {"child_id": "c2", "statement": f"{target_id} part2", "role": "NEC"},
+                    {
+                        "child_id": "c1",
+                        "statement": f"{target_id} part1",
+                        "role": "NEC",
+                        "falsifiable": True,
+                        "test_procedure": "Check evidence for part1",
+                        "overlap_with_siblings": [],
+                    },
+                    {
+                        "child_id": "c2",
+                        "statement": f"{target_id} part2",
+                        "role": "NEC",
+                        "falsifiable": True,
+                        "test_procedure": "Check evidence for part2",
+                        "overlap_with_siblings": [],
+                    },
                 ],
             }
         return {"ok": True, "feasibility_statement": f"{target_id} feasible"}
@@ -39,7 +53,19 @@ class ScriptEvaluator:
     def evaluate(self, node_key: str) -> Dict[str, Any]:
         return self.outcomes.get(
             node_key,
-            {"p": 0.75, "A": 2, "B": 1, "C": 1, "D": 1, "evidence_refs": "ref1"},
+            {
+                "p": 0.75,
+                "A": 2,
+                "B": 1,
+                "C": 1,
+                "D": 1,
+                "evidence_ids": ["EV-1"],
+                "evidence_quality": "direct",
+                "reasoning_summary": "Supported by EV-1.",
+                "defeaters": ["No contradicting items seen."],
+                "uncertainty_source": "Limited packet.",
+                "assumptions": [],
+            },
         )
 
 
@@ -53,10 +79,11 @@ def test_replay_matches_final_ledger_and_stop_reason() -> None:
             RootSpec("H1", "Mechanism A", "x"),
             RootSpec("H2", "Mechanism B", "x"),
         ],
-        config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40),
+        config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open"),
         credits=6,
         required_slots=[{"slot_key": "feasibility", "role": "NEC"}],
         run_mode="until_credits_exhausted",
+        evidence_items=[{"id": "EV-1", "source": "test", "text": "Evidence item 1."}],
     )
 
     res = run_session(req, deps).to_dict_view()

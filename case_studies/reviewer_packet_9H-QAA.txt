@@ -1,0 +1,185 @@
+=== evidence_packet.md ===
+# Evidence Packet (E_T) — Boeing_737-8AS_9H-QAA_12-25
+
+## Provenance
+- source_family: aaib_uk_bulletin
+- source_agency: AAIB
+- doc_id: AAIB-30304
+- bulletin_issue: 12/2025
+- retrieved_date_utc: 2026-01-08
+- pdf_sha256: 130859a0546fc0899be7c94e0cbd072dbbc7e69e5492ddedfbfd1903d516b277
+
+## Evidence items
+- [H1] (history) A tug driving instructor (tug instructor) and trainee tug driver (trainee driver) were seated beside each other in the tug. The flight crew were in communication with the headset operator via the aircraft’s interphone.
+- [H2] (history) The trainee driver decided to stop the pushback and asked the tug instructor to take over.
+- [H3] (history) After swapping seats the instructor recommenced the pushback, correcting the aircraft back onto the taxiway centreline. He continued to reassure and advise the trainee while performing the pushback, looking at her while doing so. The headset operator continued walking on the right side of the tug, abeam its cabin. The wingman was on the left just ahead of the tug.
+- [H4] (history) The aircraft’s nosewheel reached the ‘Tug release point’ (TRP) ground markings , such that the tug was meant to stop. However, it continued moving beyond the TRP with its engine at idle and hit the blast barrier at the end of the cul-de-sac .
+- [H5] (history) Realising what had happened, the tug instructor pulled the aircraft forward off the fence then stopped the tug.
+- [H6] (history) The airport operator and ATC were notified. Soon after, representatives from the airport operator and the RFFS were on scene. The aircraft sustained substantial damage to the rear of the aircraft, including the APU, which was running at the time .
+- [H7] (history) The TRP on Taxiway Delta is between Stands 61L and 61R. There is a 14.97 m clearance behind a B737-800 and the blast fence when its nosewheel is on the TRP.
+- [H8] (history) The tug instructor stated that the method for getting a tug driver to stop quickly was to raise a clenched first, indicating the driver should apply the tug’s brakes. However, he suggested such a visual signal was not sufficient given a driver would be concentrating on the pushback, with the headset operator often out of his field of view. He did not receive any warning of the impending collision from the wingman or the headset operator.
+- [H9] (history) Trainee tug driver The trainee driver was qualified as a headset operator and wingman, and was aware of the TRP through the training for these roles. This was her second pushback. The first was completed earlier that day, without event.
+- [H10] (history) The trainee driver reported that she felt the tug slow down as the aircraft’s nose wheel approached the TRP, so believed the instructor would stop the pushback. However, she did not say anything when he drove past the TRP, assuming he must have known what he was doing. After the collision, she suggested not moving the aircraft off the blast fence.
+- [H11] (history) Headset operator The headset operator was also qualified as a wingman. Prior to this accident, he knew about TRPs from his training for the headset operator role but had not physically seen one.
+- [H12] (history) He commented that the tug instructor took over when the aircraft was abeam Stand 62 and thereafter was attending to talking to the trainee. The tug slowed down when the aircraft was abeam Stand 61, so he positioned himself to disconnect the tug from the aircraft when it stopped. However, the aircraft continued to move slowly until it hit the blast fence. He said he assumed the instructor had a reason for that and did not question his actions.
+- [H13] (history) Wingman The wingman was also a qualified headset operator. On the day of the accident, he had been called into work at short notice. To avoid delaying the pushback, he had not collected the marshalling wands from the tug. Nevertheless, it was not mandatory to use them. He commented that the TRP was quite small.
+
+=== answer_key.md ===
+# Answer key (oracle label) — Boeing_737-8AS_9H-QAA_12-25
+
+## Label
+- oracle_root_id: R1_PUSHBACK_PROCEDURAL_DEVIATION
+- label_confidence_hint: high
+
+## Oracle strength
+- OS_class: OS-A
+
+=== oracle.md ===
+# Oracle — Boeing_737-8AS_9H-QAA_12-25
+
+## Oracle source
+- oracle_type: conclusion
+- doc_id: AAIB-30304
+- retrieval_date_utc: 2026-01-08
+
+## Oracle excerpt
+The aircraft was pushed beyond the TRP while the tug driving instructor was focussed on training another driver, while performing the driving task. It struck a blast fence at the end of a cul-de-sac.
+
+## Mapping to root set
+- mapped_root_id: R1_PUSHBACK_PROCEDURAL_DEVIATION
+- OS_class: OS-A
+
+=== roots.yaml ===
+case_id: Boeing_737-8AS_9H-QAA_12-25
+scope:
+root_set_id: AAIB_GROUND_COLLISION_S1_v1
+
+open_world_mode: false
+roots:
+  - id: R1_PUSHBACK_PROCEDURAL_DEVIATION
+    nec_slots:
+      - NEC_STOP_POINT_NOT_OBSERVED
+      - NEC_MOVEMENT_CONTINUED_UNTIL_CONTACT
+  - id: R2_COMMUNICATION_BREAKDOWN
+    nec_slots:
+      - NEC_MISALIGNMENT_IN_SHARED_MODEL
+      - NEC_FAILURE_TO_CHALLENGE_OR_ALERT
+  - id: R3_ENVIRONMENT_OR_MARKING_DEFICIENCY
+    nec_slots:
+      - NEC_MARKING_INADEQUATE
+      - NEC_CONTRIBUTED_TO_ERROR
+  - id: R4_MECHANICAL_CONTROL_FAILURE
+    nec_slots:
+      - NEC_EQUIPMENT_MALFUNCTION
+      - NEC_CORROBORATION
+  - id: H_OTHER
+
+=== hashes.txt ===
+answer_key_md_sha256=5a8cdc9f17e6c8e564a6641a776d2e8afe9f2be4fa1fb9f5bfe643f8101eda2c
+evidence_packet_json_sha256=0cee346ae1d03e9799b2b367c2da8d91b86ab3b0744b6c48603b7876841730c2
+evidence_packet_md_sha256=dcc764c4b4c48f971d58d671135a2e6ca8288e1bc9063c6280a138f27e8a16ed
+oracle_md_sha256=346b81005a240c23861a705173f9de5fdb58b44292a9e9ea293b82365a9ae1a6
+pdf_sha256=130859a0546fc0899be7c94e0cbd072dbbc7e69e5492ddedfbfd1903d516b277
+roots_yaml_sha256=bed2b3905e6e8050db500f60542004b393a113cc0900622aa84057f9a53eb28b
+
+=== build_manifest.json ===
+{
+  "builder_version": "0.1.0",
+  "case_id": "Boeing_737-8AS_9H-QAA_12-25",
+  "git_sha": "d1d97147ee81582ffcfba4697e4ff5bdde63514b",
+  "leakage_warnings": [],
+  "outputs": {
+    "answer_key_md": "case_studies/data/UK_AAIB_Reports/cases/Boeing_737-8AS_9H-QAA_12-25/answer_key.md",
+    "evidence_packet_json": "case_studies/data/UK_AAIB_Reports/cases/Boeing_737-8AS_9H-QAA_12-25/evidence_packet.json",
+    "evidence_packet_md": "case_studies/data/UK_AAIB_Reports/cases/Boeing_737-8AS_9H-QAA_12-25/evidence_packet.md",
+    "oracle_md": "case_studies/data/UK_AAIB_Reports/cases/Boeing_737-8AS_9H-QAA_12-25/oracle.md",
+    "roots_yaml": "case_studies/data/UK_AAIB_Reports/cases/Boeing_737-8AS_9H-QAA_12-25/roots.yaml"
+  },
+  "pdf_sha256": "130859a0546fc0899be7c94e0cbd072dbbc7e69e5492ddedfbfd1903d516b277",
+  "spec_hashes": {
+    "leakage_checks.md": "18f03c43b6378abf901541024936df7c4e9bb56da6c453cce9aeef7c56326c38",
+    "metrics_spec.md": "4c2498eeac1dcf57f8850c34ae2ae7ac453451a2191310c85da41c10294cdab8",
+    "oracle_strength_rubric.md": "919a5bf6811d54ec94ca7ec8ea388a1ee075cd1e9558fe0ab3cace8544cf4896",
+    "roots_library.json": "adf3053dc281bd1346ca10f45913065e67f244fa1b98b56e391c49f8120405aa",
+    "roots_library.yaml": "da7131136f25d62951d398a2b0ca739f6e9ee818992f74c2319a0b0dc870a0bf",
+    "schemas/answer_key.schema.json": "59c1d6049888ffd0d547b2134b80999c2f9db29c7b7720133fd122e5bfedc4cb",
+    "schemas/evidence_packet.schema.json": "2356ec24b3c0d523011030d1318a07b568b4be9d93188c29bd9405bec67ec09b",
+    "schemas/oracle.schema.json": "6c1729e78c9bf83cbbe9f778fd630c2abe040660fa11748a3c4b4bf43dc775ac",
+    "schemas/roots.schema.json": "7d19823a696600850eba39733a408a009faea5830b3a4233dfaf0c79ccaa65ec",
+    "type_spec.org": "ad462ecddb1294c2ed5d646d1c55b59f02ab0f6e67a52db8f189ddccfaa288ad"
+  }
+}
+
+=== evidence_packet.json ===
+{
+  "case_id": "Boeing_737-8AS_9H-QAA_12-25",
+  "evidence_freeze_time_utc": "2026-01-08",
+  "items": [
+    {
+      "id": "H1",
+      "source": "history",
+      "text": "A tug driving instructor (tug instructor) and trainee tug driver (trainee driver) were seated beside each other in the tug. The flight crew were in communication with the headset operator via the aircraft\u2019s interphone."
+    },
+    {
+      "id": "H2",
+      "source": "history",
+      "text": "The trainee driver decided to stop the pushback and asked the tug instructor to take over."
+    },
+    {
+      "id": "H3",
+      "source": "history",
+      "text": "After swapping seats the instructor recommenced the pushback, correcting the aircraft back onto the taxiway centreline. He continued to reassure and advise the trainee while performing the pushback, looking at her while doing so. The headset operator continued walking on the right side of the tug, abeam its cabin. The wingman was on the left just ahead of the tug."
+    },
+    {
+      "id": "H4",
+      "source": "history",
+      "text": "The aircraft\u2019s nosewheel reached the \u2018Tug release point\u2019 (TRP) ground markings , such that the tug was meant to stop. However, it continued moving beyond the TRP with its engine at idle and hit the blast barrier at the end of the cul-de-sac ."
+    },
+    {
+      "id": "H5",
+      "source": "history",
+      "text": "Realising what had happened, the tug instructor pulled the aircraft forward off the fence then stopped the tug."
+    },
+    {
+      "id": "H6",
+      "source": "history",
+      "text": "The airport operator and ATC were notified. Soon after, representatives from the airport operator and the RFFS were on scene. The aircraft sustained substantial damage to the rear of the aircraft, including the APU, which was running at the time ."
+    },
+    {
+      "id": "H7",
+      "source": "history",
+      "text": "The TRP on Taxiway Delta is between Stands 61L and 61R. There is a 14.97 m clearance behind a B737-800 and the blast fence when its nosewheel is on the TRP."
+    },
+    {
+      "id": "H8",
+      "source": "history",
+      "text": "The tug instructor stated that the method for getting a tug driver to stop quickly was to raise a clenched first, indicating the driver should apply the tug\u2019s brakes. However, he suggested such a visual signal was not sufficient given a driver would be concentrating on the pushback, with the headset operator often out of his field of view. He did not receive any warning of the impending collision from the wingman or the headset operator."
+    },
+    {
+      "id": "H9",
+      "source": "history",
+      "text": "Trainee tug driver The trainee driver was qualified as a headset operator and wingman, and was aware of the TRP through the training for these roles. This was her second pushback. The first was completed earlier that day, without event."
+    },
+    {
+      "id": "H10",
+      "source": "history",
+      "text": "The trainee driver reported that she felt the tug slow down as the aircraft\u2019s nose wheel approached the TRP, so believed the instructor would stop the pushback. However, she did not say anything when he drove past the TRP, assuming he must have known what he was doing. After the collision, she suggested not moving the aircraft off the blast fence."
+    },
+    {
+      "id": "H11",
+      "source": "history",
+      "text": "Headset operator The headset operator was also qualified as a wingman. Prior to this accident, he knew about TRPs from his training for the headset operator role but had not physically seen one."
+    },
+    {
+      "id": "H12",
+      "source": "history",
+      "text": "He commented that the tug instructor took over when the aircraft was abeam Stand 62 and thereafter was attending to talking to the trainee. The tug slowed down when the aircraft was abeam Stand 61, so he positioned himself to disconnect the tug from the aircraft when it stopped. However, the aircraft continued to move slowly until it hit the blast fence. He said he assumed the instructor had a reason for that and did not question his actions."
+    },
+    {
+      "id": "H13",
+      "source": "history",
+      "text": "Wingman The wingman was also a qualified headset operator. On the day of the accident, he had been called into work at short notice. To avoid delaying the pushback, he had not collected the marshalling wands from the tug. Nevertheless, it was not mandatory to use them. He commented that the TRP was quite small."
+    }
+  ],
+  "pdf_sha256": "130859a0546fc0899be7c94e0cbd072dbbc7e69e5492ddedfbfd1903d516b277"
+}

@@ -9,6 +9,9 @@ Feature: Deterministic scheduling, frontier selection, and tie-breaking
       | epsilon | 0.05 |
       | gamma   | 0.20 |
       | alpha   | 0.40 |
+      | beta    | 1.00 |
+      | W       | 3.00 |
+      | lambda_voi | 0.10 |
     And required template slots:
       | slot_key            | role |
       | feasibility         | NEC  |

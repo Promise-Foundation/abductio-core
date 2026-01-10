@@ -9,6 +9,9 @@ Feature: Session bootstrap and MECE initialization
       | epsilon | 0.05 |
       | gamma   | 0.20 |
       | alpha   | 0.40 |
+      | beta    | 1.00 |
+      | W       | 3.00 |
+      | lambda_voi | 0.10 |
 
   Scenario: Initialize with explicit roots and H_other is always present
     Given a hypothesis set with named roots:
@@ -36,3 +39,21 @@ Feature: Session bootstrap and MECE initialization
     When I start a session for scope "Test scope"
     Then the engine records a canonical_id for every root derived from normalized statement text
     And canonical_id does not depend on the input ordering of roots
+
+  Scenario: Closed-world mode omits H_other
+    Given default config:
+      | tau     | 0.70 |
+      | epsilon | 0.05 |
+      | gamma   | 0.20 |
+      | alpha   | 0.40 |
+      | beta    | 1.00 |
+      | W       | 3.00 |
+      | lambda_voi | 0.10 |
+      | world_mode | closed |
+    Given a hypothesis set with named roots:
+      | id   | statement          | exclusion_clause                |
+      | H1   | Alpha mechanism    | Not explained by any other root |
+      | H2   | Beta mechanism     | Not explained by any other root |
+    And credits 1
+    When I start a session for scope "Closed world"
+    Then the session does not contain root "H_other"

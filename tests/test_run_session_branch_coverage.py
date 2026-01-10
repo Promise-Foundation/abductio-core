@@ -9,6 +9,7 @@ from abductio_core.application.dto import RootSpec, SessionConfig, SessionReques
 from abductio_core.application.ports import RunSessionDeps
 from abductio_core.application.use_cases import run_session as rs
 from abductio_core.domain.audit import AuditEvent
+from abductio_core.domain.canonical import canonical_id_for_statement
 from abductio_core.domain.model import Node, RootHypothesis
 
 
@@ -60,7 +61,7 @@ def _base_request() -> SessionRequest:
     return SessionRequest(
         scope="test",
         roots=[RootSpec("H1", "Mechanism A", "x")],
-        config=SessionConfig(tau=0.7, epsilon=0.05, gamma=0.2, alpha=0.4),
+        config=SessionConfig(tau=0.7, epsilon=0.05, gamma=0.2, alpha=0.4, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open"),
         credits=1,
         required_slots=None,
         run_mode="start_only",
@@ -72,7 +73,7 @@ def test_validate_request_errors() -> None:
     with pytest.raises(ValueError):
         rs._validate_request(req.__class__(**{**req.__dict__, "credits": -1}))
     with pytest.raises(ValueError):
-        rs._validate_request(req.__class__(**{**req.__dict__, "config": SessionConfig(1.2, 0.1, 0.2, 0.3)}))
+        rs._validate_request(req.__class__(**{**req.__dict__, "config": SessionConfig(1.2, 0.1, 0.2, 0.3, 1.0, 3.0, 0.1, "open")}))
     with pytest.raises(ValueError):
         rs._validate_request(
             req.__class__(**{**req.__dict__, "roots": [RootSpec("", "S", "x")]})
@@ -93,9 +94,9 @@ def test_aggregate_soft_and_no_assessed_children() -> None:
     slot.children = [child_key]
     nodes = {child_key: Node(node_key=child_key, statement="child", role="NEC", assessed=False)}
     value, details = rs._aggregate_soft_and(slot, nodes)
-    assert value == 1.0
-    assert details["p_min"] == 1.0
-    assert details["p_prod"] == 1.0
+    assert value == 0.5
+    assert details["p_min"] == 0.5
+    assert details["p_prod"] == 0.5
 
 
 def test_apply_node_decomposition_branches() -> None:
@@ -116,7 +117,8 @@ def test_apply_node_decomposition_branches() -> None:
         "children": ["bad", {"id": ""}, {"child_id": "c1", "statement": "ok"}],
     }
     assert rs._apply_node_decomposition(deps, "H1:slot", decomp, nodes) is True
-    assert "H1:slot:c1" in nodes
+    canonical_child = canonical_id_for_statement("ok")
+    assert f"H1:slot:{canonical_child}" in nodes
 
 
 def test_select_helpers_cover_empty_and_assessed() -> None:

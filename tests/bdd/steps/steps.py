@@ -235,7 +235,12 @@ def given_deterministic_evaluator_one(context) -> None:
             "B": "1",
             "C": "1",
             "D": "1",
-            "evidence_refs": "ref1",
+            "evidence_ids": ["ref1"],
+            "evidence_quality": "direct",
+            "reasoning_summary": "BDD evaluator stub.",
+            "defeaters": ["None noted."],
+            "uncertainty_source": "BDD evaluator stub.",
+            "assumptions": [],
         }
         for root in roots
     ]
@@ -297,10 +302,11 @@ def given_slot_initial_p(context, node_key: str, p_value: float) -> None:
     world.set_slot_initial_p(node_key, p_value)
 
 
-@given('only child "{child_id}" is evaluated with p={p_value:f} and evidence_refs "{refs}"')
+@given('only child "{child_id}" is evaluated with p={p_value:f} and evidence_ids "{refs}"')
 def given_only_child_evaluated(context, child_id: str, p_value: float, refs: str) -> None:
     world = get_world(context)
-    world.set_child_evaluated(child_id, p_value, refs)
+    evidence_ids = [] if refs.strip() in {"", "(empty)"} else [refs.strip()]
+    world.set_child_evaluated(child_id, p_value, evidence_ids)
 
 
 @given("the ledger is externally corrupted so that sum(named_roots) = 1.2 and H_other = -0.2")
@@ -445,6 +451,14 @@ def then_session_contains_root(context, root_id: str) -> None:
         named_ids = {row["id"] for row in world.roots}
         assert "H_other" not in named_ids
         assert len(world.result.get("roots", {})) == len(named_ids) + 1
+
+
+@then('the session does not contain root "{root_id}"')
+def then_session_excludes_root(context, root_id: str) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    assert root_id not in world.result.get("roots", {})
 
 
 @then('the ledger probabilities sum to 1.0 within {tolerance}')
@@ -757,6 +771,26 @@ def then_audit_damped_update(context, alpha: float) -> None:
     assert any(abs(event["payload"].get("alpha", 0.0) - alpha) <= 1e-9 for event in events)
 
 
+@then('the audit log includes a delta-w update for root "{root_id}" slot "{slot_key}"')
+def then_audit_delta_w(context, root_id: str, slot_key: str) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    events = [event for event in world.result.get("audit", []) if event["event_type"] == "DELTA_W_APPLIED"]
+    assert any(
+        event["payload"].get("root_id") == root_id and event["payload"].get("slot_key") == slot_key
+        for event in events
+    )
+
+
+@then("the audit log includes a normalized ledger update")
+def then_audit_normalized_ledger(context) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    assert any(event["event_type"] == "LOG_LEDGER_NORMALIZED" for event in world.result.get("audit", []))
+
+
 @then("H_other is set to 1 - sum(named_roots)")
 def then_h_other_absorber(context) -> None:
     world = get_world(context)
@@ -915,7 +949,7 @@ def then_audit_soft_and(context) -> None:
         assert key in payload
 
 
-@then('unassessed children "{child_a}" and "{child_b}" are treated as p=1.0 in aggregation')
+@then('unassessed children "{child_a}" and "{child_b}" are treated as neutral in aggregation')
 def then_unassessed_children(context, child_a: str, child_b: str) -> None:
     world = get_world(context)
     if not world.result:

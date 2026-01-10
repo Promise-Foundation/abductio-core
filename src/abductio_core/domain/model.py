@@ -9,7 +9,7 @@ class Node:
     node_key: str
     statement: str
     role: str
-    p: float = 1.0
+    p: float = 0.5
     k: float = 0.15
     assessed: bool = False
     children: List[str] = field(default_factory=list)

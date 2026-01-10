@@ -9,6 +9,9 @@ Feature: Cost model and operation legality
       | epsilon | 0.05 |
       | gamma   | 0.20 |
       | alpha   | 0.40 |
+      | beta    | 1.00 |
+      | W       | 3.00 |
+      | lambda_voi | 0.10 |
 
   Scenario: Each operation spends exactly 1 credit and is audited
     Given a hypothesis set with named roots:
@@ -23,7 +26,7 @@ Feature: Cost model and operation legality
       | B | 1    |
       | C | 1    |
       | D | 1    |
-      | evidence_refs | ref1 |
+      | evidence_ids | ref1 |
     And credits 2
     When I run the engine until credits exhausted
     Then total_credits_spent = 2

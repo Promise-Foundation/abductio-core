@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["case_id", "evidence_freeze_time_utc", "pdf_sha256", "items"],
+  "properties": {
+    "case_id": {"type": "string"},
+    "evidence_freeze_time_utc": {"type": "string"},
+    "pdf_sha256": {"type": "string"},
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "source"],
+        "properties": {
+          "id": {"type": "string"},
+          "text": {"type": "string"},
+          "source": {
+            "oneOf": [
+              {"type": "string"},
+              {
+                "type": "object",
+                "required": ["uri"],
+                "properties": {
+                  "uri": {"type": "string"},
+                  "title": {"type": "string"},
+                  "author": {"type": "string"},
+                  "date": {"type": "string"},
+                  "license": {"type": "string"}
+                }
+              }
+            ]
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "page": {"type": "integer"},
+              "line_start": {"type": "integer"},
+              "line_end": {"type": "integer"},
+              "offset_start": {"type": "integer"},
+              "offset_end": {"type": "integer"}
+            }
+          },
+          "metadata": {"type": "object"}
+        }
+      }
+    }
+  }
+}

@@ -4,6 +4,7 @@ import importlib
 import json
 import os
 import time
+import hashlib
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -30,6 +31,10 @@ def _chat_text(response: Any) -> str:
     except Exception:
         pass
     return ""
+
+
+def _hash_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 @dataclass
@@ -93,7 +98,22 @@ class OpenAIJsonClient:
                 continue
 
             try:
-                return json.loads(text)
+                payload = json.loads(text)
+                if isinstance(payload, dict):
+                    payload.setdefault(
+                        "_provenance",
+                        {
+                            "provider": "openai",
+                            "model": self.model,
+                            "temperature": self.temperature,
+                            "timeout_s": self.timeout_s,
+                            "response_format": "json_object",
+                            "system_hash": _hash_text(system),
+                            "user_hash": _hash_text(user),
+                            "response_hash": _hash_text(text),
+                        },
+                    )
+                return payload
             except json.JSONDecodeError as exc:
                 last_exc = exc
                 time.sleep(self.retry_backoff_s * (attempt + 1))
@@ -103,7 +123,23 @@ class OpenAIJsonClient:
 
 
 def _validate_evaluation(outcome: Dict[str, Any]) -> None:
-    missing = [key for key in ("p", "A", "B", "C", "D", "evidence_refs") if key not in outcome]
+    missing = [
+        key
+        for key in (
+            "p",
+            "A",
+            "B",
+            "C",
+            "D",
+            "evidence_ids",
+            "reasoning_summary",
+            "defeaters",
+            "uncertainty_source",
+            "evidence_quality",
+            "assumptions",
+        )
+        if key not in outcome
+    ]
     if missing:
         raise RuntimeError(f"LLM evaluation missing keys: {missing}")
     try:
@@ -122,9 +158,31 @@ def _validate_evaluation(outcome: Dict[str, Any]) -> None:
             raise RuntimeError(f"LLM evaluation {key} is not an int") from exc
         if score < 0 or score > 2:
             raise RuntimeError(f"LLM evaluation {key} out of range")
-    refs = str(outcome.get("evidence_refs", "")).strip()
-    if not refs or refs == "(empty)":
-        raise RuntimeError("LLM evaluation evidence_refs must be non-empty")
+    evidence_ids = outcome.get("evidence_ids")
+    if not isinstance(evidence_ids, list) or not all(isinstance(item, str) and item for item in evidence_ids):
+        raise RuntimeError("LLM evaluation evidence_ids must be a non-empty list of strings (or [] when none)")
+    evidence_quality = outcome.get("evidence_quality")
+    if evidence_quality not in {"direct", "indirect", "weak", "none"}:
+        raise RuntimeError("LLM evaluation evidence_quality must be one of {direct,indirect,weak,none}")
+    if not isinstance(outcome.get("reasoning_summary"), str) or not outcome["reasoning_summary"].strip():
+        raise RuntimeError("LLM evaluation reasoning_summary must be a non-empty string")
+    defeaters = outcome.get("defeaters")
+    if not isinstance(defeaters, list) or not all(isinstance(item, str) for item in defeaters):
+        raise RuntimeError("LLM evaluation defeaters must be a list of strings")
+    if not isinstance(outcome.get("uncertainty_source"), str) or not outcome["uncertainty_source"].strip():
+        raise RuntimeError("LLM evaluation uncertainty_source must be a non-empty string")
+    assumptions = outcome.get("assumptions")
+    if not isinstance(assumptions, list) or not all(isinstance(item, str) for item in assumptions):
+        raise RuntimeError("LLM evaluation assumptions must be a list of strings")
+    quotes = outcome.get("quotes")
+    if quotes is not None:
+        if not isinstance(quotes, list):
+            raise RuntimeError("LLM evaluation quotes must be a list")
+        for quote in quotes:
+            if not isinstance(quote, dict):
+                raise RuntimeError("LLM evaluation quote must be object")
+            if not quote.get("evidence_id") or not quote.get("exact_quote"):
+                raise RuntimeError("LLM evaluation quote requires evidence_id and exact_quote")
 
 
 def _validate_slot_decomposition(out: Dict[str, Any]) -> None:
@@ -152,6 +210,13 @@ def _validate_slot_decomposition(out: Dict[str, Any]) -> None:
             raise RuntimeError("LLM slot decomposition child missing child_id/id")
         if not child.get("statement"):
             raise RuntimeError("LLM slot decomposition child missing statement")
+        if "falsifiable" not in child or not isinstance(child.get("falsifiable"), bool):
+            raise RuntimeError("LLM slot decomposition child missing falsifiable boolean")
+        if not isinstance(child.get("test_procedure"), str) or not child.get("test_procedure"):
+            raise RuntimeError("LLM slot decomposition child missing test_procedure")
+        overlap = child.get("overlap_with_siblings")
+        if overlap is None or not isinstance(overlap, list):
+            raise RuntimeError("LLM slot decomposition child missing overlap_with_siblings list")
         role = child.get("role", "NEC")
         if role not in {"NEC", "EVID"}:
             raise RuntimeError("LLM slot decomposition child role must be NEC or EVID")
@@ -181,11 +246,20 @@ class OpenAIDecomposerPort:
                 "  \"type\": \"AND\"|\"OR\",\n"
                 "  \"coupling\": 0.20|0.50|0.80|0.95 (required if type==AND),\n"
                 "  \"children\": [\n"
-                "    {\"child_id\":\"c1\",\"statement\":\"...\",\"role\":\"NEC\"|\"EVID\"},\n"
+                "    {\n"
+                "      \"child_id\":\"c1\",\n"
+                "      \"statement\":\"...\",\n"
+                "      \"role\":\"NEC\"|\"EVID\",\n"
+                "      \"falsifiable\": true,\n"
+                "      \"test_procedure\": \"what evidence would raise or lower p\",\n"
+                "      \"overlap_with_siblings\": []\n"
+                "    },\n"
                 "    ...\n"
                 "  ]\n"
                 "}\n"
                 "Constraints:\n"
+                "- Each child must be falsifiable and tied to a test procedure.\n"
+                "- Siblings should be non-overlapping unless overlap is explicitly listed.\n"
                 "- Use type AND unless explicitly instructed otherwise.\n"
                 "- Prefer NEC children.\n"
                 "- Keep statements concrete and necessary-condition-like.\n"
@@ -212,8 +286,22 @@ class OpenAIDecomposerPort:
             out.setdefault(
                 "children",
                 [
-                    {"child_id": "c1", "statement": f"{target_id} part 1 holds", "role": "NEC"},
-                    {"child_id": "c2", "statement": f"{target_id} part 2 holds", "role": "NEC"},
+                    {
+                        "child_id": "c1",
+                        "statement": f"{target_id} part 1 holds",
+                        "role": "NEC",
+                        "falsifiable": True,
+                        "test_procedure": f"Observe evidence that {target_id} part 1 holds",
+                        "overlap_with_siblings": [],
+                    },
+                    {
+                        "child_id": "c2",
+                        "statement": f"{target_id} part 2 holds",
+                        "role": "NEC",
+                        "falsifiable": True,
+                        "test_procedure": f"Observe evidence that {target_id} part 2 holds",
+                        "overlap_with_siblings": [],
+                    },
                 ],
             )
             _validate_slot_decomposition(out)
@@ -249,6 +337,7 @@ class OpenAIEvaluatorPort:
     client: OpenAIJsonClient
     scope: Optional[str] = None
     root_statements: Optional[Dict[str, str]] = None
+    evidence_items: Optional[List[Dict[str, Any]]] = None
 
     def evaluate(self, node_key: str) -> Dict[str, Any]:
         root_id, slot_key, child_id = _parse_node_key(node_key)
@@ -264,8 +353,17 @@ class OpenAIEvaluatorPort:
             "  \"B\": int 0..2,\n"
             "  \"C\": int 0..2,\n"
             "  \"D\": int 0..2,\n"
-            "  \"evidence_refs\": \"ref1\" (non-empty)\n"
+            "  \"evidence_ids\": [\"EV-1\", \"EV-2\"],\n"
+            "  \"quotes\": [{\"evidence_id\":\"EV-1\",\"exact_quote\":\"...\",\"location\":{}}],\n"
+            "  \"evidence_quality\": \"direct\"|\"indirect\"|\"weak\"|\"none\",\n"
+            "  \"reasoning_summary\": \"short justification referencing evidence ids\",\n"
+            "  \"defeaters\": [\"what would change my mind\"],\n"
+            "  \"uncertainty_source\": \"missing evidence / ambiguity\",\n"
+            "  \"assumptions\": []\n"
             "}\n"
+            "Rules:\n"
+            "- Use ONLY facts present in the evidence packet; list any assumptions explicitly.\n"
+            "- If no evidence supports the claim, set evidence_ids to [] and evidence_quality to \"none\".\n"
         )
         user = json.dumps(
             {
@@ -276,6 +374,7 @@ class OpenAIEvaluatorPort:
                 "slot_key": slot_key,
                 "child_id": child_id,
                 "scope": self.scope or "",
+                "evidence_items": self.evidence_items or [],
             }
         )
         out = self.client.complete_json(system=system, user=user)

@@ -1,0 +1,71 @@
+{
+  "root_sets": {
+    "AAIB_GROUND_COLLISION_S1_v1": {
+      "description": "Single proximate mechanism for ground collision during pushback/taxi",
+      "roots": [
+        {
+          "id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+          "label": "Procedural deviation in pushback execution",
+          "nec_slots": [
+            {
+              "id": "NEC_STOP_POINT_NOT_OBSERVED",
+              "description": "A required stop/release point was not observed"
+            },
+            {
+              "id": "NEC_MOVEMENT_CONTINUED_UNTIL_CONTACT",
+              "description": "Aircraft/tug continued moving until contact occurred"
+            }
+          ]
+        },
+        {
+          "id": "R2_COMMUNICATION_BREAKDOWN",
+          "label": "Communication/coordination breakdown among crew",
+          "nec_slots": [
+            {
+              "id": "NEC_MISALIGNMENT_IN_SHARED_MODEL",
+              "description": "Team members had conflicting expectations about state/stop"
+            },
+            {
+              "id": "NEC_FAILURE_TO_CHALLENGE_OR_ALERT",
+              "description": "No effective stop/alert occurred despite cues"
+            }
+          ]
+        },
+        {
+          "id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+          "label": "Environmental/marking deficiency",
+          "nec_slots": [
+            {
+              "id": "NEC_MARKING_INADEQUATE",
+              "description": "Stop/release point marking inadequate in visibility or placement"
+            },
+            {
+              "id": "NEC_CONTRIBUTED_TO_ERROR",
+              "description": "Deficiency plausibly contributed to the miss"
+            }
+          ]
+        },
+        {
+          "id": "R4_MECHANICAL_CONTROL_FAILURE",
+          "label": "Mechanical/control failure",
+          "nec_slots": [
+            {
+              "id": "NEC_EQUIPMENT_MALFUNCTION",
+              "description": "Tug/aircraft equipment malfunction affecting stopping/control"
+            },
+            {
+              "id": "NEC_CORROBORATION",
+              "description": "Corroborating evidence (tests, fault codes, repeated failures)"
+            }
+          ]
+        },
+        {
+          "id": "H_OTHER",
+          "label": "Other / undetermined",
+          "nec_slots": [],
+          "policy": "Use when key NEC slots for any root are not supportable from E_T."
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,212 @@
+#+TITLE: ABDUCTIO Data Source Processing Spec — AAIB UK Bulletin-Style Accident/Incident Reports
+#+SUBTITLE: Turning AAIB bulletins into defensible ABDUCTIO benchmark cases
+#+OPTIONS: toc:2 num:t
+
+* 0. Purpose
+This document defines a repeatable method for converting AAIB Bulletin-style reports into ABDUCTIO benchmark cases.
+
+It is designed to be:
+- *Anti-hindsight:* methods are evaluated on what was knowable before the investigation’s later synthesis.
+- *Defensible without “Truth” access:* the AAIB’s determination is treated as a *later, better-resourced inference state*, not as capital-T Truth.
+- *Auditable:* all transformations are reproducible from frozen source files.
+
+* 1. What an AAIB bulletin report usually contains
+Most reports include:
+- A *header block* (aircraft type/registration, date/time, location, type of flight, injuries, damage, info source).
+- A *Synopsis* summarizing the event and often (but not always) a causal story.
+- A *History of the flight* narrative.
+Some reports additionally include explicit sections such as:
+- *Aircraft information / Meteorology / Recorded data / Wreckage examination*
+- *Analysis*
+- *Conclusion*
+- *Safety actions / Safety recommendations*
+
+Critical note: In some reports, the *Synopsis itself states the cause* (e.g., “The power loss was caused by…”). In others, the report explicitly states that *no definitive cause* was established. Both must be handled without leaking hindsight into the evidence packet.
+
+* 2. Core principle: “Reference outcome” is not Truth
+AAIB findings are treated as a *reference outcome* with:
+- higher evidential coverage than earlier observers,
+- better tooling and access,
+- and an explicit institutional mandate.
+
+But they are not assumed infallible. Therefore:
+- A benchmark should report agreement with the reference outcome, *and also* report whether the method behaves responsibly under uncertainty (humility, stability, auditability).
+- Cases where the AAIB does not establish a definitive cause must be supported as first-class “open-world” cases (ie, “undetermined” is an allowed outcome class).
+
+* 3. Benchmark scopes suitable for this source
+Choose exactly one scope per dataset slice.
+
+Recommended single-label scopes:
+- *S1 (Proximate mechanism):* “What mechanism most directly produced the loss of control / impact / damage outcome?”
+- *S2 (Preventable mechanism):* “What primary preventable mechanism would have broken the causal chain at highest leverage?”
+
+Avoid scopes that require private evidence not present in the public report.
+
+* 4. Artifact outputs per case
+Each AAIB report selected into the corpus must be transformed into these artifacts:
+
+- *scope.org or scope.md*
+  A single sentence defining the benchmark question and what counts as “correct.”
+
+- *evidence_packet.md*
+  A strictly “pre-conclusion” evidence bundle given to all methods.
+
+- *answer_key.md* (kept separate / gated)
+  The reference outcome text + mapping to your root set + strength rating.
+
+- *roots.yaml*
+  The MECE roots (with exclusion clauses) used for the case.
+
+- *source_manifest.json*
+  File hash, retrieval date, and section cut rules used.
+
+* 5. Sectioning rules: what goes into evidence vs held-out
+** 5.1 Allowed in the Evidence Packet
+The evidence packet may include:
+- Header facts (date/time/location, operation type, injuries, damage).
+- Narrative facts from “History of the flight” and “Factual information”-style sections.
+- Observations, measurements, and quoted witness statements.
+- Timelines and data plots treated as observations (not interpretations).
+
+** 5.2 Held-out (the Answer Key material)
+Hold out:
+- Any explicit *cause attribution* statements from the Synopsis.
+- “Analysis” sections (when present).
+- “Conclusion / Probable cause / Causal factor identified” sections (when present).
+- “Safety actions / recommendations” unless the benchmark scope is specifically prevention-focused.
+
+** 5.3 Special handling: Synopsis that mixes facts + causation
+If the Synopsis contains both:
+- a factual event summary, and
+- causal attribution,
+then split it:
+- Keep the *event summary* (what happened).
+- Hold out the *causal attribution sentences* (why it happened).
+
+Rule of thumb:
+- If a sentence asserts a mechanism (“was caused by”, “the cause was”, “most probably stalled because”), it is held-out.
+
+* 5A. Evidence Freeze and Leakage Gates (AAIB-specific)
+Evidence packets MUST comply with:
+- `case_studies/data/UK_AAIB_Reports/spec/evidence_packet_protocol.md`
+- `case_studies/data/UK_AAIB_Reports/spec/leakage_checks.md`
+
+Required leakage audit elements per build:
+- Count of items dropped by each rule
+- Keyword hits (soft and hard gates)
+- Evidence packet hashes
+- Two-independent-builder agreement on a subset
+
+* 6. Open-world handling (“undetermined” is valid)
+AAIB reports sometimes explicitly state that no definitive cause was established.
+In that situation:
+- Include an explicit root such as *H_undetermined_or_other* in the MECE set.
+- Mark the case as *open-world* in index.csv.
+- The answer key records the reference as “undetermined” with a high-strength tag (because the report is explicitly refusing to close the world).
+
+Evaluation then emphasizes:
+- avoiding overconfident collapse onto a single story,
+- allocating meaningful mass to “other/undetermined” when evidence is insufficient,
+- and producing an audit trail that makes uncertainty legible.
+
+* 7. Root-set construction for AAIB cases
+** 7.1 Granularity discipline
+AAIB narratives often include both:
+- proximate mechanical/operational mechanisms, and
+- deeper organizational/system contributors.
+Do not mix levels in a single MECE set.
+
+If you need both, create two benchmarks:
+- Layer A: proximate mechanism (single-label).
+- Layer B: contributing/systemic factors (multi-label; separate evaluation).
+
+** 7.2 Recommended starter root patterns (proximate)
+- H_flight_handling_loss_of_control (stall/spin, mis-handling, unstable approach)
+- H_powerplant_or_propulsion_anomaly
+- H_system_or_component_failure
+- H_configuration_or_procedural_error (wrong setting, checklist/crew coordination)
+- H_environmental_or_weather_factor
+- H_ground_handling_or_airport_interface (pushback/tug, runway incursion/obstacle)
+- H_other_or_undetermined
+
+Add exclusion clauses so roots do not overlap (eg, “system failure excluding pilot control inputs,” etc).
+
+* 7A. Root-set validation (AAIB-specific)
+Root sets MUST pass the MECE checks in:
+- `case_studies/data/UK_AAIB_Reports/spec/root_set_validation.md`
+
+* 8. Reference outcome extraction + strength grading
+Each case’s answer key must include:
+- A *reference statement* (quoted or tightly paraphrased).
+- The *section source* (Conclusion / Analysis / Synopsis causal sentence).
+- A *strength grade*:
+
+Suggested grading:
+- A: Explicit “Conclusion / Cause / Causal factor identified” section, unambiguous.
+- B: Strong causal statement in Analysis, but with hedging or partial uncertainty.
+- C: Cause implied only by synopsis wording, operator statement, or weak evidence.
+
+If the report states “no definitive cause,” treat that as:
+- A-strength for *undetermined* (a strong refusal to label), not as C-strength.
+
+** 8.1 Oracle strength usage in scoring
+- Record OS class for every case (map A/B/C to OS-3/OS-2/OS-1 if needed).
+- Label-dependent metrics must be reported with OS context.
+- Tier 2 analyses should stratify by OS class or include OS as a covariate.
+
+* 9. Evidence staging (optional but recommended)
+Some cases can be staged to emulate real-time investigation:
+- T0: Header + immediate outcome + initial witness observations.
+- T1: Full history narrative.
+- T2: Technical examination data (still factual-only).
+- (Held-out): Analysis/Conclusion.
+
+If staged, all methods receive the same staged releases and the same budget per stage.
+
+* 10. Fairness contract (non-negotiables)
+For a benchmark run to be valid, all methods must share:
+- identical scope statement,
+- identical evidence packet(s),
+- identical root set (same wording and exclusions),
+- identical budget model (credits/steps/time),
+- identical mapping rules from outputs to root IDs.
+
+* 10A. Evaluator constraints (AAIB-specific)
+- Evaluators must be deterministic (fixed seed, temperature, and model version).
+- External citations are not required because evidence is local.
+- Reproducibility is mandatory: log evaluator spec and reuse matched calls for ablations.
+
+* 11. Metrics to report (beyond agreement with the AAIB)
+Because the reference outcome is not Truth, report both agreement and responsibility:
+
+Agreement metrics (when labelable):
+- Top-1 accuracy / Top-k accuracy
+- Brier score or log score (if probabilistic)
+
+Responsibility metrics (always):
+- Calibration by confidence bucket
+- “Humility under thin evidence”: mass assigned to H_other_or_undetermined when warranted
+- Robustness: sensitivity to (a) hypothesis ordering, (b) root decomposition changes
+- Auditability: can an auditor reproduce each update from the run log?
+
+* 12. Recommended folder layout for this source
+reports/aaib_uk_bulletin/
+  index.csv
+  processing_spec.org (this file)
+  cases/
+    <case_id>/
+      source.pdf
+      source_manifest.json
+      scope.md
+      evidence_packet.md
+      roots.yaml
+      answer_key.md          (gated or in a separate private folder if desired)
+      runs/
+
+* 13. Minimal “done” definition for a new case
+A case is considered ready when:
+- source.pdf is frozen and hashed,
+- evidence_packet.md contains no causal-attribution leakage,
+- roots.yaml is MECE with explicit exclusions,
+- answer_key.md includes reference statement + strength grade,
+- index.csv row is complete and selected_for_corpus=Y.

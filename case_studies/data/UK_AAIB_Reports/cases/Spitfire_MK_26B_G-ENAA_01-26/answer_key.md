@@ -1,0 +1,23 @@
+# Answer Key (Reference Outcome)
+
+Reference type: conclusion
+Reference strength: A
+Reference is undetermined: N
+Label root id: 
+
+## Reference statement
+Immediately after takeoff the aircraft stalled during a rapid pitch up. Control was lost and 
+the aircraft rolled and yawed left as a result of a post-stall autorotation.
+
+## Source section excerpt
+Immediately after takeoff the aircraft stalled during a rapid pitch up.  Control was lost and 
+the aircraft rolled and yawed left as a result of a post-stall autorotation.  The left wing struck 
+the ground, the aircraft came to rest inverted and caught fire, and the pilot was fatally 
+injured.  Despite the extensive damage sustained during the impact and ensuing fire, there 
+was no evidence of a malfunction or failure of any of the aircraft’s flying control systems that 
+would explain a loss of control.  It was possible that the pilot did not control the yaw during 
+the takeoff run, initiated a rapid pitch up to lift off before running off the side of the runway 
+and, in so doing, began the sequence of events.  Although the medical evidence did not 
+permit a definitive conclusion, it was also possible that the reason for the loss of control was 
+that the pilot became incapacitated to some extent during the takeoff.
+Published: 4 December 2025.

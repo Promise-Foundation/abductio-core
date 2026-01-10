@@ -1,0 +1,295 @@
+#+TITLE: ABDUCTIO Case Study Methodology Spec — Defensible Benchmarks Without Truth(T)
+#+SUBTITLE: How to create case-study documents that remain valid when “reference conclusions” may be wrong
+#+OPTIONS: toc:2 num:t
+
+* 0. PURPOSE (meta)
+This document specifies how to create *case study documents* (and domain-specific “case type specs”) that are defensible *without assuming Truth-with-a-capital-T*.
+
+Core principle integrated:
+- Reference findings (regulators, postmortems, boards, courts) are not Truth(T).
+- They are *later, better-resourced inference states*.
+- ABDUCTIO should be evaluated by *responsible epistemic behavior before those states are reachable*, not by agreement with them.
+
+This spec defines:
+- how to treat “answer keys” as *oracles* (fallible comparators),
+- how to score outcomes without overcommitting to oracle correctness,
+- how to document disagreement in a principled, publishable way.
+
+* 1. UNDERSTAND (core question)
+How do we integrate the “not Truth(T)” insight into a complete, reusable methodology for creating case study documents across domains?
+
+* 2. ANALYZE (key components)
+A defensible case study pipeline has 7 components:
+
+1) *Scope definition* (what question are we evaluating?)
+2) *Evidence freeze & packetization* (what was knowable at time T?)
+3) *Hypothesis model* (MECE roots + exclusion clauses + Other policy)
+4) *Oracle model* (what is the reference conclusion, and what is its epistemic status?)
+5) *Method contract* (fairness: same inputs, same budget model)
+6) *Evaluation targets* (what counts as “good” if oracle may be wrong?)
+7) *Disagreement protocol* (how to treat ABDUCTIO-vs-oracle divergence)
+
+* 2A. CASE STUDY PIPELINE ALIGNMENT (v2)
+Case study execution MUST align with the canonical v2 framework in
+`case_studies/abductio_v2_validation_framework.md`.
+
+Required process constraints:
+- *Evidence Freeze Time (T):* explicitly defined per case.
+- *Allowed sections:* factual header + factual narrative + limited factual synopsis only.
+- *Disallowed sections:* analysis, conclusion, safety actions.
+- *No-hindsight gates:* enforce leakage checks; for AAIB, reference
+  `case_studies/data/UK_AAIB_Reports/spec/evidence_packet_protocol.md`.
+
+Ablation runs:
+- An ablation run is any variant that changes exactly one system component
+  (scheduler, template usage, decomposition policy, update rule).
+- Each run MUST log a config hash, evaluator hash/spec, credit budget,
+  and stopping rule.
+
+Minimum required outputs per run:
+- p/k traces per EVALUATE step
+- credit ledger (per operation)
+- allocation traces (per hypothesis/root)
+- results.json (label-dependent and label-independent metrics)
+
+* 3. REASON (logic linking the components)
+If the oracle is fallible, then “accuracy vs label” is not the sole objective.
+Instead:
+
+- The oracle becomes *one* downstream inference state among several comparators.
+- “Good performance” must include:
+  - calibrated uncertainty,
+  - defeater awareness,
+  - auditability,
+  - robustness to representation attacks (order/decomposition),
+  - appropriate allocation to H_other when evidence is insufficient.
+
+Therefore, case-study documents must explicitly encode:
+- the oracle’s *strength* and *failure modes*,
+- which evaluation metrics are label-dependent vs label-independent,
+- and how to score “justified dissent.”
+
+* 4. SYNTHESIZE (how it all fits together)
+We treat each case as a timeline of epistemic states:
+
+- E_T : evidence available at freeze time T (the benchmark input)
+- O_L : later “oracle” conclusion produced with additional evidence/time/resources
+- (optional) O_2, O_3 : other oracles / corroborators (appeals, independent reconstructions, alternative investigations)
+
+ABDUCTIO is evaluated on:
+- its *state at time T*, produced only from E_T under budget B,
+- compared to O_L as a *downstream reference state*, not Truth(T).
+
+* 5. CONCLUDE (deliverable)
+What follows is the normative methodology spec you can use to create domain-specific documents and individual case writeups.
+
+* 6. TERMINOLOGY (normative)
+- *Evidence Freeze Time (T)*: the cutoff time; only information available at or before T is allowed in evidence packets.
+- *Evidence Packet (E_T)*: the canonical benchmark input (bulleted, timestamped if possible).
+- *Oracle*: any later, better-resourced inference product (final report, postmortem conclusion, judgment, regulator order).
+- *Oracle Strength Class*: a documented assessment of oracle reliability for this case type.
+- *Label*: a mapping from oracle conclusion -> one of the MECE roots (may be “soft” or “contested”).
+- *Justified Dissent*: ABDUCTIO diverges from oracle *with explicit, audit-supported reasons* and appropriate confidence/uncertainty.
+
+* 7. THE ORACLE MODEL (the big upgrade)
+Every case type spec MUST include an explicit Oracle Model section.
+
+** 7.1 Oracle Strength Classes (required)
+Assign each oracle (per case type) to a strength class:
+
+- OS-1 (Procedural Determination): conclusion is authoritative but evidence record is thin/opaque.
+- OS-2 (Documented Determination): conclusion is supported by a public factual record, but incentives/PR/legal framing may distort.
+- OS-3 (Investigative Determination): deep factual record + separation of facts/analysis + exhibits; still fallible.
+- OS-4 (Multi-Oracle Convergence): multiple independent oracles converge (e.g., investigation board + court + independent expert report).
+- OS-5 (Mechanistic Confirmation): the conclusion has direct mechanistic confirmation (e.g., component failure verified, pathology confirmed, reproducible exploit verified).
+
+Normative constraint:
+- Do not call any oracle “ground truth” unless OS-5 *and* the confirmation is explicitly documented.
+
+** 7.2 Oracle Failure Modes (required)
+Each case type spec MUST list typical failure modes, e.g.:
+- hindsight bias / narrative smoothing
+- institutional incentives (liability, political, PR, budget)
+- incomplete data access / redactions
+- single-point expert failure
+- forced single-cause labeling when reality is multi-factor
+
+** 7.3 Oracle Mapping Policy (required)
+Define how oracle conclusions map to MECE roots:
+- single-label mapping (preferred for S1 scopes)
+- multi-label mapping (for contributing factors, only if benchmarked separately)
+- contested mapping (if reasonable experts can map differently)
+- “Other / Unknown” mapping (if oracle explicitly says uncertain/undetermined)
+
+* 8. EVALUATION TARGETS (beyond “match the label”)
+Each case study MUST report metrics in two buckets:
+
+** 8.1 Label-dependent metrics (use carefully)
+These treat oracle label as a *reference*, not Truth(T):
+
+- Rank of oracle-mapped root
+- Top-K coverage (does ABDUCTIO keep oracle root in top 2/3?)
+- Log score / Brier score vs oracle label (reported with oracle strength class)
+- Budget-efficiency curves for the above
+
+Normative disclaimer:
+- These metrics are “agreement with oracle,” not “truth accuracy.”
+
+** 8.2 Label-independent metrics (core defensibility)
+These do not require believing the oracle is correct:
+
+- Audit Reproducibility: can a third party recompute ledger shifts from logs + cited evidence?
+- Uncertainty Discipline: does k stay low when evidence is thin or contested?
+- H_other Appropriateness (open-world): does residual mass rise when required slots remain weak?
+- Defeater Awareness: are the strongest defeaters explicitly articulated and tracked?
+- Robustness:
+  - permutation invariance tests
+  - decomposition sensitivity tests (DSI)
+- Premature Commitment Rate:
+  - how often does a method concentrate probability too early under weak evidence?
+
+These are the flagship metrics for “responsible epistemic behavior.”
+
+* 9. THE DISAGREEMENT PROTOCOL (the second big upgrade)
+Every individual case document MUST include a Disagreement Protocol section.
+
+** 9.1 Disagreement types (required)
+If ABDUCTIO disagrees with the oracle, classify it:
+
+- D0: No disagreement (same top root)
+- D1: Soft disagreement (oracle root is in ABDUCTIO top-K; uncertainty acknowledged)
+- D2: Competing lead (ABDuctio lead differs; oracle root still plausible)
+- D3: Strong dissent (oracle root low-ranked), but ABDUCTIO k is also low (epistemic humility)
+- D4: Strong dissent with high k (rare; requires high evidentiary traceability)
+
+** 9.2 Justified Dissent Criteria (required for D2–D4)
+ABDuctio dissent is *defensible* when:
+1) It cites explicit evidence_refs supporting the dissenting root’s key NEC slots, and
+2) It logs explicit defeaters for the oracle root, and
+3) It keeps k appropriately bounded (high k requires OS-4/OS-5-level support), and
+4) It identifies a concrete *hinge*:
+   - “If evidence X is wrong / missing, the conclusion flips.”
+
+** 9.3 Scoring disagreements (normative)
+When oracle strength is low (OS-1/OS-2):
+- Weight label-dependent penalties less.
+- Weight label-independent metrics more.
+
+When oracle strength is high (OS-4/OS-5):
+- Disagreement is costlier, unless ABDUCTIO flags the dispute as low-k with clear hinges.
+
+* 10. MULTI-ORACLE EVALUATION (recommended when feasible)
+To avoid “single pronouncement benchmarking,” optionally add additional oracles:
+
+- O_reg: regulator / board report
+- O_court: judicial finding
+- O_ind: independent expert report
+- O_rep: replicated technical reproduction (when possible)
+
+Report:
+- agreement vs each oracle
+- convergence / divergence notes
+- whether ABDUCTIO anticipated later oracle shifts (e.g., appeals, amended postmortems)
+
+* 11. CASE DOCUMENT TEMPLATE (what each case writeup MUST contain)
+Each case writeup MUST include:
+
+1) Case ID + Source URLs + retrieval dates + hashes
+2) Scope statement (single sentence; choose S1/S2/S3 explicitly)
+3) Evidence Freeze Time T (definition + justification)
+4) Evidence Packet E_T (canonical; bulleted; timestamped where possible)
+5) MECE Roots + Exclusion Clauses (+ H_other policy)
+6) Budget Model + Budget B
+7) Run Artifacts
+   - ABDUCTIO run log (canonicalized)
+   - baseline runs (same inputs/budget model)
+8) Oracle Model for this case
+   - oracle excerpt(s) + mapping policy
+   - oracle strength class (OS-1..OS-5) + rationale
+   - oracle failure mode notes (if relevant)
+9) Results
+   - label-dependent metrics (with disclaimers)
+   - label-independent metrics (auditability/robustness/etc.)
+10) Disagreement Protocol
+   - D0..D4 classification
+   - justified dissent checklist
+   - hinges (what evidence would change the outcome?)
+11) “What this case demonstrates” (1 paragraph; claim-bounded)
+
+* 12. UPDATING YOUR EXISTING CASE TYPE SPECS (patch list)
+For each existing type_spec.org (tech postmortems, transport safety, OSHA, medical, security, partner NDA, legal/regulatory), add:
+
+- New Section: *Oracle Model*
+  - typical oracle strength class for this type
+  - common oracle failure modes
+  - mapping policy (single vs multi-label; contested labels)
+
+- New Section: *Evaluation Targets*
+  - label-dependent vs label-independent metrics
+  - required disclaimers
+
+- New Section: *Disagreement Protocol*
+  - D0..D4 classification
+  - justified dissent criteria
+  - how to write “ABDuctio vs Oracle” without claiming Truth(T)
+
+- New Section: *Claims Policy for Website Publication*
+  - allowed claims: auditability, robustness, humility, budget-efficiency, decomposition resilience
+  - disallowed claims: “proves regulator wrong,” “Truth,” “objective posterior” without OS-5 evidence
+
+* 13. CLAIMS YOU CAN DEFEND PUBLICLY (recommended wording)
+Allowed claim templates:
+
+- “Given only the evidence available by time T and a fixed budget, ABDUCTIO produced an auditable distribution over hypotheses.”
+- “ABDuctio avoids premature certainty by allocating residual uncertainty to H_other when required slots remain weak.”
+- “ABDuctio’s outputs are reproducible and invariant to input order and (within design) robust to decomposition attacks.”
+- “Compared to baseline methods under identical inputs/budgets, ABDuctio produced fewer epistemically unjustified commitments.”
+
+Avoid:
+- “ABDuctio found the true cause” (unless OS-5 and clearly documented)
+- “The regulator was wrong” (you can say: “ABDuctio remained unconvinced given E_T.”)
+
+* 14. MINIMUM VIABLE DEFENSIBLE BENCHMARK (MVDB)
+If you need a lean version:
+
+Required:
+- Evidence freeze + packet
+- MECE roots + exclusion
+- budget model
+- ABDUCTIO run + at least one baseline
+- oracle strength class + mapping policy
+- at least 2 label-independent metrics (audit reproducibility, decomposition sensitivity)
+
+Optional:
+- multi-oracle, staged evidence, utilities/decision layer
+
+* 15. OUTPUT ARTIFACTS (repo-standard)
+For each case:
+
+- evidence_packet.md
+- roots.yaml
+- oracle.md
+  - oracle_excerpt
+  - mapping rationale
+  - oracle strength class
+- runs/abductio/
+- runs/baseline_checklist/
+- runs/baseline_logodds/
+- results.json
+  - label-dependent metrics
+  - label-independent metrics
+  - disagreement classification
+  - hinges
+
+For each case type:
+
+- type_spec.org (this methodology applied to the domain)
+- metrics_spec.md (any domain-specific metrics)
+- roots_library.yaml (starter MECE patterns)
+
+* 16. FINAL NORMATIVE STATEMENT (include verbatim in each published benchmark)
+“This benchmark does not assume Truth-with-a-capital-T. The reference conclusion is treated as a later, better-resourced inference state (an oracle) with documented strength and failure modes. ABDUCTIO is evaluated primarily on responsible epistemic behavior under frozen evidence and fixed budget: auditability, calibrated uncertainty, defeater awareness, and robustness to representation artifacts. Agreement with the oracle is reported as agreement, not as metaphysical truth.”
+
+#+BEGIN_COMMENT
+End of methodology spec.
+#+END_COMMENT

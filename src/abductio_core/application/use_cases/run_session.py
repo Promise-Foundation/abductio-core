@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import math
 from typing import Dict, Iterable, List, Optional, Tuple
 
-from abductio_core.application.dto import SessionRequest
+from abductio_core.application.dto import EvidenceItem, SessionRequest
 from abductio_core.application.ports import RunSessionDeps
 from abductio_core.application.result import SessionResult, StopReason
 from abductio_core.domain.audit import AuditEvent
@@ -15,6 +16,33 @@ def _clamp_probability(value: float) -> float:
     return max(0.0, min(1.0, value))
 
 
+def _clip(value: float, lower: float, upper: float) -> float:
+    return max(lower, min(upper, value))
+
+
+def _logit(p: float) -> float:
+    p = _clip(p, 1e-6, 1.0 - 1e-6)
+    return math.log(p / (1.0 - p))
+
+
+def _safe_log(p: float) -> float:
+    return math.log(max(p, 1e-12))
+
+
+def _logsumexp(values: Iterable[float]) -> float:
+    vals = list(values)
+    if not vals:
+        return 0.0
+    peak = max(vals)
+    total = sum(math.exp(v - peak) for v in vals)
+    return peak + math.log(total)
+
+
+def _normalize_log_ledger(log_ledger: Dict[str, float]) -> Dict[str, float]:
+    lse = _logsumexp(log_ledger.values())
+    return {key: math.exp(value - lse) for key, value in log_ledger.items()}
+
+
 def _validate_request(request: SessionRequest) -> None:
     if request.credits < 0:
         raise ValueError("credits must be non-negative")
@@ -22,6 +50,14 @@ def _validate_request(request: SessionRequest) -> None:
         value = getattr(request.config, attr)
         if not (0.0 <= value <= 1.0):
             raise ValueError(f"{attr} must be within [0,1]")
+    if request.config.beta < 0.0:
+        raise ValueError("beta must be non-negative")
+    if request.config.W <= 0.0:
+        raise ValueError("W must be greater than 0")
+    if request.config.lambda_voi < 0.0:
+        raise ValueError("lambda_voi must be non-negative")
+    if request.config.world_mode not in {"open", "closed"}:
+        raise ValueError("world_mode must be 'open' or 'closed'")
     for root in request.roots:
         if not root.root_id:
             raise ValueError("root_id is required")
@@ -45,6 +81,28 @@ def _required_slot_roles(request: SessionRequest) -> Dict[str, str]:
     if not required_slots:
         return {"feasibility": "NEC"}
     return {row["slot_key"]: row.get("role", "NEC") for row in required_slots if "slot_key" in row}
+
+
+def _evidence_index(request: SessionRequest) -> Dict[str, EvidenceItem]:
+    items = request.evidence_items or []
+    index: Dict[str, EvidenceItem] = {}
+    for item in items:
+        if isinstance(item, EvidenceItem):
+            evidence_id = item.id
+            index[evidence_id] = item
+            continue
+        if isinstance(item, dict):
+            evidence_id = str(item.get("id") or item.get("evidence_id") or "").strip()
+            if not evidence_id:
+                continue
+            index[evidence_id] = EvidenceItem(
+                id=evidence_id,
+                source=str(item.get("source", "")),
+                text=str(item.get("text", "")),
+                location=item.get("location"),
+                metadata=dict(item.get("metadata", {})) if isinstance(item.get("metadata"), dict) else {},
+            )
+    return index
 
 
 def _node_statement_map(decomposition: Dict[str, str]) -> Dict[str, str]:
@@ -74,14 +132,15 @@ def _init_hypothesis_set(request: SessionRequest) -> HypothesisSet:
         )
         ledger[root.root_id] = base_p
 
-    roots[H_OTHER_ID] = RootHypothesis(
-        root_id=H_OTHER_ID,
-        statement="Other",
-        exclusion_clause="Not explained by any named root",
-        canonical_id=canonical_id_for_statement("Other"),
-        status="OTHER",
-    )
-    ledger[H_OTHER_ID] = gamma if count_named else 1.0
+    if request.config.world_mode != "closed":
+        roots[H_OTHER_ID] = RootHypothesis(
+            root_id=H_OTHER_ID,
+            statement="Other",
+            exclusion_clause="Not explained by any named root",
+            canonical_id=canonical_id_for_statement("Other"),
+            status="OTHER",
+        )
+        ledger[H_OTHER_ID] = gamma if count_named else 1.0
 
     if request.initial_ledger:
         ledger.update(request.initial_ledger)
@@ -93,14 +152,20 @@ def _compute_frontier(
     roots: Iterable[RootHypothesis],
     ledger: Dict[str, float],
     epsilon: float,
+    lambda_voi: float,
 ) -> Tuple[Optional[str], List[RootHypothesis]]:
     named_roots = list(roots)
     if not named_roots:
         return None, []
-    ordered = sorted(named_roots, key=lambda r: (-ledger.get(r.root_id, 0.0), r.canonical_id))
+    def priority(root: RootHypothesis) -> float:
+        p = float(ledger.get(root.root_id, 0.0))
+        n = max(1, int(root.credits_spent))
+        return (p * (1.0 - p) + (lambda_voi / n)) * (1.0 - float(root.k_root))
+
+    ordered = sorted(named_roots, key=lambda r: (-priority(r), r.canonical_id))
     leader = ordered[0]
-    leader_p = ledger.get(leader.root_id, 0.0)
-    frontier = [r for r in ordered if ledger.get(r.root_id, 0.0) >= leader_p - epsilon]
+    leader_score = priority(leader)
+    frontier = [r for r in ordered if priority(r) >= leader_score - epsilon]
     return leader.root_id, frontier
 
 
@@ -126,7 +191,7 @@ def _aggregate_soft_and(node: Node, nodes: Dict[str, Node]) -> Tuple[float, Dict
     children = [nodes[k] for k in node.children if k in nodes]
     assessed = [c for c in children if c.assessed]
     if not assessed:
-        return 1.0, {"p_min": 1.0, "p_prod": 1.0, "c": float(node.coupling or 0.0)}
+        return 0.5, {"p_min": 0.5, "p_prod": 0.5, "c": float(node.coupling or 0.0)}
     p_values = [c.p for c in assessed]
     p_min = min(p_values)
     p_prod = 1.0
@@ -157,6 +222,8 @@ def _apply_node_decomposition(
                         "type": node.decomp_type,
                         "coupling": node.coupling,
                         "children": [],
+                        "children_spec": [],
+                        "llm": decomposition.get("_provenance"),
                     },
                 )
             )
@@ -166,22 +233,37 @@ def _apply_node_decomposition(
     node.coupling = decomposition.get("coupling")
     node.children = []
 
+    children_spec: List[Dict[str, object]] = []
     for child in decomposition.get("children", []):
         if not isinstance(child, dict):
             continue
         child_id = child.get("child_id") or child.get("id")
-        if not child_id:
+        statement = str(child.get("statement", ""))
+        if not child_id and not statement:
             continue
-        child_node_key = f"{node_key}:{child_id}"
+        canonical_child_id = canonical_id_for_statement(statement) if statement else str(child_id)
+        child_node_key = f"{node_key}:{canonical_child_id}"
         nodes[child_node_key] = Node(
             node_key=child_node_key,
-            statement=str(child.get("statement", "")),
+            statement=statement,
             role=str(child.get("role", "NEC")),
-            p=1.0,
+            p=0.5,
             k=0.15,
             assessed=False,
         )
         node.children.append(child_node_key)
+        children_spec.append(
+            {
+                "child_id": child_id,
+                "canonical_child_id": canonical_child_id,
+                "statement": statement,
+                "role": child.get("role", "NEC"),
+                "node_key": child_node_key,
+                "falsifiable": child.get("falsifiable"),
+                "test_procedure": child.get("test_procedure"),
+                "overlap_with_siblings": child.get("overlap_with_siblings", []),
+            }
+        )
 
     node.children.sort()
     deps.audit_sink.append(
@@ -192,6 +274,8 @@ def _apply_node_decomposition(
                 "type": node.decomp_type,
                 "coupling": node.coupling,
                 "children": list(node.children),
+                "children_spec": children_spec,
+                "llm": decomposition.get("_provenance"),
             },
         )
     )
@@ -212,16 +296,38 @@ def _decompose_root(
     if not ok:
         root.k_root = min(root.k_root, 0.40)
         deps.audit_sink.append(AuditEvent("UNSCOPED_CAPPED", {"root_id": root.root_id, "k_root": root.k_root}))
+        deps.audit_sink.append(
+            AuditEvent(
+                "ROOT_DECOMPOSED",
+                {
+                    "root_id": root.root_id,
+                    "ok": False,
+                    "slot_statements": {},
+                    "llm": decomposition.get("_provenance"),
+                },
+            )
+        )
         return
 
     statement_map = _node_statement_map(decomposition)
+    deps.audit_sink.append(
+        AuditEvent(
+            "ROOT_DECOMPOSED",
+            {
+                "root_id": root.root_id,
+                "ok": True,
+                "slot_statements": dict(statement_map),
+                "llm": decomposition.get("_provenance"),
+            },
+        )
+    )
     for slot_key in required_slot_keys:
         if slot_key in root.obligations:
             continue
         node_key = f"{root.root_id}:{slot_key}"
         statement = statement_map.get(slot_key) or ""
         role = required_slot_roles.get(slot_key, "NEC")
-        initial_p = float(slot_initial_p.get(node_key, 1.0))
+        initial_p = float(slot_initial_p.get(node_key, 0.5))
         node_k = float(slot_k_min) if slot_k_min is not None else 0.15
         nodes[node_key] = Node(
             node_key=node_key,
@@ -235,7 +341,11 @@ def _decompose_root(
 
     root.status = "SCOPED"
     if root.obligations:
-        slot_nodes = [nodes[k] for k in root.obligations.values() if k in nodes]
+        slot_nodes = [
+            nodes[k]
+            for slot_key, k in root.obligations.items()
+            if k in nodes and required_slot_roles.get(slot_key, "NEC") == "NEC"
+        ]
         if slot_nodes:
             root.k_root = min(n.k for n in slot_nodes)
 
@@ -431,17 +541,65 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
     hypothesis_set = _init_hypothesis_set(request)
     required_slot_keys = _required_slot_keys(request)
     required_slot_roles = _required_slot_roles(request)
+    evidence_index = _evidence_index(request)
 
     named_root_ids = [rid for rid in hypothesis_set.roots if rid != H_OTHER_ID]
     deps.audit_sink.append(
-        AuditEvent("SESSION_INITIALIZED", {"roots": list(hypothesis_set.roots.keys()), "ledger": dict(hypothesis_set.ledger)})
+        AuditEvent(
+            "SESSION_INITIALIZED",
+            {
+                "roots": list(hypothesis_set.roots.keys()),
+                "ledger": dict(hypothesis_set.ledger),
+                "roots_spec": [
+                    {
+                        "root_id": root.root_id,
+                        "statement": root.statement,
+                        "exclusion_clause": root.exclusion_clause,
+                        "canonical_id": root.canonical_id,
+                    }
+                    for root in hypothesis_set.roots.values()
+                ],
+                "config": {
+                    "tau": request.config.tau,
+                    "epsilon": request.config.epsilon,
+                    "gamma": request.config.gamma,
+                    "alpha": request.config.alpha,
+                    "beta": request.config.beta,
+                    "W": request.config.W,
+                    "lambda_voi": request.config.lambda_voi,
+                    "world_mode": request.config.world_mode,
+                },
+                "required_slots": request.required_slots or [],
+                "initial_ledger": dict(request.initial_ledger or {}),
+                "slot_k_min": dict(request.slot_k_min or {}),
+                "slot_initial_p": dict(request.slot_initial_p or {}),
+                "evidence_items": [
+                    {
+                        "id": item.id,
+                        "source": item.source,
+                        "text": item.text,
+                        "location": item.location,
+                        "metadata": dict(item.metadata),
+                    }
+                    for item in evidence_index.values()
+                ],
+            },
+        )
     )
 
-    sum_named = sum(hypothesis_set.ledger.get(rid, 0.0) for rid in named_root_ids)
-    branch = "S<=1" if sum_named <= 1.0 else "S>1"
-    enforce_absorber(hypothesis_set.ledger, named_root_ids)
-    deps.audit_sink.append(AuditEvent("OTHER_ABSORBER_ENFORCED", {"branch": branch, "sum_named": sum_named}))
-    deps.audit_sink.append(AuditEvent("INVARIANT_SUM_TO_ONE_CHECK", {"total": sum(hypothesis_set.ledger.values())}))
+    if H_OTHER_ID in hypothesis_set.ledger:
+        sum_named = sum(hypothesis_set.ledger.get(rid, 0.0) for rid in named_root_ids)
+        branch = "S<=1" if sum_named <= 1.0 else "S>1"
+        enforce_absorber(hypothesis_set.ledger, named_root_ids)
+        deps.audit_sink.append(AuditEvent("OTHER_ABSORBER_ENFORCED", {"branch": branch, "sum_named": sum_named}))
+        deps.audit_sink.append(AuditEvent("INVARIANT_SUM_TO_ONE_CHECK", {"total": sum(hypothesis_set.ledger.values())}))
+    else:
+        total = sum(hypothesis_set.ledger.values())
+        if total > 0.0:
+            hypothesis_set.ledger = {k: v / total for k, v in hypothesis_set.ledger.items()}
+        deps.audit_sink.append(
+            AuditEvent("NAMED_LEDGER_NORMALIZED", {"total": sum(hypothesis_set.ledger.values()), "ledger": dict(hypothesis_set.ledger)})
+        )
 
     credits_remaining = int(request.credits)
     total_credits_spent = 0
@@ -461,37 +619,123 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
         operation_log.append({"op_type": op_type, "target_id": target_id, "credits_before": before, "credits_after": after})
         deps.audit_sink.append(AuditEvent("OP_EXECUTED", {"op_type": op_type, "target_id": target_id, "credits_before": before, "credits_after": after}))
 
+    w_applied: Dict[Tuple[str, str], float] = {}
+
+    def _slot_weight(node: Node, beta: float, weight_cap: float) -> float:
+        if not node.assessed:
+            return 0.0
+        return _clip(beta * float(node.k) * _logit(float(node.p)), -weight_cap, weight_cap)
+
     def apply_ledger_update(root: RootHypothesis) -> None:
-        slot_p_values = []
+        beta = float(request.config.beta)
+        weight_cap = float(request.config.W)
+        p_base = float(hypothesis_set.ledger.get(root.root_id, 0.0))
+        previous_ledger = dict(hypothesis_set.ledger)
+        total_delta = 0.0
+        log_ledger = {key: _safe_log(float(value)) for key, value in hypothesis_set.ledger.items()}
         for slot_key in required_slot_keys:
             node_key = root.obligations.get(slot_key)
             if not node_key:
                 continue
             node = nodes.get(node_key)
-            if node:
-                slot_p_values.append(node.p)
-        if not slot_p_values:
-            slot_p_values = [1.0]
-        m = 1.0
-        for v in slot_p_values:
-            m *= float(v)
-        deps.audit_sink.append(AuditEvent("MULTIPLIER_COMPUTED", {"root_id": root.root_id, "slot_p_values": slot_p_values, "m": m}))
+            if not node:
+                continue
+            w_new = _slot_weight(node, beta, weight_cap)
+            key = (root.root_id, slot_key)
+            w_prev = w_applied.get(key, 0.0)
+            delta = w_new - w_prev
+            total_delta += float(delta)
+            if abs(delta) > 0.0:
+                log_ledger[root.root_id] = log_ledger.get(root.root_id, _safe_log(0.0)) + delta
+            w_applied[key] = w_new
+            deps.audit_sink.append(
+                AuditEvent(
+                    "DELTA_W_APPLIED",
+                    {
+                        "root_id": root.root_id,
+                        "slot_key": slot_key,
+                        "w_prev": w_prev,
+                        "w_new": w_new,
+                        "delta": delta,
+                        "beta": beta,
+                        "W": weight_cap,
+                    },
+                )
+            )
 
-        p_base = float(hypothesis_set.ledger.get(root.root_id, 0.0))
-        p_prop = p_base * m
-        deps.audit_sink.append(AuditEvent("P_PROP_COMPUTED", {"root_id": root.root_id, "p_base": p_base, "p_prop": p_prop}))
+        multiplier = math.exp(total_delta)
+        deps.audit_sink.append(
+            AuditEvent(
+                "MULTIPLIER_COMPUTED",
+                {"root_id": root.root_id, "multiplier": multiplier, "total_delta_w": total_delta},
+            )
+        )
+        deps.audit_sink.append(
+            AuditEvent(
+                "P_PROP_COMPUTED",
+                {
+                    "root_id": root.root_id,
+                    "p_base": p_base,
+                    "multiplier": multiplier,
+                    "p_prop": p_base * multiplier,
+                },
+            )
+        )
 
+        hypothesis_set.ledger = _normalize_log_ledger(log_ledger)
+        deps.audit_sink.append(AuditEvent("LOG_LEDGER_NORMALIZED", {"ledger": dict(hypothesis_set.ledger)}))
+
+        if H_OTHER_ID in hypothesis_set.ledger:
+            sum_named_local = sum(hypothesis_set.ledger.get(rid, 0.0) for rid in named_root_ids)
+            branch_local = "S<=1" if sum_named_local <= 1.0 else "S>1"
+            enforce_absorber(hypothesis_set.ledger, named_root_ids)
+            deps.audit_sink.append(AuditEvent("OTHER_ABSORBER_ENFORCED", {"branch": branch_local, "sum_named": sum_named_local}))
+            deps.audit_sink.append(AuditEvent("INVARIANT_SUM_TO_ONE_CHECK", {"total": sum(hypothesis_set.ledger.values())}))
+        else:
+            deps.audit_sink.append(
+                AuditEvent("NAMED_LEDGER_NORMALIZED", {"total": sum(hypothesis_set.ledger.values()), "ledger": dict(hypothesis_set.ledger)})
+            )
         alpha = float(request.config.alpha)
-        p_new = p_base + alpha * (p_prop - p_base)
-        p_new = _clamp_probability(p_new)
-        hypothesis_set.ledger[root.root_id] = p_new
-        deps.audit_sink.append(AuditEvent("DAMPING_APPLIED", {"root_id": root.root_id, "alpha": alpha, "p_base": p_base, "p_new": p_new}))
-
-        sum_named_local = sum(hypothesis_set.ledger.get(rid, 0.0) for rid in named_root_ids)
-        branch_local = "S<=1" if sum_named_local <= 1.0 else "S>1"
-        enforce_absorber(hypothesis_set.ledger, named_root_ids)
-        deps.audit_sink.append(AuditEvent("OTHER_ABSORBER_ENFORCED", {"branch": branch_local, "sum_named": sum_named_local}))
-        deps.audit_sink.append(AuditEvent("INVARIANT_SUM_TO_ONE_CHECK", {"total": sum(hypothesis_set.ledger.values())}))
+        p_new = float(hypothesis_set.ledger.get(root.root_id, 0.0))
+        if alpha > 0.0:
+            blended = {}
+            for key in set(previous_ledger) | set(hypothesis_set.ledger):
+                blended[key] = alpha * float(previous_ledger.get(key, 0.0)) + (1.0 - alpha) * float(
+                    hypothesis_set.ledger.get(key, 0.0)
+                )
+            total = sum(blended.values())
+            if total > 0.0:
+                blended = {k: v / total for k, v in blended.items()}
+            hypothesis_set.ledger = blended
+            if H_OTHER_ID in hypothesis_set.ledger:
+                sum_named_local = sum(hypothesis_set.ledger.get(rid, 0.0) for rid in named_root_ids)
+                branch_local = "S<=1" if sum_named_local <= 1.0 else "S>1"
+                enforce_absorber(hypothesis_set.ledger, named_root_ids)
+                deps.audit_sink.append(
+                    AuditEvent("OTHER_ABSORBER_ENFORCED", {"branch": branch_local, "sum_named": sum_named_local})
+                )
+                deps.audit_sink.append(
+                    AuditEvent("INVARIANT_SUM_TO_ONE_CHECK", {"total": sum(hypothesis_set.ledger.values())})
+                )
+            else:
+                deps.audit_sink.append(
+                    AuditEvent(
+                        "NAMED_LEDGER_NORMALIZED",
+                        {"total": sum(hypothesis_set.ledger.values()), "ledger": dict(hypothesis_set.ledger)},
+                    )
+                )
+        deps.audit_sink.append(
+            AuditEvent(
+                "DAMPING_APPLIED",
+                {
+                    "root_id": root.root_id,
+                    "alpha": alpha,
+                    "p_before": p_base,
+                    "p_new": p_new,
+                    "p_damped": float(hypothesis_set.ledger.get(root.root_id, 0.0)),
+                },
+            )
+        )
 
     def evaluate_node(root: RootHypothesis, node_key: str) -> None:
         node = nodes.get(node_key)
@@ -501,9 +745,32 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
         outcome = deps.evaluator.evaluate(node_key) or {}
         previous_p = float(node.p)
         proposed_p = float(outcome.get("p", previous_p))
+        evidence_ids = outcome.get("evidence_ids")
+        if not isinstance(evidence_ids, list):
+            evidence_ids = []
+        evidence_ids = [str(item) for item in evidence_ids if isinstance(item, str)]
+        missing_ids = [item for item in evidence_ids if item not in evidence_index]
+        has_refs = bool(evidence_ids) and not missing_ids
+        quotes = outcome.get("quotes")
+        quotes_valid = True
+        quote_mismatches: List[str] = []
+        if quotes is not None and isinstance(quotes, list):
+            for quote in quotes:
+                if not isinstance(quote, dict):
+                    quotes_valid = False
+                    quote_mismatches.append("invalid_quote_object")
+                    continue
+                evidence_id = quote.get("evidence_id")
+                exact_quote = quote.get("exact_quote")
+                if not evidence_id or not exact_quote:
+                    quotes_valid = False
+                    quote_mismatches.append(str(evidence_id or "missing"))
+                    continue
+                item = evidence_index.get(str(evidence_id))
+                if item and item.text and str(exact_quote) not in item.text:
+                    quotes_valid = False
+                    quote_mismatches.append(str(evidence_id))
 
-        refs_text = str(outcome.get("evidence_refs", "")).strip()
-        has_refs = bool(refs_text and refs_text != "(empty)")
         if not has_refs:
             delta = max(min(proposed_p - previous_p, 0.05), -0.05)
             proposed_p = previous_p + delta
@@ -513,31 +780,105 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
         node.assessed = True
 
         rubric = {k: int(outcome[k]) for k in ("A", "B", "C", "D") if k in outcome and str(outcome[k]).isdigit()}
+        k_caps: List[Dict[str, object]] = []
+        evidence_quality = outcome.get("evidence_quality")
+        if not isinstance(evidence_quality, str):
+            evidence_quality = "none" if not evidence_ids else "indirect"
+        if not has_refs and rubric:
+            rubric["A"] = 0
         if rubric:
             node.k, guardrail = _derive_k_from_rubric(rubric)
             if guardrail:
                 deps.audit_sink.append(AuditEvent("K_GUARDRAIL_APPLIED", {"node_key": node_key, "k": node.k}))
+            if not has_refs and node.k > 0.55:
+                node.k = 0.55
+                k_caps.append({"reason": "missing_evidence_ids", "cap": 0.55})
+                deps.audit_sink.append(AuditEvent("K_EMPTY_REFS_CAPPED", {"node_key": node_key, "k": node.k}))
+            quality_caps = {"weak": 0.35, "indirect": 0.55, "none": 0.35}
+            if evidence_quality in quality_caps and node.k > quality_caps[evidence_quality]:
+                node.k = quality_caps[evidence_quality]
+                k_caps.append({"reason": f"evidence_quality_{evidence_quality}", "cap": node.k})
+            if not quotes_valid and node.k > 0.35:
+                node.k = 0.35
+                k_caps.append({"reason": "quote_mismatch", "cap": node.k})
+            assumptions = outcome.get("assumptions")
+            if isinstance(assumptions, list) and assumptions and node.k > 0.55:
+                node.k = 0.55
+                k_caps.append({"reason": "assumptions_present", "cap": 0.55})
 
-        deps.audit_sink.append(AuditEvent("NODE_EVALUATED", {"node_key": node_key, "p": node.p, "k": node.k}))
+        deps.audit_sink.append(
+            AuditEvent(
+                "NODE_EVALUATED",
+                {
+                    "node_key": node_key,
+                    "node": {
+                        "statement": node.statement,
+                        "role": node.role,
+                        "decomp_type": node.decomp_type,
+                        "coupling": node.coupling,
+                    },
+                    "p_before": previous_p,
+                    "p_after": node.p,
+                    "k": node.k,
+                    "outcome": {
+                        "p": outcome.get("p"),
+                        "A": outcome.get("A"),
+                        "B": outcome.get("B"),
+                        "C": outcome.get("C"),
+                        "D": outcome.get("D"),
+                        "evidence_ids": evidence_ids,
+                        "quotes": outcome.get("quotes"),
+                        "evidence_quality": evidence_quality,
+                        "reasoning_summary": outcome.get("reasoning_summary"),
+                        "defeaters": outcome.get("defeaters"),
+                        "uncertainty_source": outcome.get("uncertainty_source"),
+                        "assumptions": outcome.get("assumptions"),
+                    },
+                    "derived": {
+                        "has_evidence": has_refs,
+                        "missing_evidence_ids": missing_ids,
+                        "quotes_valid": quotes_valid,
+                        "quote_mismatches": quote_mismatches,
+                        "guardrail_applied": guardrail if rubric else False,
+                        "conservative_delta_applied": not has_refs,
+                        "k_caps": k_caps,
+                    },
+                    "llm": outcome.get("_provenance"),
+                },
+            )
+        )
 
         for parent in nodes.values():
             if parent.decomp_type == "AND" and node_key in parent.children:
                 aggregated, details = _aggregate_soft_and(parent, nodes)
                 parent.p = _clamp_probability(float(aggregated))
+                parent.assessed = True
                 deps.audit_sink.append(
                     AuditEvent("SOFT_AND_COMPUTED", {"node_key": parent.node_key, **details, "m": parent.p})
                 )
+            if parent.decomp_type == "OR" and node_key in parent.children:
+                children = [nodes[k] for k in parent.children if k in nodes and nodes[k].assessed]
+                if not children:
+                    parent.p = 0.5
+                else:
+                    parent.p = max(child.p for child in children)
+                parent.assessed = True
+                deps.audit_sink.append(
+                    AuditEvent("SOFT_OR_COMPUTED", {"node_key": parent.node_key, "m": parent.p})
+                )
 
-        assessed_slots = []
+        slot_nodes = []
         for slot_key in required_slot_keys:
+            if required_slot_roles.get(slot_key, "NEC") != "NEC":
+                continue
             node_key_for_slot = root.obligations.get(slot_key)
             if not node_key_for_slot:
                 continue
             slot_node = nodes.get(node_key_for_slot)
-            if slot_node and slot_node.assessed:
-                assessed_slots.append(slot_node)
-        if assessed_slots:
-            root.k_root = min(n.k for n in assessed_slots)
+            if slot_node:
+                slot_nodes.append(slot_node)
+        if slot_nodes:
+            root.k_root = min(n.k for n in slot_nodes)
 
         apply_ledger_update(root)
 
@@ -564,7 +905,12 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
             _apply_node_decomposition(deps, slot_node_key, slot_decomp, nodes)
 
     def frontier_ids() -> Tuple[Optional[str], List[RootHypothesis]]:
-        return _compute_frontier([root for root_id, root in hypothesis_set.roots.items() if root_id != H_OTHER_ID], hypothesis_set.ledger, request.config.epsilon)
+        return _compute_frontier(
+            [root for root_id, root in hypothesis_set.roots.items() if root_id != H_OTHER_ID],
+            hypothesis_set.ledger,
+            request.config.epsilon,
+            request.config.lambda_voi,
+        )
 
     stop_reason: Optional[StopReason] = None
     rr_index = 0

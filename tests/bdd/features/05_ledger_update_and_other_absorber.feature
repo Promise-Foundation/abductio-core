@@ -8,6 +8,9 @@ Feature: Ledger updates, damping, and Other absorber invariant
       | epsilon | 0.05 |
       | gamma   | 0.20 |
       | alpha   | 0.40 |
+      | beta    | 1.00 |
+      | W       | 3.00 |
+      | lambda_voi | 0.10 |
     And required template slots:
       | slot_key            | role |
       | feasibility         | NEC  |
@@ -15,7 +18,7 @@ Feature: Ledger updates, damping, and Other absorber invariant
       | fit_to_key_features | NEC  |
       | defeater_resistance | NEC  |
 
-  Scenario: Evaluating a slot reduces root multiplier and applies damped ledger update
+  Scenario: Evaluating a slot applies a log-space delta-w ledger update
     Given a hypothesis set with named roots:
       | id   | statement       | exclusion_clause                |
       | H1   | Mechanism A     | Not explained by any other root |
@@ -26,12 +29,11 @@ Feature: Ledger updates, damping, and Other absorber invariant
       | B | 1    |
       | C | 1    |
       | D | 1    |
-      | evidence_refs | ref1 |
+      | evidence_ids | ref1 |
     And credits 2
     When I run the engine until credits exhausted
-    Then the audit log includes a computed multiplier m_H1 = product(slot_p_values)
-    And the audit log includes p_prop(H1) = p_base(H1) * m_H1
-    And the audit log includes damped update with alpha = 0.40
+    Then the audit log includes a delta-w update for root "H1" slot "feasibility"
+    And the audit log includes a normalized ledger update
     And the ledger probabilities sum to 1.0 within 1e-9
     And H_other is set to 1 - sum(named_roots)
 

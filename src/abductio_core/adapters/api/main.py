@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from abductio_core.adapters.openai_llm import (
@@ -13,7 +14,7 @@ from abductio_core.adapters.openai_llm import (
     OpenAIEvaluatorPort,
     OpenAIJsonClient,
 )
-from abductio_core.application.dto import RootSpec, SessionConfig, SessionRequest
+from abductio_core.application.dto import EvidenceItem, RootSpec, SessionConfig, SessionRequest
 from abductio_core.application.ports import RunSessionDeps
 from abductio_core.application.use_cases.replay_session import replay_session
 from abductio_core.application.use_cases.run_session import run_session
@@ -26,7 +27,12 @@ def _app_version() -> str:
         return "0.0.0"
 
 
-app = FastAPI(title="abductio-core API", version=_app_version())
+app = FastAPI(
+    title="abductio-core API",
+    version=_app_version(),
+    docs_url=None,
+    redoc_url=None,
+)
 
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 cors_origins = [origin.strip() for origin in cors_origins if origin.strip()]
@@ -40,30 +46,78 @@ app.add_middleware(
 
 
 class SessionConfigIn(BaseModel):
-    tau: float = Field(..., ge=0.0, le=1.0)
-    epsilon: float = Field(..., ge=0.0, le=1.0)
-    gamma: float = Field(..., ge=0.0, le=1.0)
-    alpha: float = Field(..., ge=0.0, le=1.0)
+    tau: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Confidence threshold for declaring a frontier slot confident.",
+        examples=[0.7],
+    )
+    epsilon: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Frontier inclusion tolerance around the leader score.",
+        examples=[0.05],
+    )
+    gamma: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Prior mass assigned to H_other when world_mode is open.",
+        examples=[0.2],
+    )
+    alpha: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Damping factor for blending prior and updated ledger.",
+        examples=[0.4],
+    )
+    beta: float = Field(
+        ...,
+        ge=0.0,
+        description="Evidence weight scale used in log-space updates.",
+        examples=[1.0],
+    )
+    W: float = Field(
+        ...,
+        gt=0.0,
+        description="Maximum absolute log-space weight per slot.",
+        examples=[3.0],
+    )
+    lambda_voi: float = Field(
+        ...,
+        ge=0.0,
+        description="VOI-Lite scheduler exploration term.",
+        examples=[0.1],
+    )
+    world_mode: str = Field(
+        "open",
+        description="Whether to include H_other absorber ('open' or 'closed').",
+        examples=["open"],
+    )
 
 
 class RootSpecIn(BaseModel):
-    root_id: str = Field(..., min_length=1)
-    statement: str = Field(..., min_length=1)
-    exclusion_clause: str = ""
+    root_id: str = Field(..., min_length=1, examples=["H1"])
+    statement: str = Field(..., min_length=1, examples=["Mechanism A"])
+    exclusion_clause: str = Field("", examples=["Not explained by any other root"])
 
 
 class SessionRequestIn(BaseModel):
-    scope: Optional[str] = Field(None, min_length=1)
-    claim: Optional[str] = Field(None, min_length=1)
-    roots: List[RootSpecIn] = Field(..., min_length=1)
+    scope: Optional[str] = Field(None, min_length=1, description="Problem scope or claim under evaluation.")
+    claim: Optional[str] = Field(None, min_length=1, description="Deprecated alias for scope.")
+    roots: List[RootSpecIn] = Field(..., min_length=1, description="Named hypotheses.")
     config: SessionConfigIn
-    credits: int = Field(..., ge=0)
+    credits: int = Field(..., ge=0, description="Total credits available for DECOMPOSE/EVALUATE ops.")
 
     required_slots: Optional[List[Dict[str, Any]]] = None
     run_mode: Optional[str] = None
     run_count: Optional[int] = None
     run_target: Optional[str] = None
     initial_ledger: Optional[Dict[str, float]] = None
+    evidence_items: Optional[List[Dict[str, Any]]] = None
     pre_scoped_roots: Optional[List[str]] = None
     slot_k_min: Optional[Dict[str, float]] = None
     slot_initial_p: Optional[Dict[str, float]] = None
@@ -71,7 +125,7 @@ class SessionRequestIn(BaseModel):
 
 
 class ReplayRequestIn(BaseModel):
-    audit_trace: List[Dict[str, Any]] = Field(..., min_length=1)
+    audit_trace: List[Dict[str, Any]] = Field(..., min_length=1, description="Audit events to replay.")
 
 
 def _build_openai_client() -> OpenAIJsonClient:
@@ -94,7 +148,19 @@ def _build_deps(req: SessionRequest) -> RunSessionDeps:
     client = _build_openai_client()
 
     evaluator = OpenAIEvaluatorPort(
-        client=client, scope=req.scope, root_statements=root_statements
+        client=client,
+        scope=req.scope,
+        root_statements=root_statements,
+        evidence_items=[
+            {
+                "id": item.id,
+                "source": item.source,
+                "text": item.text,
+                "location": item.location,
+                "metadata": dict(item.metadata),
+            }
+            for item in (req.evidence_items or [])
+        ],
     )
     decomposer = OpenAIDecomposerPort(
         client=client,
@@ -122,7 +188,40 @@ def healthz() -> Dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/v1/sessions/run")
+@app.get("/docs", include_in_schema=False)
+def scalar_docs() -> HTMLResponse:
+    """Scalar API Reference UI backed by FastAPI's OpenAPI schema."""
+    html = """
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>abductio-core API Reference</title>
+    <style>
+      html, body { height: 100%; margin: 0; }
+      #api-reference { height: 100%; }
+    </style>
+  </head>
+  <body>
+    <div id="api-reference"></div>
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+    <script>
+      Scalar.createApiReference(document.getElementById('api-reference'), {
+        spec: { url: '/openapi.json' }
+      });
+    </script>
+  </body>
+</html>
+"""
+    return HTMLResponse(html)
+
+
+@app.post(
+    "/v1/sessions/run",
+    summary="Run an ABDUCTIO session",
+    description="Executes the ABDUCTIO engine using the provided roots, config, and credits.",
+)
 def run_session_endpoint(body: SessionRequestIn) -> Dict[str, Any]:
     scope = body.scope or body.claim
     if not scope:
@@ -135,6 +234,10 @@ def run_session_endpoint(body: SessionRequestIn) -> Dict[str, Any]:
             epsilon=body.config.epsilon,
             gamma=body.config.gamma,
             alpha=body.config.alpha,
+            beta=body.config.beta,
+            W=body.config.W,
+            lambda_voi=body.config.lambda_voi,
+            world_mode=body.config.world_mode,
         ),
         credits=body.credits,
         required_slots=body.required_slots,
@@ -142,6 +245,17 @@ def run_session_endpoint(body: SessionRequestIn) -> Dict[str, Any]:
         run_count=body.run_count,
         run_target=body.run_target,
         initial_ledger=body.initial_ledger,
+        evidence_items=[
+            EvidenceItem(
+                id=str(item.get("id") or item.get("evidence_id") or ""),
+                source=str(item.get("source", "")),
+                text=str(item.get("text", "")),
+                location=item.get("location"),
+                metadata=dict(item.get("metadata", {})) if isinstance(item.get("metadata"), dict) else {},
+            )
+            for item in (body.evidence_items or [])
+            if isinstance(item, dict) and (item.get("id") or item.get("evidence_id"))
+        ],
         pre_scoped_roots=body.pre_scoped_roots,
         slot_k_min=body.slot_k_min,
         slot_initial_p=body.slot_initial_p,
@@ -163,7 +277,11 @@ def run_session_endpoint(body: SessionRequestIn) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"run_session failed: {exc}") from exc
 
 
-@app.post("/v1/sessions/replay")
+@app.post(
+    "/v1/sessions/replay",
+    summary="Replay an ABDUCTIO session",
+    description="Replays a session from an audit trace to reproduce the final ledger and stop reason.",
+)
 def replay_session_endpoint(body: ReplayRequestIn) -> Dict[str, Any]:
     try:
         result = replay_session(body.audit_trace)

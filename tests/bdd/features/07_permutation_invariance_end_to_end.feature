@@ -8,6 +8,9 @@ Feature: Permutation invariance (end-to-end)
       | epsilon | 0.05 |
       | gamma   | 0.20 |
       | alpha   | 0.40 |
+      | beta    | 1.00 |
+      | W       | 3.00 |
+      | lambda_voi | 0.10 |
     And required template slots:
       | slot_key            | role |
       | feasibility         | NEC  |
@@ -16,7 +19,7 @@ Feature: Permutation invariance (end-to-end)
       | defeater_resistance | NEC  |
     And a deterministic decomposer that will scope all roots
     And a deterministic evaluator with the following outcomes:
-      | node_key                         | p    | A | B | C | D | evidence_refs |
+      | node_key                         | p    | A | B | C | D | evidence_ids |
       | H1:feasibility                   | 0.80 | 2 | 1 | 1 | 1 | ref1          |
       | H2:feasibility                   | 0.70 | 2 | 1 | 1 | 1 | ref1          |
       | H1:availability                  | 0.60 | 2 | 1 | 1 | 1 | ref2          |

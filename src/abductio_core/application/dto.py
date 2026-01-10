@@ -10,6 +10,10 @@ class SessionConfig:
     epsilon: float
     gamma: float
     alpha: float
+    beta: float
+    W: float
+    lambda_voi: float
+    world_mode: str
 
 
 @dataclass(frozen=True)
@@ -26,6 +30,15 @@ class EvidenceBundle:
 
 
 @dataclass(frozen=True)
+class EvidenceItem:
+    id: str
+    source: str
+    text: str
+    location: Optional[Dict[str, Any]] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class SessionRequest:
     scope: str
     roots: List[RootSpec]
@@ -36,6 +49,7 @@ class SessionRequest:
     run_count: Optional[int] = None
     run_target: Optional[str] = None
     initial_ledger: Optional[Dict[str, float]] = None
+    evidence_items: Optional[List[EvidenceItem]] = None
     pre_scoped_roots: Optional[List[str]] = None
     slot_k_min: Optional[Dict[str, float]] = None
     slot_initial_p: Optional[Dict[str, float]] = None

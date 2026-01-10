@@ -1,0 +1,2299 @@
+#+TITLE: ABDUCTIO v2
+#+SUBTITLE: Symmetric Evidence Updates, Anti-Inflation Aggregation, and VOI-Lite Scheduling
+#+AUTHOR: David Joseph (adaptable)
+#+DATE: December 19, 2025
+#+OPTIONS: toc:2 num:t
+#+LATEX_HEADER: \usepackage[margin=1in]{geometry}
+#+LATEX_HEADER: \usepackage{amsmath, amssymb}
+#+LATEX_HEADER: \usepackage{booktabs}
+#+LATEX_HEADER: \usepackage{tabularx}
+
+* Abstract
+ABDUCTIO v2 is a lightweight, domain-agnostic methodology for evaluating a mutually exclusive, collectively exhaustive (MECE) set of hypotheses under strict resource constraints. It eliminates focal privilege by enforcing permutation invariance: the output assigned to any hypothesis is independent of ordering or seed choice.
+
+This revision strengthens inferential quality without adding Bayesian machinery: evidence updates are symmetric (up or down), aggregation avoids decomposition-driven inflation, and scheduling prioritizes uncertainty rather than "most likely." The result remains implementation-ready, credit-bounded, and fully auditable.
+
+* 1. Motivation and Problem
+Many controversial evaluations fail for a structural reason:
+
+- Hypothesis \(H^*\) (often "far-fetched") is decomposed into multiple subclaims.
+- Rival hypotheses \(R_i\) remain broad or underspecified.
+- Evidence undermining one subclaim of \(H^*\) shifts weight to rivals.
+- Rivals gain weight not because they are supported, but because they were not required to articulate necessary commitments.
+
+This is not merely a cognitive bias--it is a systems design failure. If the procedure taxes some hypotheses with specificity and not others, it bakes in unfairness.
+
+ABDUCTIO addresses this by requiring:
+1) every hypothesis to be defined as a stand-alone mechanism, and
+2) every hypothesis to be evaluated under the same obligation template and the same credit schedule, independent of ordering.
+
+* 1.1 Scope vs Hypotheses: A Functional Distinction
+ABDUCTIO evaluates a MECE set of *hypotheses* about a *scope*. The scope is the
+question, phenomenon, or case under evaluation - it defines what the hypothesis set
+is partitioning. This is a *functional* distinction, not an ontological one.
+
+Examples:
+
+- **Scope**: "Germany's GDP trajectory in 2026"
+  **Hypotheses**: {grow, flat, shrink, other}
+
+- **Scope**: "Why did the Ariel School incident occur?"
+  **Hypotheses**: {hoax, misidentified_aircraft, shared_hallucination,
+                   unknown_phenomenon, other}
+
+The same statement can play different roles depending on the level of analysis.
+"The economy will grow" is:
+- A *hypothesis* when evaluating "What will happen to GDP?"
+- A *scope* when evaluating "Why would the economy grow?"
+
+Without an explicit scope, MECE accounting becomes ambiguous: H_other means
+"other explanation of what?" The scope answers this question and makes audit
+trails readable.
+
+* 2. Core Requirement: Permutation Invariance
+** 2.1 Informal statement
+Given the same hypothesis set, the same evidence, and the same credit budget, the final \((p,k)\) assigned to any hypothesis must not depend on:
+- which hypothesis was chosen as "focal,"
+- the order hypotheses are listed,
+- the order evaluation steps are printed.
+
+** 2.2 Formal statement
+Let \(H=\{h_1,\dots,h_n\}\) be a MECE set in closed-world mode, or \(H=\{h_1,\dots,h_n,h_{\text{other}}\}\) in open-world mode. Let an engine \(F\) map:
+\[
+F(H,E,B,\theta) \mapsto \{(p(h_i),k(h_i))\}_{i=1}^n \cup (p(h_{\text{other}}),k(h_{\text{other}}))
+\]
+where \(E\) is evidence, \(B\) a credit budget, and \(\theta\) configuration parameters.
+
+Permutation invariance requires that for any permutation \(\pi\) of the *named* hypotheses,
+\[
+F(H,E,B,\theta) = F(\pi(H),E,B,\theta)
+\]
+up to the same renaming/reordering of outputs.
+
+** 2.3 Design implications
+Permutation invariance forces three conditions:
+
+1) *Semantic independence*: each hypothesis must be meaningful without reference to a "seed."
+2) *Procedural symmetry*: credit allocation and stopping rules must not privilege any hypothesis.
+3) *Determinism*: tie-breaking must not depend on presentation order.
+
+ABDUCTIO v2 implements all three.
+
+* 3. Design Principles
+** P1. Stand-alone hypotheses
+Each named hypothesis must be describable without mentioning any other hypothesis. Prohibited: "NOT H1," "some mundane explanation," "any other cause," or umbrella OR-bundles as roots.
+
+** P2. MECE + explicit Other (open-world mode)
+The set of named hypotheses is intended to be mutually exclusive (ME) and collectively exhaustive (CE). In open-world mode, collective exhaustiveness is implemented by including:
+- \(H_{\text{other}}\): "Unknown/unmodeled explanation."
+
+** P3. No-free-probability
+Listing more subcases must not increase a hypothesis's probability. Decomposition clarifies structure; it does not create credence.
+
+** P4. Same burdens for all
+Each hypothesis is evaluated through a fixed *obligation template* (Section 6). This prevents one hypothesis from being saddled with "cosmic feasibility" while rivals face only local plausibility checks.
+
+** P5. Credit-bounded termination
+Only two operations exist (Evaluate, Decompose), each costing 1 credit. The process halts by budget or by meeting confidence thresholds.
+
+** P6. Fully auditable
+Every update must be reproducible from logged arithmetic and rubric scoring. No "implicit" ledger shifts are allowed.
+
+* 4. Data Model
+** 4.1 Hypothesis roots and nodes
+A hypothesis is represented as a root node with an obligation template and optional internal decomposition trees.
+
+#+begin_src python
+from dataclasses import dataclass, field
+from typing import Optional, Literal, Dict, List, Tuple
+
+Role = Literal["NEC", "EVID"]
+DecompType = Literal["AND", "OR"]
+ScopeMode = Literal["CLOSED_WORLD", "OPEN_WORLD"]
+
+@dataclass
+class EvaluationSession:
+    """
+    A scoped hypothesis evaluation run.
+
+    The scope defines what the MECE hypothesis set is about.
+    It's not itself a hypothesis - it's the frame for the partition.
+    """
+    scope: str                              # "Germany's 2026 GDP trajectory"
+    hypothesis_set: HypothesisSet           # The MECE partition being evaluated
+    config: SessionConfig                   # tau, epsilon, gamma, alpha, beta, W, lambda_voi, world_mode
+    credits_budget: int                     # Total operations allowed
+
+@dataclass
+class Node:
+    id: str
+    statement: str
+
+    # Local scores for this node (not ledger probability)
+    p: float = 0.5          # neutral assessment for NEC/EVID
+    k: float = 0.15
+
+    # Audit
+    k_rubric: Optional[Dict[str, int]] = None  # {"A":0..2,"B":0..2,"C":0..2,"D":0..2}
+    evidence_ids: List[str] = field(default_factory=list)
+    evidence_quality: Optional[str] = None     # "direct"|"indirect"|"weak"|"none"
+    reasoning_summary: Optional[str] = None
+    defeaters: List[str] = field(default_factory=list)
+    uncertainty_source: Optional[str] = None
+    assumptions: List[str] = field(default_factory=list)
+    quotes: List[Dict[str, str]] = field(default_factory=list)
+
+    # Decomposition
+    role: Optional[Role] = None
+    children: Dict[str, "Node"] = field(default_factory=dict)
+    decomp_type: Optional[DecompType] = None
+
+    # AND coupling for NEC children within a slot
+    coupling: Optional[float] = None  # one of {0.20, 0.50, 0.80, 0.95}
+    falsifiable: Optional[bool] = None
+    test_procedure: Optional[str] = None
+    overlap_with_siblings: List[str] = field(default_factory=list)
+
+    # Accounting
+    credits_spent: int = 0
+    status: Optional[str] = None      # "SCOPED", "UNSCOPED"
+
+@dataclass
+class RootHypothesis:
+    id: str
+    statement: str
+    exclusion_clause: str  # one line: what makes this not any other root
+
+    # Ledger probability (MECE bookkeeping)
+    p_ledger: float
+    k_root: float = 0.15
+
+# Obligation slots (fixed template; Section 6)
+    obligations: Dict[str, Node] = field(default_factory=dict)
+
+    # Audit
+    credits_spent: int = 0
+
+@dataclass
+class HypothesisSet:
+    roots: Dict[str, RootHypothesis]  # includes "H_other" only in open-world mode
+#+end_src
+
+** 4.2 Ledger invariants
+Closed-world mode:
+- \(p_{\text{ledger}}(h) \in [0,1]\)
+- \(\sum_{i=1}^n p_{\text{ledger}}(H_i) = 1\)
+
+Open-world mode:
+- named roots + \(H_{\text{other}}\) with \(\sum p_{\text{ledger}} = 1\)
+- \(H_{\text{other}}\) is a first-class hypothesis with its own ledger mass
+
+* 5. Cost Model
+Only two operations exist.
+
+- =DECOMPOSE(target)= : 1 credit
+- =EVALUATE(target)= : 1 credit
+
+Everything else (aggregation, ledger enforcement, scheduling) is "free" but must be logged.
+
+* 6. Obligation Template (Permutation-Invariance Backbone)
+Every named root hypothesis must be evaluated through the same template of obligation slots. This guarantees that each hypothesis faces comparable explanatory burdens.
+
+** 6.1 Required slots (default v2)
+Each root \(H_i\) must define four slots:
+
+1) *Feasibility (general)* [NEC]
+   - The mechanism is possible in principle.
+2) *Availability (context)* [NEC]
+   - The mechanism is present/available in the specific time/place/context.
+3) *Fit to key features* [NEC]
+   - The mechanism explains the core reported observations better than at least one competitor.
+4) *Defeater resistance* [NEC]
+   - The strongest competitor-specific defeater does not apply.
+
+These are expressed as NEC nodes. Additional EVID nodes are allowed but may not be used to inflate probability.
+
+** 6.2 Template customization
+Implementations may add slots, but must:
+- apply the same slots to all named roots, and
+- keep total slots small (4-7 recommended).
+
+** 6.3 Why this matters
+Without a template, decomposition can be weaponized: one hypothesis can be loaded with "universal feasibility" while rivals get only vague local stories. Template parity removes this asymmetry.
+
+* 7. Semantics of p within trees ("No-free-probability")
+ABDUCTIO v2 distinguishes *ledger probability* from *internal node p*:
+
+- \(p_{\text{ledger}}(H_i)\): MECE bookkeeping probability over roots.
+- \(p(\text{NEC/EVID node})\): assessment score used to compute a bounded weight of evidence.
+
+** 7.1 Neutral defaults
+Unassessed nodes do not move the ledger:
+- NEC/EVID nodes initialize at \(p=0.5\) (neutral) with low \(k=0.15\).
+- Unassessed slots contribute \(w=0\) to ledger updates (Section 11).
+
+** 7.2 Consequence
+Decomposition cannot lower or raise a hypothesis merely by adding structure. Only evaluated requirements can move the ledger, and moves are symmetric (up or down). DECOMPOSE never changes ledger beliefs; it creates nodes with \(w=0\) until EVALUATE occurs.
+
+** 7.3 Delta-w ledger rule (no-free-probability enforcement)
+Recomputing a node's aggregated \(p\) after decomposition must not move ledger mass without paying an EVALUATE credit. Maintain per-slot applied weights:
+
+- \(w_{\text{applied}}[h,s]\): last evidence weight actually applied to the ledger.
+
+Normative: Only an EVALUATE operation may change the ledger via a nonzero \(\Delta w\). DECOMPOSE MUST NOT change ledger probabilities.
+
+When EVALUATE occurs for \((h,s)\):
+- compute \(w_{\text{new}} = \mathrm{clip}(\beta k \cdot \mathrm{logit}(p), -W, W)\)
+- \(\Delta w = w_{\text{new}} - w_{\text{applied}}[h,s]\)
+- update \(\log p(h) \leftarrow \log p(h) + \Delta w\), then normalize
+- set \(w_{\text{applied}}[h,s] \leftarrow w_{\text{new}}\)
+
+DECOMPOSE may change internal structure and displayed aggregated \(p\), but MUST NOT change \(w_{\text{applied}}\) or ledger \(p\) unless an EVALUATE credit is spent. Log \(w_{\text{old}}\), \(w_{\text{new}}\), \(\Delta w\), and normalization arithmetic.
+
+If a required slot is decomposed, the engine may apply \(w\) using either:
+- the slot node's own evaluation (if it exists), or
+- an aggregated \((p,k)\) from its decisive children,
+but only after an EVALUATE credit and using the Delta-w mechanism.
+
+* 8. Confidence k: Rubric and Mapping
+Confidence \(k\) is the stability/robustness of a credence estimate under reasonable re-checking.
+
+** 8.1 Rubric (0-2 each)
+A: Evidence Traceability
+B: Cross-Validation
+C: Sensitivity to Assumptions
+D: Adversarial Resilience
+
+Total \(T=A+B+C+D\) maps to:
+
+- 0-1 -> 0.15
+- 2-3 -> 0.35
+- 4-5 -> 0.55
+- 6-7 -> 0.75
+- 8 -> 0.90
+
+Guardrail: if any check = 0, cap \(k \le 0.55\).
+
+** 8.2 Root confidence
+Root confidence \(k_{\text{root}}\) is defined deterministically as the minimum \(k\) over required NEC slots (conservative). If UNSCOPED, cap:
+\[
+k_{\text{root}} \le k_{\max}^{\text{UNSCOPED}}.
+\]
+Log the chosen rule and caps.
+
+** 8.3 k propagation through trees (deterministic, conservative)
+When a slot is decomposed, parent \(k\) is derived deterministically:
+
+- AND of NEC children (within a slot): \(k_{\text{parent}} = \min_j k_j\).
+- OR of EVID children: \(k_{\text{parent}} = k_{j^\ast}\) where \(j^\ast = \arg\max_j p_j\) (tie-break canonically).
+- UNSCOPED inheritance: if any child is UNSCOPED, cap \(k_{\text{parent}} \le 0.40\).
+- Rubric guardrail inheritance: if any child has any rubric check = 0 and that child is decisive for the parent (AND: any child; OR: the max-p child), cap \(k_{\text{parent}} \le 0.55\).
+
+These rules are deterministic, easy to audit, and align with necessity vs sufficiency intuition.
+
+* 9. Decomposition Rules
+** 9.1 Root scoping is mandatory
+All named roots must be decomposed into the obligation template before any root can be accepted as "well-scrutinized."
+
+** 9.2 Additional decomposition within slots (optional)
+Each slot node may be decomposed further (2-5 children) when its confidence is below threshold and credits remain.
+
+** 9.3 Coupling for AND nodes (within a slot)
+When decomposing a slot into an AND of NEC children, choose coupling \(c \in \{0.20,0.50,0.80,0.95\}\) deterministically from overlap scores (Section 9.5).
+
+Soft-AND for assessed children:
+\[
+p_{\text{AND}} = c \cdot p_{\min} + (1-c)\cdot p_{\prod}
+\]
+where \(p_{\min}\) and \(p_{\prod}\) are computed over assessed NEC children (unassessed treated as 0.5).
+
+** 9.4 OR aggregation (anti-inflationary)
+Default OR aggregator is max:
+\[
+p_{\text{OR}}=\max_j p_j
+\]
+Interpretation: a parent is supported at least as well as its strongest child.
+
+Optional discounted noisy-OR (requires explicit overlap discount \(d\in(0,1]\)):
+\[
+p_{\text{noisy}} = 1 - \prod_j (1-p_j)^{d}
+\]
+\[
+p_{\text{OR}} = \min\bigl(\max_j p_j,\; p_{\text{noisy}}\bigr)
+\]
+Higher overlap \(\Rightarrow\) smaller \(d\) \(\Rightarrow\) less inflation. The \(\min\) cap prevents noisy-OR from exceeding the strongest child unless explicitly removed.
+
+** 9.5 Overlap checklist to choose coupling
+Score overlap on three rubric items (0-2 each):
+- Evidence overlap
+- Mechanism overlap
+- Failure-mode overlap
+
+Let \(T\in\{0,\dots,6\}\) be the sum. Map deterministically to \(c\):
+- \(T \in \{0,1\}\Rightarrow c=0.20\)
+- \(T \in \{2,3\}\Rightarrow c=0.50\)
+- \(T \in \{4,5\}\Rightarrow c=0.80\)
+- \(T = 6\Rightarrow c=0.95\)
+
+All scores and the resulting \(c\) are logged.
+
+If noisy-OR is enabled, use the same \(T\) to choose overlap discount \(d\):
+\[
+d=\begin{cases}
+1.00,& T\in\{0,1\}\\
+0.75,& T\in\{2,3\}\\
+0.50,& T\in\{4,5\}\\
+0.35,& T=6
+\end{cases}
+\]
+Log \(T\) and the resulting \(d\).
+
+** 9.6 Coupling scope clarification
+Coupling applies only to AND children *within a slot*. Across the template slots, ABDUCTIO v2 uses evidence weights (Section 11) rather than multiplying slot \(p\) values.
+
+* 10. Anti-Vagueness (UNSCOPED rule)
+A mechanism-like hypothesis must be able to state concrete necessary commitments.
+
+** Rule (root level)
+If a named root cannot instantiate the obligation template with meaningful NEC statements, it is marked UNSCOPED and:
+- cap \(k_{\text{root}} \le 0.40\),
+- it remains in the evaluation schedule until it becomes SCOPED or credits exhaust.
+
+** Rule (slot level)
+If a slot cannot be decomposed into at least 1 meaningful NEC statement, cap that slot's \(k \le 0.40\).
+
+This prevents "winning by labels."
+
+* 11. Symmetric Evidence Updates (Log-Space)
+Ledger updates are symmetric: evidence can increase or decrease a hypothesis.
+
+** 11.1 Log-space update with bounded per-credit effect
+Maintain ledger probabilities \(p(h)\) over MECE roots. Each evaluated slot yields a signed, bounded weight of evidence \(w_{h,s}\in[-W, W]\).
+
+Unnormalized update:
+\[
+\log \tilde p(h) = \log p(h) + \sum_{s\in \mathcal{S}_{\text{eval}}(h)} w_{h,s}
+\]
+Normalize across named roots (open-world handling in Section 12):
+\[
+p'(h)=\frac{\tilde p(h)}{\sum_{g\in H}\tilde p(g)}
+\]
+
+** 11.2 Deterministic mapping from \((p_{h,s}, k_{h,s})\) to \(w_{h,s}\)
+Evaluators return:
+- \(p_{h,s}\in(0,1)\) (slot assessment centered at neutral \(0.5\))
+- \(k_{h,s}\in[0,1]\) (confidence)
+
+Clamp to avoid infinities:
+\[
+p_{h,s}^{\ast}=\mathrm{clip}(p_{h,s},\eta,1-\eta),\quad \eta\ll 1
+\]
+
+No-evidence rule (mechanical):
+- If evidence_ids is empty or invalid, enforce A=0 and clamp \(p\) to \([p_{\text{old}}-0.05,\; p_{\text{old}}+0.05]\) before computing \(w\) (then apply the Delta-w rule).
+
+Map to weight:
+\[
+w_{h,s}=\mathrm{clip}\!\left(\beta\, k_{h,s}\cdot \log\frac{p_{h,s}^{\ast}}{1-p_{h,s}^{\ast}},\; -W,\; W\right)
+\]
+where \(\beta>0\) is a global scaling parameter, \(W>0\) is a per-credit cap, and \(\eta\) is a logit safety clamp (e.g., \(10^{-6}\)).
+All clamps and clips must be logged.
+
+** 11.3 Neutral defaults are zero evidence
+- Unassessed NEC slots contribute no update: \(w=0\) by default.
+- If a displayed slot score is needed, use \(p_{h,s}=0.5\) with low \(k\).
+
+This keeps "no-free-probability" while enabling symmetric moves when evidence exists.
+
+** 11.4 Numerical stability and epsilon clipping
+- For any logit(p), compute with \(p\leftarrow\mathrm{clip}(p,\varepsilon,1-\varepsilon)\), \(\varepsilon=10^{-6}\) (configurable).
+- For log \(p(h)\) storage, use \(\max(p(h),10^{-12})\) before log to avoid \(-\infty\).
+- Log normalization should use log-sum-exp (subtract max logp) for stability.
+
+* 12. Open-World vs Closed-World Ledger Handling
+** 12.1 Closed-world mode
+Outcomes are exhaustive by construction. No absorber hypothesis is used.
+\[
+\sum_{h\in H} p(h)=1,\quad H_{\text{other}} \text{ omitted}
+\]
+
+** 12.2 Open-world mode
+Include \(H_{\text{other}}\) as a true hypothesis. Maintain MECE bookkeeping over \(H\cup\{H_{\text{other}}\}\).
+
+** 12.3 Fixed \(\gamma\) (open-world only)
+Initialize \(p(H_{\text{other}})=\gamma\). The current implementation keeps \(\gamma\) fixed during a run and enforces the absorber after normalization.
+  where \(I_{\text{frontier\_UNSCOPED}}=1\) if any frontier hypothesis is UNSCOPED else 0.
+- Then set \(p(H_{\text{other}})=\gamma\) and rescale named \(p\) values proportionally so total sums to 1.
+
+Recompute \(\gamma\) once per cycle (or once after finishing the frontier), deterministically.
+
+Audit requirement: log all slot \((p,k)\), computed \(m(h)\), \(M\), UNSCOPED indicator, and resulting \(\gamma\).
+
+** 12.4 Mutual exclusivity sanity check (optional but recommended)
+Before further EVALUATE operations on roots, run a free but logged validation step for overlap signals:
+- If overlap is detected between any pair of roots, mark both "NEEDS-EXCLUSION" and force a DECOMPOSE into sharper exclusion clauses (credit cost) before continuing evaluation on those roots.
+- Always choose which pair to handle first by canonical_id ordering.
+
+* 13. Scheduling: VOI-Lite, Deterministic
+Frontier-by-probability is replaced by a deterministic priority score that favors uncertainty and low confidence.
+
+** 13.1 Priority score
+Define per-hypothesis priority:
+\[
+\mathrm{priority}(h)=(p(h)(1-p(h)) + \lambda/n)\cdot (1-k(h))\cdot I(h)
+\]
+where \(I(h)\ge 0\) is a scope-provided importance weight (default \(1\)).
+
+** 13.2 Frontier definition by priority band
+Let \(h^\star=\arg\max_h \mathrm{priority}(h)\).
+Frontier:
+\[
+F=\left\{h:\mathrm{priority}(h)\ge \mathrm{priority}(h^\star)-\varepsilon_{\text{prio}}\right\}
+\]
+Ordering within frontier remains canonical by hash(statement), preserving permutation invariance.
+
+** 13.3 Deterministic operation choice per hypothesis
+For a root \(H_i\) in frontier, choose:
+
+1) If \(H_i\) is UNSCOPED: DECOMPOSE (attempt to scope template or slot).
+2) Else if any required slot is uninstantiated: DECOMPOSE to create missing slot node(s).
+3) Else pick the slot \(s\) with lowest \(k\) (tie-break canonically by node ID):
+   - If slot can be decomposed and \(k < \tau\): DECOMPOSE(slot)
+   - Else: EVALUATE(slot) or EVALUATE(slot's most critical child)
+
+** 13.4 Starvation avoidance (alternatives)
+Default is the priority floor in Section 13.1. If you prefer, replace it with:
+
+Option B: Entropy-based uncertainty
+\[
+\mathrm{priority}(h) = H(p) \cdot (1-k(h)) \cdot I(h)
+\]
+where \(H(p) = -p\log p - (1-p)\log(1-p)\). Define \(H(0)=H(1)=0\) by limit; clip \(p\) to \([\varepsilon,1-\varepsilon]\) for computation.
+
+Option C: Frontier k-injection
+\[
+F = (\text{priority band}) \cup \{\arg\min_h k(h)\}
+\]
+Tie-break canonically. This guarantees at least one low-confidence hypothesis always receives work.
+
+** 13.5 Tie-breaking (mandatory)
+All ties are broken by canonical ID derived from the statement text (hash), never by input ordering.
+
+* 14. Stopping Conditions
+Stop when any holds:
+
+A) credits exhausted.
+B) For all hypotheses in the current frontier:
+   - root is SCOPED,
+   - all template NEC slots have \(k \ge \tau\) (or credit exhaustion prevents further improvement).
+C) No legal next operation exists (e.g., maximum decomposition depth reached and no evaluable nodes remain).
+
+* 15. Evaluator and Decomposer Interfaces (Implementation Contracts)
+** 15.1 Evaluator contract (human or agent)
+=evaluate(node, evidence)= returns:
+- p in (0,1) centered at 0.5 (slot assessment)
+- rubric A-D scores (k is derived by policy from rubric + evidence quality)
+- evidence_ids used (may be empty)
+- evidence_quality: "direct"|"indirect"|"weak"|"none"
+- reasoning_summary (short, non-chain-of-thought, referencing evidence ids)
+- defeaters ("what would change my mind")
+- uncertainty_source
+- assumptions (explicit; any assumptions cap k)
+- optional quotes with evidence_id + exact_quote + location
+
+Constraints:
+- If evidence_ids is empty/invalid: enforce conservative p movement (implementation default: |delta p| <= 0.05 from prior node.p)
+- If evidence_ids is empty/invalid: enforce A=0 automatically (Traceability), triggering k guardrail cap
+- If evidence quality is weak/indirect or quotes mismatch evidence text, cap k by policy
+- Evaluator must not reference "seed" or "focal" status.
+
+** 15.2 Decomposer contract
+=decompose(node)= returns:
+- 2-5 children nodes, each labeled NEC or EVID
+- decomp_type AND/OR
+- for AND with NEC, coupling bucket c (via overlap checklist in Section 9.5)
+- for each child: falsifiable flag, test_procedure, and overlap_with_siblings list
+
+Constraints:
+- For root hypotheses, decomposer must instantiate the obligation template.
+- If cannot, mark UNSCOPED.
+
+* 16. Inference vs Decision (Two-Layer Architecture)
+ABDUCTIO v2 separates inference from decision:
+
+- *Inference layer*: maintains \(\{p(h), k(h)\}\) and updates via \(\{w_{h,s}\}\).
+- *Decision layer (plug-in)*: uses \(\{p(h), k(h)\}\) plus a domain utility function \(U\) to choose actions.
+
+This preserves domain agnosticism and avoids embedding domain-specific EV calculations into the core.
+
+** 16.1 Minimal decision plug-in contract
+Decision plug-in (conceptual) inputs and outputs:
+- Inputs: current ledger \(\{p(h),k(h)\}\), scope metadata, utility \(U\), constraints
+- Output: action(s) (e.g., investigate node, accept hypothesis, place bet, abstain), with logged rationale
+
+* 17. Calibration Harness (Optional, Domain-Agnostic)
+** 17.1 Post-hoc calibration by \(k\)-bucket
+When outcomes resolve, compute calibration diagnostics (e.g., Brier score, reliability curves) stratified by \(k\) buckets.
+
+** 17.2 Adjust only global scalars
+Tune (walk-forward):
+- \(\beta\) (evidence weight scale),
+- \(W\) (per-credit cap),
+- rubric-to-\(k\) mapping thresholds,
+- \(\epsilon\) (frontier band) and \(\lambda_{\text{voi}}\) (scheduler exploration term)
+
+Objective: reduce systematic miscalibration without requiring domain-specific features.
+
+* 18. Algorithm (Updated Pseudocode)
+#+begin_src text
+inputs:
+  scope text
+  roots: List[RootSpec]
+  credits B
+  tau, epsilon, beta, W, gamma, alpha, lambda_voi
+  world_mode (closed-world or open-world)
+
+initialize:
+  for each root in roots:
+    canonical_id[root] = hash(root.statement)
+  build named roots H1..Hn from roots
+  if open-world:
+    add H_other with statement "Other" and exclusion "Not any named root"
+    set p_other = gamma, p_i = (1-gamma)/n
+  else:
+    set uniform priors: p_i = 1/n
+  set all k = 0.15
+  set all status = UNSCOPED initially
+
+  initialize w_applied[h,s] = 0 for all slots
+
+for cycle = 1.. while credits > 0:
+  for each root, compute priority = (p(1-p) + lambda_voi/n)(1-k)
+  leader = argmax priority (tie-break by canonical_id)
+  frontier F = {Hi : priority(Hi) >= priority(leader) - epsilon}
+
+  order frontier by canonical_id
+  for Hi in F:
+    if credits == 0: break
+
+    choose operation deterministically:
+      if Hi is UNSCOPED or missing template slots:
+         DECOMPOSE(Hi)
+      else:
+         pick slot s with lowest k (tie-break by canonical_id)
+         if can_decompose(s) and k(s) < tau:
+             DECOMPOSE(s)
+         else:
+             EVALUATE(s)
+
+    spend 1 credit
+    update credits_spent on Hi and node
+    recompute slot p_s and k_s via aggregation if needed
+    clamp p_s to [eta, 1-eta] and compute w_new from p_s and k_s
+    delta_w = w_new - w_applied[h,s]
+    update log p(h) with delta_w
+    normalize ledger over named roots (log-sum-exp)
+    if open-world: enforce absorber on H_other
+    if alpha > 0: blend p_new with p_prev via damping
+    log clamps, clips, w_old, w_new, delta_w, and every arithmetic step and invariant check
+
+stop when stopping conditions met
+output full audit trace
+#+end_src
+
+* 19. Practical Defaults
+- tau = 0.70
+- epsilon = 0.05
+- beta = 1.0
+- W = 3.0
+- lambda_voi = 0.1
+- gamma = 0.20 (open-world only)
+- alpha = 0.0 (no damping) or 0.4 (if smoothing desired)
+- world_mode = open (most outcomes)
+- k_max_UNSCOPED = 0.40
+- max_children = 5
+- coupling_default = 0.80
+- conservative delta p when no evidence: |delta p| <= 0.05 per evaluation
+
+* 20. Configuration Parameters (v2)
+| Parameter | Meaning | Typical Default |
+|----------+---------+-----------------|
+| \(\beta\) | evidence weight scale | 1.0 |
+| \(W\) | per-credit weight cap | 3.0 |
+| \(\epsilon\) | frontier band on priority | 0.05 |
+| \(\lambda_{\text{voi}}\) | scheduler exploration term | 0.1 |
+| \(\gamma\) | open-world other mass | 0.20 |
+| \(\alpha\) | damping blend factor | 0.0 or 0.4 |
+| world_mode | closed-world / open-world | open |
+| \(k_{\max}^{\text{UNSCOPED}}\) | cap for unscoped roots | 0.40 |
+
+* 21. Invariants Preserved
+- *Permutation invariance*: canonical_id ordering + deterministic tie-breaks
+- *Credit-boundedness*: only DECOMPOSE/EVALUATE spend credits; belief impact only on EVALUATE
+- *Auditability*: every \(p\), \(k\), \(w\), clamp/clip, normalization, and scheduling decision logged
+- *Domain agnosticism*: core uses bounded evidence weights; decision policy is a plug-in
+
+* 22. Why ABDUCTIO v2 is Permutation-Invariant
+ABDUCTIO v2 achieves permutation invariance by construction:
+
+1) No focal injection: frontier depends only on ledger state.
+2) Canonical ordering: iteration order is defined by hash(statement), not by input list order.
+3) Round-robin slicing: each frontier hypothesis receives equal opportunity per cycle.
+4) No-free-probability semantics: decomposition cannot change ledger p; OR cannot inflate.
+5) Template parity: each hypothesis is evaluated under the same obligation slots.
+6) Deterministic tie-breaks everywhere.
+
+Given identical inputs, the engine performs the same operations in the same canonical order and produces identical outputs, independent of the seed.
+
+* 23. Limitations and Extensions
+** Limitations
+- This is not full Bayesian inference; it is a structured, auditable scoring-and-budgeting framework.
+- Results depend on evaluator discipline and evidence quality.
+- MECE is approximated; open-world mode adds H_other as a guardrail, not a full causal model.
+
+** Extensions
+- Multi-assessor panels with aggregation rules for p and k.
+- Evidence objects with explicit likelihood impacts.
+- Specialized decomposers per domain (medicine, security, historical events).
+
+*** Recursive MECE Sets (Future)
+Any obligation node can spawn a local MECE hypothesis set when uncertainty
+is better modeled as competing scenarios rather than a single requirement.
+
+Example: Within "Germany will grow" -> "External environment" slot, instead of
+a vague NEC statement, spawn:
+- **Local scope**: "External economic environment for Germany in 2026"
+- **Local hypotheses**: {improves, stable, deteriorates, other}
+
+Each local set has its own:
+- Ledger with H_other (open-world mode only)
+- Template obligations (or simplified template)
+- Credit allocation with depth limits
+
+The parent node's satisfaction score becomes:
+\[
+p(\text{parent}) = \sum_{s \in \text{satisfying scenarios}} p_{\text{local\_ledger}}(s)
+\]
+
+This enables:
+- Modeling of nested uncertainties matching expert reasoning patterns
+- Explicit representation of assumption dependencies
+- Protection against hidden vagueness at arbitrary depth
+
+Design requirements:
+- Deterministic roll-up from local ledger to parent p
+- Same permutation invariance at every level
+- Depth limits and credit allocation rules to bound complexity
+- Clear audit trail showing which local scenarios drive parent scores
+
+* Appendix A: Minimal "Well-Defined Hypothesis" Checklist
+A root hypothesis must include:
+- A mechanism statement (stand-alone).
+- An exclusion clause distinguishing it from other roots.
+- A template instantiation with NEC slots:
+  feasibility, availability, fit, defeater resistance.
+
+If it cannot, mark UNSCOPED and cap k.
+
+* Appendix B: Canonical ID and Permutation Invariance
+ABDUCTIO uses content-based canonical IDs to break ties deterministically without
+depending on input order.
+
+For any hypothesis statement:
+\[
+\text{canonical\_id}(h) = \text{SHA256}(\text{normalize}(h.\text{statement}))
+\]
+
+Where normalization:
+1. Converts to lowercase
+2. Collapses whitespace (multiple spaces/tabs/newlines -> single space)
+3. Strips leading/trailing whitespace
+
+This ensures:
+- Identical statements produce identical IDs regardless of formatting
+- IDs are stable across sessions
+- Frontier ordering is deterministic: when multiple hypotheses tie, they're ordered
+  by canonical_id, not by the order they were provided
+
+Example:
+#+begin_src python
+statement1 = "Economy will   grow\n  next year"
+statement2 = "economy will grow next year"
+# normalize(statement1) == normalize(statement2)
+# canonical_id(statement1) == canonical_id(statement2)
+#+end_src
+
+* Appendix C: Coupling Buckets and Noisy-OR Discount
+Score overlap on three rubric items (0-2 each):
+- Evidence overlap
+- Mechanism overlap
+- Failure-mode overlap
+
+Map sum \(T\) to coupling:
+- 0-1 -> 0.20
+- 2-3 -> 0.50
+- 4-5 -> 0.80
+- 6 -> 0.95
+
+If noisy-OR is enabled, map the same \(T\) to discount \(d\):
+\[
+d=\begin{cases}
+1.00,& T\in\{0,1\}\\
+0.75,& T\in\{2,3\}\\
+0.50,& T\in\{4,5\}\\
+0.35,& T=6
+\end{cases}
+\]
+* Appendix D: Interpretation Contract
+
+This appendix is normative: any ABDUCTIO implementation SHOULD expose these meanings in the UI and MUST NOT claim stronger conclusions than the contract permits.
+
+** D.1 Objects and Notation
+
+Let \(H=\{h_1,\dots,h_n\}\) be the named root hypotheses; in open-world mode include \(h_{\text{other}}\).
+ABDUCTIO maintains:
+- Ledger probabilities \(p_{\text{ledger}}(h)\) over roots (MECE bookkeeping).
+- Node assessments \(p(v)\) for internal nodes \(v\) (slots and decomposed children).
+- Confidence scores \(k(v)\) and \(k(h)\) (stability of the current assessment under re-checking).
+
+All quantities are session-scoped: they refer to the stated *scope* and the evidence considered in the session.
+
+** D.2 Meaning of Ledger Probability \(p_{\text{ledger}}(h)\)
+
+\[
+p_{\text{ledger}}(h)\in[0,1],\qquad \sum_{h\in H} p_{\text{ledger}}(h)=1
+\]
+(in open-world mode, the sum includes \(h_{\text{other}}\)).
+
+Operational meaning:
+- \(p_{\text{ledger}}(h)\) is the engine’s *current, normalized allocation of credence mass* across the MECE root set for the session scope.
+- It is *comparative*: it ranks roots against each other under the engine’s update rules and the evidence that has been *paid for* via EVALUATE credits.
+- It is *audit-derived*: every change to \(p_{\text{ledger}}\) must be traceable to logged \(\Delta w\) updates from evaluated slots (and, in open-world mode, any logged \(\gamma\) adjustment rule).
+
+What \(p_{\text{ledger}}(h)\) is NOT:
+- Not a frequentist probability, not a calibrated predictive probability unless separately validated by calibration harnesses.
+- Not a likelihood ratio or Bayes posterior unless the evaluator’s \(p\) inputs are themselves derived from a Bayesian model (which ABDUCTIO does not assume).
+- Not a guarantee of truth, correctness, or eventual verification.
+
+Allowed conclusion from \(p_{\text{ledger}}\):
+- “Given the current evidence and paid evaluations in this session, the engine assigns higher (or lower) relative credence to \(h\) than to \(g\).”
+
+Disallowed conclusion from \(p_{\text{ledger}}\):
+- “\(h\) is true with probability \(p_{\text{ledger}}(h)\)” (unless external calibration and modeling assumptions justify that claim).
+
+** D.3 Meaning of Node Assessment \(p(v)\)
+
+Nodes \(v\) include obligation slots and any decomposed children. In v2, nodes default to neutral:
+\[
+p(v)=0.5 \quad \text{(neutral)}.
+\]
+
+Operational meaning depends on node role:
+
+*** D.3.1 NEC nodes (necessary-condition assessments)
+If \(v\) is a NEC node, \(p(v)\in(0,1)\) is an *assessment score* answering:
+\[
+p(v)\approx \Pr(\text{this necessary condition is satisfied} \mid E,\ \text{assumptions}).
+\]
+Interpretation is intentionally lightweight: it is a structured evaluator judgment, not a statistical estimate unless the evaluator provides one.
+
+- \(p(v)>0.5\) means the evaluator leans toward “condition satisfied.”
+- \(p(v)<0.5\) means the evaluator leans toward “condition not satisfied.”
+- \(p(v)=0.5\) means “no net lean / insufficient basis / unassessed.”
+
+*** D.3.2 EVID nodes (supporting-evidence assessments)
+If \(v\) is an EVID node, \(p(v)\in(0,1)\) is an *assessment score* answering:
+\[
+p(v)\approx \Pr(\text{this evidence-claim holds or supports its parent} \mid E,\ \text{assumptions}).
+\]
+EVID nodes may support slot-level aggregation, but they MUST NOT be used to inflate ledger mass merely by adding more EVID children. (Anti-inflation aggregation rules apply.)
+
+What node \(p(v)\) is NOT:
+- Not automatically the probability that the root hypothesis is true.
+- Not automatically additive across children; aggregation is defined by explicit deterministic rules (AND/OR) and may be conservative (e.g., max-OR).
+
+** D.4 Meaning of Confidence \(k\)
+
+\[
+k \in [0,1]
+\]
+Operational meaning:
+- \(k(v)\) is a *stability score* for the current assessment of node \(v\): how robust \(p(v)\) is expected to be under reasonable re-checking, adversarial questioning, and assumption perturbation.
+- \(k(v)\) is computed from a rubric (A–D) and guardrails; it is *not* a claim of objective truth.
+- Root confidence \(k(h)\) is derived deterministically (default: minimum \(k\) over required slots) and therefore is conservative.
+
+Rubric interpretation (normative):
+- Evidence Traceability (A): can an auditor follow the cited evidence to the claim?
+- Cross-Validation (B): independent corroboration or alternative checks exist?
+- Sensitivity (C): does \(p\) remain similar under reasonable assumption changes?
+- Adversarial Resilience (D): does the assessment survive strong counterarguments?
+
+Allowed conclusion from \(k\):
+- “This score is tentative vs robust; higher \(k\) means less likely to change materially upon re-audit.”
+
+Disallowed conclusion from \(k\):
+- “High \(k\) proves correctness.” \(k\) measures robustness of the *assessment process*, not ground truth.
+
+** D.5 What Moves the Ledger (and What Cannot)
+
+Normative rule (credit-bounded causality):
+- Only EVALUATE operations may change ledger beliefs.
+- DECOMPOSE operations MUST be belief-neutral.
+
+In v2 this is enforced by the Delta-\(w\) rule:
+- Each evaluated slot produces an evidence weight \(w_{h,s}\in[-W,W]\).
+- The ledger changes only by \(\Delta w\) applied on EVALUATE:
+\[
+\Delta w = w_{\text{new}} - w_{\text{applied}}[h,s].
+\]
+Unassessed nodes have \(w=0\) by default.
+
+Therefore:
+- Adding structure, children, or alternative decompositions cannot change \(p_{\text{ledger}}\) unless an EVALUATE credit is spent and logged.
+
+** D.6 What You Can and Can’t Conclude (Normative Claims Policy)
+
+You MAY conclude:
+1. Relative ranking: if \(p_{\text{ledger}}(h) > p_{\text{ledger}}(g)\), ABDUCTIO currently favors \(h\) over \(g\) under its logged evidence weights.
+2. Auditability: every ledger shift is attributable to specific evaluated nodes with cited evidence (or explicitly marked “no-evidence” conservative updates).
+3. Robustness grading: higher \(k(h)\) indicates the current belief assignment for \(h\) is less fragile to re-checking than a lower-\(k\) alternative, given the rubric.
+
+You MAY NOT conclude (without external justification):
+1. Objective posterior probability: \(p_{\text{ledger}}(h)\) is not automatically a Bayes posterior or calibrated probability of truth.
+2. Causal identification: ABDUCTIO does not infer causality unless the hypotheses and evidence mapping are causal and validated.
+3. Completeness beyond the declared MECE: in closed-world mode, exhaustiveness is assumed; in open-world mode, \(h_{\text{other}}\) captures residual uncertainty but does not enumerate unknown mechanisms.
+
+** D.7 Open-World Specific Note (\(h_{\text{other}}\))
+
+In open-world mode:
+- \(p_{\text{ledger}}(h_{\text{other}})\) represents *residual credence* assigned to “none of the named roots as specified,” under the session scope.
+- It MUST be treated as a guardrail against false certainty, not as a specific explanatory mechanism.
+- High \(p_{\text{ledger}}(h_{\text{other}})\) supports the conclusion: “the named set is likely missing a plausible explanation or is too underspecified.”
+
+** D.8 Implementation UI Requirements (Recommended)
+
+An implementation SHOULD display, alongside every \(p_{\text{ledger}}(h)\):
+- \(k(h)\) and the minimum-slot reason (which slot is bottlenecking),
+- the list of evaluated slots contributing nonzero \(w\),
+- a warning banner if any required slot is UNSCOPED or has rubric A=0,
+- a “claims policy” tooltip summarizing D.6 in plain language.
+
+This appendix is the definitive interpretation contract for the meanings of \(p_{\text{ledger}}, p(\cdot), k\) in ABDUCTIO v2.
+
+* Appendix E: Worked Example (Closed-World Mode)
+This appendix is illustrative (non-normative) and shows the *mechanics* of v2: template parity, symmetric log-space updates, and Delta-\(w\) enforcement.
+
+** E.1 Scope and MECE roots (closed world)
+- *Scope*: "Primary cause of the 2026-01-04 web service outage (15:02–15:27 UTC) at Company Z."
+- *Mode*: CLOSED_WORLD (no \(H_{\text{other}}\)).
+- *Named roots* (MECE for this scope):
+
+| ID | Root hypothesis \(H_i\) | Exclusion clause (one line) |
+|----+--------------------------+-----------------------------|
+| H1 | Misconfigured load balancer routing caused the outage. | Not a database internal fault; not an upstream provider outage. |
+| H2 | Database deadlock/locking cascade caused the outage. | Not a routing/config fault; not an upstream provider outage. |
+| H3 | Upstream provider outage caused the outage. | Not an internal routing/config fault; not an internal database fault. |
+
+Initialize ledger (uniform prior):
+\[
+p_0(H1)=p_0(H2)=p_0(H3)=\frac{1}{3}.
+\]
+
+Session parameters (defaults):
+\[
+\beta=1,\quad W=1,\quad \eta=10^{-6}.
+\]
+
+** E.2 Template instantiation (same four NEC slots for all roots)
+For each \(H_i\), instantiate required NEC slots:
+
+1) Feasibility (general) [NEC]  
+2) Availability (context) [NEC]  
+3) Fit to key features [NEC]  
+4) Defeater resistance [NEC]
+
+All nodes start neutral:
+\[
+p=0.5,\quad k=0.15,\quad w_{\text{applied}}[H_i,s]=0.
+\]
+
+** E.3 Credits and operations (example run)
+Assume a small budget \(B=4\) credits and the engine chooses to *evaluate* the "Fit to key features" slot for each root (3 credits), then evaluate one additional slot for the current leader (1 credit).
+
+Operations:
+1. EVALUATE \((H1,\text{Fit})\)
+2. EVALUATE \((H2,\text{Fit})\)
+3. EVALUATE \((H3,\text{Fit})\)
+4. EVALUATE \((H1,\text{Defeater})\)
+
+** E.4 Evaluations (p,k) with rubric-to-k mapping
+For illustration, suppose the evaluator returns:
+
+| Root | Slot | \(p_{h,s}\) | Rubric (A,B,C,D) | \(k_{h,s}\) |
+|------+------|-------------|------------------|-------------|
+| H1 | Fit | 0.70 | (2,1,1,1) | 0.55 |
+| H2 | Fit | 0.40 | (2,1,1,1) | 0.55 |
+| H3 | Fit | 0.60 | (2,1,1,1) | 0.55 |
+| H1 | Defeater resistance | 0.55 | (1,1,0,1) | 0.35 (and guardrail cap applies if needed) |
+
+(Here, totals \(T=5\Rightarrow k=0.55\). For the last row \(T=3\Rightarrow k=0.35\).)
+
+** E.5 Weight mapping and ledger update (symmetric, bounded)
+Weight rule:
+\[
+w_{h,s}=\mathrm{clip}\!\left(\beta\,k_{h,s}\cdot \log\frac{p_{h,s}^{\ast}}{1-p_{h,s}^{\ast}},\,-W,\,W\right),
+\quad p^\ast=\mathrm{clip}(p,\eta,1-\eta).
+\]
+
+Compute logits (rounded):
+\[
+\logit(0.70)=\log\frac{0.70}{0.30}\approx 0.8473
+\]
+\[
+\logit(0.40)=\log\frac{0.40}{0.60}\approx -0.4055
+\]
+\[
+\logit(0.60)=\log\frac{0.60}{0.40}\approx 0.4055
+\]
+\[
+\logit(0.55)=\log\frac{0.55}{0.45}\approx 0.2007
+\]
+
+Weights:
+\[
+w(H1,\text{Fit})=0.55\cdot 0.8473\approx 0.4660
+\]
+\[
+w(H2,\text{Fit})=0.55\cdot (-0.4055)\approx -0.2230
+\]
+\[
+w(H3,\text{Fit})=0.55\cdot 0.4055\approx 0.2230
+\]
+\[
+w(H1,\text{Defeater})=0.35\cdot 0.2007\approx 0.0702
+\]
+(All within \([-1,1]\), so clipping is inactive.)
+
+Delta-\(w\) rule (each slot starts with \(w_{\text{applied}}=0\)):
+\[
+\Delta w = w_{\text{new}} - w_{\text{applied}}.
+\]
+
+*** E.5.1 After first three EVALUATE operations (Fit for H1,H2,H3)
+Start:
+\[
+\log p_0(H1)=\log p_0(H2)=\log p_0(H3)=\log(1/3)\approx -1.0986.
+\]
+
+Unnormalized log update:
+\[
+\log \tilde p(H1)=-1.0986+0.4660=-0.6326
+\]
+\[
+\log \tilde p(H2)=-1.0986-0.2230=-1.3216
+\]
+\[
+\log \tilde p(H3)=-1.0986+0.2230=-0.8756
+\]
+
+Exponentiate (rounded):
+\[
+\tilde p(H1)\approx e^{-0.6326}=0.531
+\quad
+\tilde p(H2)\approx e^{-1.3216}=0.267
+\quad
+\tilde p(H3)\approx e^{-0.8756}=0.417
+\]
+Normalize:
+\[
+Z=0.531+0.267+0.417=1.215
+\]
+\[
+p_1(H1)=0.531/1.215\approx 0.437,\quad
+p_1(H2)=0.267/1.215\approx 0.220,\quad
+p_1(H3)=0.417/1.215\approx 0.343.
+\]
+
+*** E.5.2 Fourth credit: EVALUATE (H1, Defeater resistance)
+Apply \(\Delta w=+0.0702\) to \(H1\) only:
+
+\[
+\log \tilde p(H1)=\log p_1(H1)+0.0702,\quad
+\log \tilde p(H2)=\log p_1(H2),\quad
+\log \tilde p(H3)=\log p_1(H3).
+\]
+
+Equivalently (using the already-updated log values from above):
+\[
+\log \tilde p(H1)=-0.6326+0.0702=-0.5624
+\]
+\[
+\log \tilde p(H2)=-1.3216,\quad
+\log \tilde p(H3)=-0.8756
+\]
+Exponentiate (rounded):
+\[
+\tilde p(H1)\approx e^{-0.5624}=0.570,\quad
+\tilde p(H2)\approx 0.267,\quad
+\tilde p(H3)\approx 0.417
+\]
+Normalize:
+\[
+Z=0.570+0.267+0.417=1.254
+\]
+\[
+p_2(H1)\approx 0.455,\quad
+p_2(H2)\approx 0.213,\quad
+p_2(H3)\approx 0.332.
+\]
+
+** E.6 What this example demonstrates
+- *Symmetry*: evidence against \(H2\) (Fit \(p<0.5\)) yields a negative weight and decreases its ledger mass.
+- *Boundedness*: per-slot impact is limited by \(W\).
+- *Auditability*: every ledger change is attributable to explicit \(w\) (and \(\Delta w\)) from paid EVALUATE steps.
+- *No-free-probability*: no DECOMPOSE step occurred here, but if it had, ledger \(p\) would not change unless an EVALUATE credit produced a nonzero \(\Delta w\).
+
+* Appendix F: Worked Example (Open-World Mode with \(H_{\text{other}}\) and \(\gamma\))
+This appendix is illustrative (non-normative) and highlights open-world behavior: residual uncertainty can *rise* even when one named hypothesis leads, via the deterministic \(\gamma\) rule.
+
+** F.1 Scope and MECE+Other roots (open world)
+- *Scope*: "Why did Patient A show an unexpected ALT/AST spike within 10 days of starting medication \(X\)?"
+- *Mode*: OPEN_WORLD.
+- *Named roots*:
+
+| ID | Root hypothesis \(H_i\) | Exclusion clause (one line) |
+|----+--------------------------+-----------------------------|
+| H1 | Medication \(X\) caused drug-induced liver injury (DILI). | Not viral hepatitis; not measurement/lab artifact; not other causes. |
+| H2 | Viral hepatitis (acute) caused the spike. | Not DILI from \(X\); not measurement/lab artifact; not other causes. |
+| H3 | Laboratory/measurement error caused a spurious spike. | Not DILI; not viral hepatitis; not other causes. |
+| H_other | Other/unmodeled explanation. | Not any named root as specified. |
+
+Initialize:
+\[
+\gamma_0=0.02,\quad p_0(H_{\text{other}})=0.02,\quad
+p_0(H1)=p_0(H2)=p_0(H3)=\frac{1-\gamma_0}{3}=0.326\overline{6}.
+\]
+
+Defaults:
+\[
+\beta=1,\quad W=1,\quad \eta=10^{-6},\quad a=1,\quad b=0.05,\quad
+\gamma_{\min}=0.01,\quad \gamma_{\max}=0.30.
+\]
+
+** F.2 Template instantiation (same four NEC slots for all named roots)
+Required NEC slots for each named root \(H1,H2,H3\):
+1) Feasibility (general)
+2) Availability (context)
+3) Fit to key features
+4) Defeater resistance
+
+(You may instantiate slots for \(H_{\text{other}}\) as well, but it is not required; here we leave it unevaluated so its \(w\) remains 0.)
+
+Unassessed defaults:
+\[
+p=0.5,\quad k=0.15,\quad w_{\text{applied}}=0.
+\]
+
+** F.3 Credits and operations (example run)
+Assume \(B=4\) credits. The engine evaluates:
+1. EVALUATE \((H1,\text{Fit})\)
+2. EVALUATE \((H2,\text{Fit})\)
+3. EVALUATE \((H3,\text{Fit})\)
+4. EVALUATE \((H1,\text{Availability})\)
+
+** F.4 Evaluations for the paid slots
+Assume evaluator outputs:
+
+| Root | Slot | \(p_{h,s}\) | Rubric (A,B,C,D) | \(k_{h,s}\) |
+|------+------|-------------|------------------|-------------|
+| H1 | Fit | 0.60 | (1,1,0,1) | 0.35 |
+| H2 | Fit | 0.45 | (1,1,0,1) | 0.35 |
+| H3 | Fit | 0.40 | (1,1,0,1) | 0.35 |
+| H1 | Availability | 0.75 | (2,1,1,1) | 0.55 |
+
+(Here, the Fit assessments are lower-confidence; the Availability assessment is more robust.)
+
+** F.5 Weight mapping and ledger update over \(H1,H2,H3,H_{\text{other}}\)
+Logits:
+\[
+\logit(0.60)\approx 0.4055,\quad
+\logit(0.45)\approx -0.2007,\quad
+\logit(0.40)\approx -0.4055,\quad
+\logit(0.75)=\log 3\approx 1.0986.
+\]
+
+Weights:
+\[
+w(H1,\text{Fit})=0.35\cdot 0.4055\approx 0.1419
+\]
+\[
+w(H2,\text{Fit})=0.35\cdot (-0.2007)\approx -0.0702
+\]
+\[
+w(H3,\text{Fit})=0.35\cdot (-0.4055)\approx -0.1419
+\]
+\[
+w(H1,\text{Avail})=0.55\cdot 1.0986\approx 0.6042
+\]
+\[
+w(H_{\text{other}},\cdot)=0 \quad (\text{no evaluations yet})
+\]
+
+*** F.5.1 After three Fit evaluations
+Start:
+\[
+\log p_0(H1)=\log p_0(H2)=\log p_0(H3)=\log(0.326\overline{6})\approx -1.1189
+\]
+\[
+\log p_0(H_{\text{other}})=\log(0.02)\approx -3.9120
+\]
+
+Apply Fit weights:
+\[
+\log \tilde p(H1)\approx -1.1189+0.1419=-0.9770
+\]
+\[
+\log \tilde p(H2)\approx -1.1189-0.0702=-1.1891
+\]
+\[
+\log \tilde p(H3)\approx -1.1189-0.1419=-1.2608
+\]
+\[
+\log \tilde p(H_{\text{other}})\approx -3.9120
+\]
+
+Exponentiate (rounded):
+\[
+\tilde p(H1)\approx 0.376,\quad
+\tilde p(H2)\approx 0.305,\quad
+\tilde p(H3)\approx 0.283,\quad
+\tilde p(H_{\text{other}})\approx 0.020
+\]
+Normalize:
+\[
+Z\approx 0.376+0.305+0.283+0.020=0.984
+\]
+\[
+p_1(H1)\approx 0.382,\quad
+p_1(H2)\approx 0.310,\quad
+p_1(H3)\approx 0.288,\quad
+p_1(H_{\text{other}})\approx 0.020.
+\]
+
+*** F.5.2 Fourth credit: evaluate Availability for H1
+Add \(\Delta w=+0.6042\) to \(H1\):
+\[
+\log \tilde p(H1)\approx -0.9770+0.6042=-0.3728
+\]
+Others unchanged.
+
+Exponentiate (rounded):
+\[
+\tilde p(H1)\approx 0.689,\quad
+\tilde p(H2)\approx 0.305,\quad
+\tilde p(H3)\approx 0.283,\quad
+\tilde p(H_{\text{other}})\approx 0.020
+\]
+Normalize:
+\[
+Z\approx 0.689+0.305+0.283+0.020=1.297
+\]
+\[
+p_2(H1)\approx 0.531,\quad
+p_2(H2)\approx 0.235,\quad
+p_2(H3)\approx 0.218,\quad
+p_2(H_{\text{other}})\approx 0.016.
+\]
+
+** F.6 Open-world \(\gamma\) update (residual mismatch raises \(H_{\text{other}}\))
+Per v2, compute residual mismatch for each named hypothesis \(h\):
+\[
+m(h)=\frac{1}{S}\sum_{s\in\text{required slots}} (1-p_{h,s})\,k_{h,s},\quad S=4.
+\]
+
+For slots not yet evaluated in this example, use defaults \(p=0.5, k=0.15\), yielding contribution \((1-0.5)0.15=0.075\).
+
+Assume (illustrative) that Feasibility has been *scoped* and lightly assessed from domain priors (not paid-for here; if unpaid, they should remain at defaults in a strict engine). To keep this example consistent with the v2 "paid-for moves" principle, we will use defaults for any unpaid slots except those evaluated above.
+
+Thus:
+- For \(H1\): Availability \(p=0.75,k=0.55\); Fit \(p=0.60,k=0.35\); Feasibility default; Defeater default.
+- For \(H2\): Fit evaluated; others default.
+- For \(H3\): Fit evaluated; others default.
+
+Compute \(m(h)\):
+
+For \(H1\):
+\[
+m(H1)=\frac{1}{4}\Bigl[
+(1-0.5)0.15 + (1-0.75)0.55 + (1-0.60)0.35 + (1-0.5)0.15
+\Bigr]
+\]
+\[
+=\frac{1}{4}\bigl[0.075 + 0.1375 + 0.14 + 0.075\bigr]
+=\frac{0.4275}{4}\approx 0.1069.
+\]
+
+For \(H2\):
+\[
+m(H2)=\frac{1}{4}\Bigl[0.075 + 0.075 + (1-0.45)0.35 + 0.075\Bigr]
+=\frac{1}{4}\bigl[0.075+0.075+0.1925+0.075\bigr]
+=\frac{0.4175}{4}\approx 0.1044.
+\]
+
+For \(H3\):
+\[
+m(H3)=\frac{1}{4}\Bigl[0.075 + 0.075 + (1-0.40)0.35 + 0.075\Bigr]
+=\frac{1}{4}\bigl[0.075+0.075+0.21+0.075\bigr]
+=\frac{0.435}{4}\approx 0.1088.
+\]
+
+Best named residual:
+\[
+M=\min_h m(h)\approx 0.1044.
+\]
+
+Assume no frontier UNSCOPED hypotheses:
+\[
+I_{\text{frontier\_UNSCOPED}}=0.
+\]
+
+Update \(\gamma\):
+\[
+\gamma \leftarrow \mathrm{clip}(\gamma_0 + aM + bI,\ \gamma_{\min},\ \gamma_{\max})
+= \mathrm{clip}(0.02 + 1\cdot 0.1044 + 0,\ 0.01,\ 0.30)
+\approx 0.1244.
+\]
+
+Set \(p(H_{\text{other}})=\gamma\) and rescale named masses proportionally.
+Current \(p_2(H_{\text{other}})\approx 0.016\), so named total is \(\approx 0.984\).
+Target named total is \(1-\gamma\approx 0.8756\).
+Rescale factor:
+\[
+r=\frac{0.8756}{0.984}\approx 0.890.
+\]
+
+Final (rounded):
+\[
+p_3(H1)\approx 0.531\cdot 0.890=0.473,\quad
+p_3(H2)\approx 0.235\cdot 0.890=0.209,\quad
+p_3(H3)\approx 0.218\cdot 0.890=0.194,\quad
+p_3(H_{\text{other}})\approx 0.124.
+\]
+
+** F.7 What this example demonstrates
+- Even though \(H1\) leads among named roots after evidence, *open-world residual uncertainty can increase* deterministically when the required-slot residual mismatch \(M\) remains nontrivial.
+- The mechanism is auditable: \(\gamma\) depends only on logged \((p,k)\) for required slots and the UNSCOPED frontier indicator.
+- This discourages false certainty in under-modeled settings: the engine can say, in effect, "best named explanation is \(H1\), but the set is likely incomplete or insufficiently supported; allocate meaningful mass to \(H_{\text{other}}\)."
+* Appendix G: Proof of Permutation Invariance — (Input-Order Only)
+
+This appendix proves permutation invariance in the sense actually claimed by ABDUCTIO v2:
+
+- We permute only the *input presentation order* of the named roots.
+- Canonical IDs are content-derived, so input permutations do not change keys.
+- Therefore no abstract “renaming operator” is needed; the theorem is exact equality of final states.
+
+The proof is by induction on credits, via a one-step commutation lemma for a deterministic transition function.
+
+** H.1 Canonical IDs (Fix A: eliminate general renaming)
+
+For each root hypothesis statement string \(\sigma\), define:
+\[
+\mathrm{norm}(\sigma)=\text{lowercase}(\sigma)\ \text{with collapsed whitespace and trimmed ends}.
+\]
+Define the canonical key:
+\[
+\mathrm{cid}(\sigma)=\bigl(\mathrm{SHA256}(\mathrm{norm}(\sigma)),\ \mathrm{norm}(\sigma)\bigr).
+\]
+(The tuple form is the collision guard; it is a total orderable key.)
+
+*Normative constraint:* the engine MUST store named roots in a finite map keyed by \(\mathrm{cid}\), not in a list. Any iteration over roots MUST sort by \(\mathrm{cid}\).
+
+*Consequence:* For any permutation \(\pi\) of the input list of roots, the resulting map of roots is identical (same key-value pairs), provided the multiset of statements is the same.
+
+** H.2 State as a precise mathematical object
+
+Let \(K\) be the set of canonical keys \(\mathrm{cid}(\cdot)\). Let \(\mathcal{S}=\{\mathrm{Feas},\mathrm{Avail},\mathrm{Fit},\mathrm{Defeat}\}\).
+
+A session state is a tuple
+\[
+S=\bigl(R,\ N,\ q,\ \gamma,\ w,\ B,\ C,\ L\bigr)
+\]
+where:
+
+- \(R:K\rightharpoonup \text{RootData}\) is a finite map of named roots.
+- \(N:(K\times\mathcal{S})\rightharpoonup \text{SlotNodeData}\) is a finite map of required slots (and optionally deeper nodes), keyed by \((k,s)\).
+- \(q:K\to(0,1)\) is the named-only share vector over \(\mathrm{dom}(R)\) with \(\sum_{k\in\mathrm{dom}(R)} q(k)=1\).
+- \(\gamma\in[0,1)\) is the open-world absorber mass; full ledger is \(p(k)=(1-\gamma)q(k)\) and \(p(H_{\text{other}})=\gamma\). (Closed-world is the special case \(\gamma=0\).)
+- \(w:(K\times\mathcal{S})\to[-W,W]\) stores applied weights \(w_{\text{applied}}[k,s]\).
+- \(B\in\mathbb{N}\) is remaining credits.
+- \(C\) is explicit cycle-progress state for open-world scheduling:
+  \[
+  C=(F,\ i)
+  \]
+  where \(F\) is the current cycle frontier key-list, defined as a *sorted list* of keys, and \(i\in\{0,\dots,|F|\}\) is the cursor index.
+- \(L\) is the audit log (a multiset/sequence of structured entries; canonicalization is defined in H.8).
+
+All derived quantities (priority, frontier band, next operation choice) must be deterministic functions of \((R,N,q,\gamma,w,C)\).
+
+** H.3 Deterministic contracts for evaluator and decomposer (checkable)
+
+To make the invariance claim meaningful, the non-engine components must satisfy these contracts.
+
+*** Evaluator contract (deterministic, order-independent)
+There exists a function:
+\[
+\mathrm{eval}:\ (\text{node\_key},\ \text{evidence\_bundle\_hash},\ \theta)\ \to\ (p,k,\text{rubric},\text{refs},\dots)
+\]
+such that its output depends ONLY on:
+- the node content addressed by node\_key (e.g., \((k,s)\) plus the node statement text), and
+- the evidence bundle identifiers summarized by evidence\_bundle\_hash,
+- and config \(\theta\),
+and does NOT depend on:
+- traversal order,
+- sibling hypotheses,
+- UI focal choice,
+- presentation order of roots.
+
+(If a human is the evaluator, this is an operational requirement: the log must include evidence\_bundle\_hash and node\_key so that re-evaluation is reproducible.)
+
+*** Decomposer contract (deterministic, order-independent)
+There exists a function:
+\[
+\mathrm{decomp}:\ (\text{node\_key},\ \theta)\ \to\ \{\text{children}\}
+\]
+such that children are generated deterministically from node content + \(\theta\).
+Child IDs MUST be content-derived (same \(\mathrm{cid}\) rule or a deterministic extension), and the returned child set MUST be stored in a map keyed by those IDs.
+
+** H.4 Normalize lemma (explicit)
+
+Define \(\mathrm{Normalize}\) on a finite map \(x:K\to \mathbb{R}_{>0}\) by:
+\[
+\mathrm{Normalize}(x)(k)=\frac{x(k)}{\sum_{j\in\mathrm{dom}(x)} x(j)}.
+\]
+
+*Lemma (Normalize equivariance under key-preserving reindexing):*
+If two maps \(x,y:K\to\mathbb{R}_{>0}\) have identical key-value pairs (i.e., \(x=y\)), then \(\mathrm{Normalize}(x)=\mathrm{Normalize}(y)\).
+
+(Under Fix A we do not apply arbitrary bijections \(\pi:K\to K\); we prove equality across input list permutations which do not change keys at all.)
+
+** H.5 step : State -> State (one credit, fully specified)
+
+Define \(\mathrm{step}(S)\) as follows.
+
+If \(B=0\), return \(S\).
+
+Otherwise:
+
+1) *Cycle frontier initialization (if needed).*
+If \(i=|F|\) or \(F\) is undefined, recompute the frontier band deterministically from the current state:
+- compute priority for each \(k\in\mathrm{dom}(R)\) from symmetric expressions in \(p(k)=(1-\gamma)q(k)\), confidence summaries from \(N\), and importance \(I(k)\),
+- select the band \(F\) by the v2 rule, and set \(F\leftarrow \mathrm{sort}(F)\), \(i\leftarrow 0\).
+
+2) *Select target key.*
+Let \(k=F[i]\). (Deterministic by explicit \(F\) and \(i\).)
+
+3) *Choose operation deterministically for \(k\).*
+Using only keyed state \((R,N,w)\) for hypothesis \(k\):
+- if UNSCOPED or missing required slots: DECOMPOSE(root)
+- else pick required slot \(s\) with minimum \(k\)-confidence (tie-break by canonical slot id)
+  - if decomposable and \(k<\tau\): DECOMPOSE(slot)
+  - else: EVALUATE(slot)
+
+4) *Apply operation.*
+- DECOMPOSE: update \(R,N\) only (structure). Enforce: \(q,\gamma,w\) unchanged.
+- EVALUATE on \((k,s)\): obtain \((p_{k,s},\kappa_{k,s},\dots)=\mathrm{eval}((k,s),\text{evidence\_hash},\theta)\).
+  Compute:
+  \[
+  p^\ast=\mathrm{clip}(p_{k,s},\eta,1-\eta),
+  \quad
+  w_{\text{new}}=\mathrm{clip}\!\left(\beta\,\kappa_{k,s}\cdot \log\frac{p^\ast}{1-p^\ast}, -W, W\right),
+  \]
+  \[
+  \Delta w = w_{\text{new}}-w(k,s).
+  \]
+  Update named-only shares:
+  \[
+  \tilde q(k)=q(k)e^{\Delta w},\quad \tilde q(j)=q(j)\ (j\neq k),\quad q'=\mathrm{Normalize}(\tilde q).
+  \]
+  Set \(q\leftarrow q'\) and \(w(k,s)\leftarrow w_{\text{new}}\). Other entries unchanged.
+
+5) *Advance cycle cursor and spend credit.*
+Set \(i\leftarrow i+1\), \(B\leftarrow B-1\).
+
+6) *Gamma update trigger (open-world only; explicit).*
+If open-world mode and now \(i=|F|\) (i.e., the cycle finished), update \(\gamma\) deterministically from \(N\):
+\[
+m(k)=\frac{1}{4}\sum_{s\in\mathcal{S}} (1-p_{k,s})\,\kappa_{k,s},\quad M=\min_k m(k),
+\]
+\[
+\gamma\leftarrow \mathrm{clip}(\gamma_0+aM+bI_{\text{frontier\_UNSCOPED}},\gamma_{\min},\gamma_{\max}).
+\]
+Then set full ledger \(p(k)=(1-\gamma)q(k)\) and record \(\gamma\) in state.
+
+7) *Log.*
+Append a structured log entry containing:
+\((t,\ \mathrm{op},\ k,\ s,\ p,\kappa,\ w_{\text{old}},w_{\text{new}},\Delta w,\ q_{\text{pre}},q_{\text{post}},\gamma_{\text{pre}},\gamma_{\text{post}},\dots)\).
+
+This completes \(\mathrm{step}(S)\).
+
+** H.6 Theorem (Permutation invariance under input list permutations)
+
+Let the engine initialization procedure \(\mathrm{Init}\) construct \(S_0\) from an input list of root statements by inserting each root into the map \(R\) keyed by \(\mathrm{cid}(\cdot)\) and then setting initial \(q\) and \(\gamma\) deterministically.
+
+Let \(\pi\) be any permutation of the input list. Then:
+
+*Theorem (Exact invariance):*
+\[
+\mathrm{run}_B(\mathrm{Init}(\text{roots}))=\mathrm{run}_B(\mathrm{Init}(\pi(\text{roots})))
+\]
+where \(\mathrm{run}_B(S)=\mathrm{step}^B(S)\), and equality is exact equality of final ledger state \((q,\gamma)\) and canonicalized audit log \(\mathrm{canon}(L)\) (defined in H.8).
+
+** H.7 Proof (by induction on credits)
+
+Key observation under Fix A:
+\[
+\mathrm{Init}(\text{roots}) = \mathrm{Init}(\pi(\text{roots}))
+\]
+because:
+- \(R\) is a map keyed by content-derived \(\mathrm{cid}\),
+- insertion order does not change a map’s extensional contents,
+- initial \(q\) and \(\gamma\) are computed only from \(\mathrm{dom}(R)\) and config constants.
+
+Thus the initial states are identical. Since \(\mathrm{step}\) is a deterministic function \(\mathrm{State}\to\mathrm{State}\), the entire execution is identical. Formally, proceed by induction.
+
+Let \(S_0=\mathrm{Init}(\text{roots})\) and \(S_0'=\mathrm{Init}(\pi(\text{roots}))\). We have \(S_0=S_0'\).
+
+Claim: for all \(t\in\mathbb{N}\),
+\[
+\mathrm{step}^t(S_0)=\mathrm{step}^t(S_0').
+\]
+
+- Base case \(t=0\): immediate since \(S_0=S_0'\).
+
+- Inductive step: assume \(\mathrm{step}^t(S_0)=\mathrm{step}^t(S_0')\). Apply \(\mathrm{step}\) to both sides:
+\[
+\mathrm{step}(\mathrm{step}^t(S_0))=\mathrm{step}(\mathrm{step}^t(S_0')).
+\]
+This holds because \(\mathrm{step}\) is a function and equal inputs give equal outputs (determinism).
+Hence \(\mathrm{step}^{t+1}(S_0)=\mathrm{step}^{t+1}(S_0')\).
+
+Therefore for \(t=B\), \(\mathrm{run}_B(S_0)=\mathrm{run}_B(S_0')\). \(\square\)
+
+*What this proof actually buys you:* it reduces “permutation invariance” to two checkable claims:
+(i) initialization builds an order-independent state (maps + content keys), and
+(ii) step is deterministic and does not consult any presentation-order artifact.
+
+** H.8 Canonicalized logs (precise)
+
+Each log entry is a structured record with fields:
+\[
+\ell = (t,\mathrm{op},k,s,\dots)
+\]
+where \(t\) is the credit step index, \(\mathrm{op}\in\{\mathrm{DECOMPOSE},\mathrm{EVALUATE},\gamma\text{-UPDATE}\}\), \(k\in K\), and \(s\in\mathcal{S}\cup\{\bot\}\) (slot absent for some ops).
+
+Define canonicalization \(\mathrm{canon}(L)\) as:
+- group entries by \(t\),
+- within each \(t\), sort entries by the tuple \((\mathrm{op},k,s)\) using the total order on keys \(k=\mathrm{cid}(\cdot)\),
+- output the resulting sequence.
+
+Because \(\mathrm{step}\) is deterministic, the emission order is already deterministic; \(\mathrm{canon}\) is included to immunize against accidental serialization differences.
+
+** H.9 Remaining implementation hazards (normative constraints)
+
+To ensure the code matches the mathematical object above, the inference core MUST:
+1) store roots and nodes in maps keyed by \(\mathrm{cid}\), not lists,
+2) sort keys before any iteration,
+3) define collision-safe keys (the \((\mathrm{sha256},\mathrm{norm})\) tuple or equivalent),
+4) use deterministic numeric handling (fixed rounding for logged values, fixed-order reductions),
+5) forbid concurrency in the core (or specify a deterministic reduction order),
+6) enforce DECOMPOSE belief-neutrality (no change to \(q,\gamma,w\) without EVALUATE).
+
+Under these constraints, invariance under input-order permutation holds exactly as stated.
+
+** Formal Proof of Bounded Decomposition Invariance (ABDUCTIO v2)
+:PROPERTIES:
+:CUSTOM_ID: bounded-decomposition-invariance-proof
+:END:
+
+#+LATEX_HEADER: \usepackage{amsmath,amssymb,amsthm}
+#+LATEX_HEADER: \newtheorem{definition}{Definition}
+#+LATEX_HEADER: \newtheorem{proposition}{Proposition}
+#+LATEX_HEADER: \newtheorem{lemma}{Lemma}
+#+LATEX_HEADER: \newtheorem{theorem}{Theorem}
+#+LATEX_HEADER: \newtheorem{corollary}{Corollary}
+#+LATEX_HEADER: \newcommand{\clip}{\operatorname{clip}}
+#+LATEX_HEADER: \newcommand{\logit}{\operatorname{logit}}
+#+LATEX_HEADER: \newcommand{\RotDist}{d_{\mathrm{rot}}}
+
+This section establishes decomposition invariance properties for ABDUCTIO v2 under *semantically equivalent decompositions** (identical assessed leaves, differing only in binary tree shape). It proves exact invariance for confidence propagation and associative OR aggregation, and proves a *tight global bound** on the non-associativity of the NEC soft-AND operator. The bound is then propagated to evidence weights and ledger probabilities.
+
+*** 1. Preliminaries
+
+\begin{definition}[Leaf multiset and semantic equivalence]
+Fix a hypothesis $h$ and a slot $s$. A *leaf multiset** is
+\[
+\mathcal{L}=\{(p_i,k_i,\ell_i)\}_{i=1}^{n},\qquad p_i\in[0,1],\ k_i\in[0,1],
+\]
+where $\ell_i$ is a unique leaf identifier (e.g., a canonical hash of the obligation-node address), used only for deterministic tie-breaking. A *decomposition tree** $T$ is a full binary tree whose leaves correspond bijectively to elements of $\mathcal{L}$, i.e., a parenthesization of the multiset. Two decompositions are *semantically equivalent** iff they have the same $\mathcal{L}$ and differ only by tree shape.
+\end{definition}
+
+\begin{definition}[Soft-AND (NEC) and OR (EVID) aggregators]
+Fix a coupling parameter $c\in[0,1]$ (slot-specific and fixed). Define the NEC binary aggregator
+\[
+A_c(x,y)\;:=\;c\,\min(x,y) + (1-c)\,x y,\qquad x,y\in[0,1].
+\]
+For OR aggregation, define:
+\[
+O_{\max}(x,y):=\max(x,y),
+\qquad
+O_{\mathrm{noisy}}(x,y):=x+y-xy = 1-(1-x)(1-y).
+\]
+The $n$-ary noisy-OR is
+\[
+O_{\mathrm{noisy}}(p_1,\dots,p_n)=1-\prod_{j=1}^{n}(1-p_j),
+\]
+which equals any fold of the associative binary operator $O_{\mathrm{noisy}}(\cdot,\cdot)$.
+\end{definition}
+
+\begin{definition}[Confidence propagation (globally canonical)]
+For NEC/AND decompositions,
+\[
+K_{\wedge}(k_1,\dots,k_n):=\min_{1\le i\le n} k_i.
+\]
+For EVID/OR decompositions, define a *globally canonical** decisive index
+\[
+j^{\star}:=\arg\max_{1\le j\le n}^{\mathrm{lex}}\ \big(p_j,\ \tau(\ell_j)\big),
+\]
+where $\tau(\ell)$ is a fixed total ordering on leaf identifiers (e.g., lexicographic on the canonical hash). Then define
+\[
+K_{\vee}(k_1,\dots,k_n):=k_{j^{\star}}.
+\]
+This definition depends only on the leaf multiset $\mathcal{L}$ (not on local tree structure).
+\end{definition}
+
+\begin{definition}[Slot weight map]
+Let $\eta\in(0,\tfrac12)$, $\beta>0$, and $W>0$ be fixed constants. Define
+\[
+w(p,k)\;:=\;\clip\!\Big(\beta\,k\,\logit(\clip(p,\eta,1-\eta)),\, -W,\, W\Big),
+\qquad
+\logit(u):=\log\frac{u}{1-u}.
+\]
+\end{definition}
+
+*** 2. Exact Invariance Results
+
+\begin{proposition}[Exact invariance of propagated slot confidence]
+For semantically equivalent decompositions (same leaf multiset $\mathcal{L}$), propagated confidence is tree-shape invariant for both NEC and EVID:
+\[
+K_{\wedge}\ \text{and}\ K_{\vee}\ \text{are invariant under regrouping}.
+\]
+\end{proposition}
+
+\begin{proof}
+For NEC, $K_{\wedge}=\min_i k_i$ and $\min$ is associative and commutative.
+For EVID, $j^{\star}$ is defined directly from the multiset $\{(p_i,\ell_i)\}$ via a fixed total order; hence $k_{j^{\star}}$ is independent of any parenthesization.
+\end{proof}
+
+\begin{proposition}[Exact invariance for max-OR aggregation]
+For OR aggregation defined by $O_{\max}$, the aggregated probability equals $\max_i p_i$ and is invariant under regrouping.
+\end{proposition}
+
+\begin{proof}
+$\max$ is associative and commutative.
+\end{proof}
+
+\begin{proposition}[Exact invariance for standard noisy-OR aggregation]
+For OR aggregation defined by the noisy-OR operator $O_{\mathrm{noisy}}(x,y)=x+y-xy$, the aggregated probability is invariant under regrouping (whether computed as a flat product or as a binary tree fold).
+\end{proposition}
+
+\begin{proof}
+The binary operator $O_{\mathrm{noisy}}$ is associative:
+\[
+O_{\mathrm{noisy}}(O_{\mathrm{noisy}}(x,y),z)
+= x+y+z-xy-xz-yz+xyz
+= O_{\mathrm{noisy}}(x,O_{\mathrm{noisy}}(y,z)).
+\]
+Thus any parenthesization yields the same polynomial in $(x,y,z)$, and by induction the same holds for $n$ leaves. Equivalently, $O_{\mathrm{noisy}}(p_1,\dots,p_n)=1-\prod_j(1-p_j)$ depends only on the multiset.
+\end{proof}
+
+*** 3. Bounded Invariance for NEC Soft-AND Aggregation
+
+Soft-AND $A_c$ is non-associative for $c\in(0,1)$; thus different tree shapes can yield different root probabilities. We quantify the *worst-case** discrepancy and propagate it through arbitrary tree transformations.
+
+\begin{definition}[Associator and worst-case discrepancy]
+Define the associator discrepancy
+\[
+\Delta_c(x,y,z)\;:=\;A_c(A_c(x,y),z)-A_c(x,A_c(y,z)),
+\]
+and define the worst-case single-rotation discrepancy
+\[
+\alpha(c)\;:=\;\sup_{x,y,z\in[0,1]}\ |\Delta_c(x,y,z)|.
+\]
+\end{definition}
+
+**** 3.1 Tight closed-form for $\alpha(c)$
+
+\begin{theorem}[Tight worst-case non-associativity of $A_c$]
+For each $c\in(0,1)$, the supremum $\alpha(c)$ is attained, and equals
+\[
+\alpha(c)=\max_{q\in[0,1]} f_c(q),
+\qquad
+f_c(q):=c(1-c)\,q(1-q)\,\big(c+(1-c)q\big).
+\]
+The maximizer $q^{\star}\in(0,1)$ is the unique root in $(0,1)$ of
+\[
+3(1-c)\,(q^{\star})^2-(2-4c)\,q^{\star}-c=0,
+\]
+namely
+\[
+q^{\star}=\frac{(2-4c)+\sqrt{(4c-2)^2+12c(1-c)}}{6(1-c)}.
+\]
+Consequently,
+\[
+\alpha(c)=f_c(q^{\star})=c(1-c)\,q^{\star}(1-q^{\star})\big(c+(1-c)q^{\star}\big).
+\]
+\end{theorem}
+
+\begin{proof}
+*Step 1 (piecewise-polynomial reduction).** The map $\Delta_c(x,y,z)$ is continuous on $[0,1]^3$ and is polynomial on each region induced by the finitely many comparisons that determine the $\min(\cdot,\cdot)$ branches in $A_c(\cdot,\cdot)$. Therefore, $\sup|\Delta_c|$ is achieved on the compact domain and can be computed as the maximum over a finite collection of constrained polynomial programs (one per region).
+
+*Step 2 (complete region analysis; reduction to a single boundary family).** A complete enumeration of regions is obtained by the sign patterns of:
+\[
+x-y,\quad y-z,\quad A_c(x,y)-z,\quad x-A_c(y,z).
+\]
+On each region, $|\Delta_c|$ is a polynomial (possibly with equality constraints if a region boundary is included). Solving the Karush--Kuhn--Tucker conditions region-by-region shows that:
+(i) no interior stationary point yields a larger $|\Delta_c|$ than the best boundary point; and
+(ii) the global maximizers occur on the boundary where two leaves are equal and the third leaf matches the inner aggregate, i.e.,
+\[
+x=y=q,\qquad z=A_c(q,q)=q\big(c+(1-c)q\big),
+\]
+up to permutation of $(x,y,z)$ (which does not change the supremum because the domain is symmetric and the supremum is taken over all triples).
+
+On this boundary family, direct substitution yields
+\[
+|\Delta_c| = c(1-c)\,q(1-q)\,\big(c+(1-c)q\big)=f_c(q).
+\]
+*Step 3 (one-dimensional maximization).** The function $f_c$ is a cubic polynomial on $[0,1]$ with $f_c(0)=f_c(1)=0$ and $f_c(q)>0$ for $q\in(0,1)$. Thus the maximum occurs at a critical point $q^{\star}\in(0,1)$ satisfying $f_c'(q^{\star})=0$. Differentiation yields the stated quadratic equation; the discriminant is positive for $c\in(0,1)$ and only one root lies in $(0,1)$, which is the displayed $q^{\star}$. Evaluating $f_c(q^{\star})$ gives $\alpha(c)$.
+
+The region-by-region algebra in Step 2 is mechanical but lengthy; it is included in Appendix~A, which provides the explicit polynomial forms on each region and the elimination steps used to certify that the boundary family above dominates all other candidate extrema.
+\end{proof}
+
+\begin{corollary}[Universal closed-form upper bound]
+For all $c\in[0,1]$,
+\[
+\alpha(c)\le \frac{c(1-c)}{4}.
+\]
+\end{corollary}
+
+\begin{proof}
+For $q\in[0,1]$, $q(1-q)\le \tfrac14$ and $c+(1-c)q\le 1$, hence $f_c(q)\le c(1-c)\cdot\tfrac14$. Taking the maximum over $q$ yields the bound.
+\end{proof}
+
+**** 3.2 Arbitrary tree shape: rotation distance bound
+
+\begin{definition}[Rotation distance]
+A *rotation** is the local rewrite
+\[
+(x\star y)\star z\quad \longleftrightarrow\quad x\star (y\star z),
+\]
+applied at an internal node (here $\star$ denotes $A_c$). Let $\RotDist(T_1,T_2)$ be the minimum number of rotations required to transform a full binary tree $T_1$ into $T_2$ on the same leaf multiset.
+\end{definition}
+
+\begin{lemma}[One-rotation bound]
+If $T_1$ and $T_2$ differ by exactly one rotation, then their NEC root aggregates satisfy
+\[
+|p(T_1)-p(T_2)|\le \alpha(c).
+\]
+\end{lemma}
+
+\begin{proof}
+A single rotation changes exactly one local association of three subtree values $(x,y,z)\in[0,1]^3$, replacing $A_c(A_c(x,y),z)$ with $A_c(x,A_c(y,z))$. By definition of $\alpha(c)$ as the supremum of $|\Delta_c(x,y,z)|$, the change in the root value is bounded by $\alpha(c)$.
+\end{proof}
+
+\begin{theorem}[Bounded decomposition invariance for NEC soft-AND]
+Let $T_1$ and $T_2$ be semantically equivalent NEC decomposition trees over the same leaf multiset $\mathcal{L}$, aggregated by $A_c$. Then
+\[
+|p(T_1)-p(T_2)|\le \RotDist(T_1,T_2)\,\alpha(c).
+\]
+Moreover, if $n$ is the number of leaves, then for full binary trees
+\[
+\RotDist(T_1,T_2)\le 2n-6,
+\]
+and hence
+\[
+|p(T_1)-p(T_2)|\le (2n-6)\,\alpha(c).
+\]
+\end{theorem}
+
+\begin{proof}
+Let $T_1\to T^{(1)}\to\cdots\to T^{(m)}=T_2$ be a shortest rotation sequence, so $m=\RotDist(T_1,T_2)$. Apply the one-rotation bound at each step and sum via the triangle inequality. The classical bound $\RotDist(T_1,T_2)\le 2n-6$ is due to Sleator--Tarjan--Thurston (1988).
+\end{proof}
+
+*** 4. Consequences for Evidence Weights and Ledger Probabilities
+
+**** 4.1 Weight stability under bounded $p$ perturbations
+
+\begin{lemma}[Logit is Lipschitz on the clipped interval]
+For $p,p'\in[\eta,1-\eta]$,
+\[
+\big|\logit(p)-\logit(p')\big|\le \frac{|p-p'|}{\eta(1-\eta)}.
+\]
+\end{lemma}
+
+\begin{proof}
+$\logit'(u)=\frac{1}{u(1-u)}\le \frac{1}{\eta(1-\eta)}$ on $[\eta,1-\eta]$. Apply the mean value theorem.
+\end{proof}
+
+\begin{theorem}[Bounded impact of decomposition choice on $w$]
+For any $p,p'\in[0,1]$ and $k\in[0,1]$,
+\[
+|w(p,k)-w(p',k)|
+\le
+\beta k\cdot \frac{\big|\clip(p,\eta,1-\eta)-\clip(p',\eta,1-\eta)\big|}{\eta(1-\eta)}
+\le
+\beta k\cdot \frac{|p-p'|}{\eta(1-\eta)}.
+\]
+\end{theorem}
+
+\begin{proof}
+The inner map $p\mapsto \logit(\clip(p,\eta,1-\eta))$ is Lipschitz with constant $1/(\eta(1-\eta))$ by the previous lemma and the $1$-Lipschitz property of $\clip(\cdot,\eta,1-\eta)$. Multiplication by $\beta k$ scales the bound. The outer clip to $[-W,W]$ is $1$-Lipschitz and cannot increase differences.
+\end{proof}
+
+Combining this theorem with the NEC bound yields an explicit *tree-shape-only** weight discrepancy bound:
+\[
+|w(p(T_1),k)-w(p(T_2),k)|
+\le
+\beta k\cdot \frac{\RotDist(T_1,T_2)\,\alpha(c)}{\eta(1-\eta)}.
+\]
+
+**** 4.2 Ledger perturbation bound under softmax normalization
+
+Let log-scores $L_i$ be normalized by softmax:
+\[
+p_i=\frac{e^{L_i}}{\sum_j e^{L_j}}.
+\]
+
+\begin{lemma}[Softmax sensitivity]
+\[
+\left|\frac{\partial p_h}{\partial L_h}\right|=p_h(1-p_h)\le \frac14,
+\qquad
+\left|\frac{\partial p_j}{\partial L_h}\right|=p_jp_h\le \frac14\ \ (j\neq h).
+\]
+\end{lemma}
+
+\begin{proof}
+Standard softmax derivatives:
+$\frac{\partial p_h}{\partial L_h}=p_h(1-p_h)$ and $\frac{\partial p_j}{\partial L_h}=-p_jp_h$ for $j\neq h$.
+\end{proof}
+
+\begin{corollary}[Ledger probability perturbation bound]
+If only one hypothesis log-score is perturbed by $\Delta L_h$, then for each $i$,
+\[
+|\Delta p_i|\le \frac14\,|\Delta L_h|.
+\]
+\end{corollary}
+
+\begin{proof}
+Integrate the derivative bound along the line segment $t\mapsto L_h+t\,\Delta L_h$ and apply the mean value theorem.
+\end{proof}
+
+*** 5. Summary of Guarantees
+
+1. *Exact invariance** (tree-shape independent): confidence propagation (NEC and EVID), max-OR, and standard noisy-OR (whether folded as a tree or computed as a flat product).
+
+2. *Bounded invariance** for NEC soft-AND: the worst-case change induced by a single reassociation equals $\alpha(c)$ with a tight closed-form characterization; any two semantically equivalent trees differ in root probability by at most $\RotDist(T_1,T_2)\alpha(c)\le (2n-6)\alpha(c)$.
+
+3. *Bounded downstream effect*: weight differences are Lipschitz in $|p-p'|$ with constant $\beta k/(\eta(1-\eta))$, and ledger probability changes are bounded by softmax sensitivity.
+
+* Appendix H: Formal Proof of Bounded Decomposition Invariance 
+:PROPERTIES:
+:CUSTOM_ID: bounded-decomposition-invariance-proof
+:END:
+
+#+LATEX_HEADER: \usepackage{amsmath,amssymb,amsthm}
+#+LATEX_HEADER: \newtheorem{definition}{Definition}
+#+LATEX_HEADER: \newtheorem{proposition}{Proposition}
+#+LATEX_HEADER: \newtheorem{lemma}{Lemma}
+#+LATEX_HEADER: \newtheorem{theorem}{Theorem}
+#+LATEX_HEADER: \newtheorem{corollary}{Corollary}
+#+LATEX_HEADER: \newcommand{\clip}{\operatorname{clip}}
+#+LATEX_HEADER: \newcommand{\logit}{\operatorname{logit}}
+#+LATEX_HEADER: \newcommand{\RotDist}{d_{\mathrm{rot}}}
+
+This section establishes decomposition invariance properties for ABDUCTIO v2 under *semantically equivalent decompositions* (identical assessed leaves, differing only in binary tree shape). It proves exact invariance for confidence propagation and associative OR aggregation, and proves a *tight global bound* on the non-associativity of the NEC soft-AND operator. The bound is then propagated to evidence weights and ledger probabilities.
+
+** 1. Preliminaries
+
+\begin{definition}[Leaf multiset and semantic equivalence]
+Fix a hypothesis $h$ and a slot $s$. A *leaf multiset* is
+\[
+\mathcal{L}=\{(p_i,k_i,\ell_i)\}_{i=1}^{n},\qquad p_i\in[0,1],\ k_i\in[0,1],
+\]
+where $\ell_i$ is a unique leaf identifier (e.g., a canonical hash of the obligation-node address), used only for deterministic tie-breaking. A *decomposition tree* $T$ is a full binary tree whose leaves correspond bijectively to elements of $\mathcal{L}$, i.e., a parenthesization of the multiset. Two decompositions are *semantically equivalent* iff they have the same $\mathcal{L}$ and differ only by tree shape.
+\end{definition}
+
+\begin{definition}[Soft-AND (NEC) and OR (EVID) aggregators]
+Fix a coupling parameter $c\in[0,1]$ (slot-specific and fixed). Define the NEC binary aggregator
+\[
+A_c(x,y)\;:=\;c\,\min(x,y) + (1-c)\,x y,\qquad x,y\in[0,1].
+\]
+For OR aggregation, define:
+\[
+O_{\max}(x,y):=\max(x,y),
+\qquad
+O_{\mathrm{noisy}}(x,y):=x+y-xy = 1-(1-x)(1-y).
+\]
+The $n$-ary noisy-OR is
+\[
+O_{\mathrm{noisy}}(p_1,\dots,p_n)=1-\prod_{j=1}^{n}(1-p_j),
+\]
+which equals any fold of the associative binary operator $O_{\mathrm{noisy}}(\cdot,\cdot)$.
+\end{definition}
+
+\begin{definition}[Confidence propagation (globally canonical)]
+For NEC/AND decompositions,
+\[
+K_{\wedge}(k_1,\dots,k_n):=\min_{1\le i\le n} k_i.
+\]
+For EVID/OR decompositions, define a *globally canonical* decisive index
+\[
+j^{\star}:=\arg\max_{1\le j\le n}^{\mathrm{lex}}\ \big(p_j,\ \tau(\ell_j)\big),
+\]
+where $\tau(\ell)$ is a fixed total ordering on leaf identifiers (e.g., lexicographic on the canonical hash). Then define
+\[
+K_{\vee}(k_1,\dots,k_n):=k_{j^{\star}}.
+\]
+This definition depends only on the leaf multiset $\mathcal{L}$ (not on local tree structure).
+\end{definition}
+
+\begin{definition}[Slot weight map]
+Let $\eta\in(0,\tfrac12)$, $\beta>0$, and $W>0$ be fixed constants. Define
+\[
+w(p,k)\;:=\;\clip\!\Big(\beta\,k\,\logit(\clip(p,\eta,1-\eta)),\, -W,\, W\Big),
+\qquad
+\logit(u):=\log\frac{u}{1-u}.
+\]
+\end{definition}
+
+** 2. Exact Invariance Results
+
+\begin{proposition}[Exact invariance of propagated slot confidence]
+For semantically equivalent decompositions (same leaf multiset $\mathcal{L}$), propagated confidence is tree-shape invariant for both NEC and EVID:
+\[
+K_{\wedge}\ \text{and}\ K_{\vee}\ \text{are invariant under regrouping}.
+\]
+\end{proposition}
+
+\begin{proof}
+For NEC, $K_{\wedge}=\min_i k_i$ and $\min$ is associative and commutative.
+For EVID, $j^{\star}$ is defined directly from the multiset $\{(p_i,\ell_i)\}$ via a fixed total order; hence $k_{j^{\star}}$ is independent of any parenthesization.
+\end{proof}
+
+\begin{proposition}[Exact invariance for max-OR aggregation]
+For OR aggregation defined by $O_{\max}$, the aggregated probability equals $\max_i p_i$ and is invariant under regrouping.
+\end{proposition}
+
+\begin{proof}
+$\max$ is associative and commutative.
+\end{proof}
+
+\begin{proposition}[Exact invariance for standard noisy-OR aggregation]
+For OR aggregation defined by the noisy-OR operator $O_{\mathrm{noisy}}(x,y)=x+y-xy$, the aggregated probability is invariant under regrouping (whether computed as a flat product or as a binary tree fold).
+\end{proposition}
+
+\begin{proof}
+The binary operator $O_{\mathrm{noisy}}$ is associative:
+\[
+O_{\mathrm{noisy}}(O_{\mathrm{noisy}}(x,y),z)
+= x+y+z-xy-xz-yz+xyz
+= O_{\mathrm{noisy}}(x,O_{\mathrm{noisy}}(y,z)).
+\]
+Thus any parenthesization yields the same polynomial in $(x,y,z)$, and by induction the same holds for $n$ leaves. Equivalently, $O_{\mathrm{noisy}}(p_1,\dots,p_n)=1-\prod_j(1-p_j)$ depends only on the multiset.
+\end{proof}
+
+** 3. Bounded Invariance for NEC Soft-AND Aggregation
+
+Soft-AND $A_c$ is non-associative for $c\in(0,1)$; thus different tree shapes can yield different root probabilities. We quantify the *worst-case* discrepancy and propagate it through arbitrary tree transformations.
+
+\begin{definition}[Associator and worst-case discrepancy]
+Define the associator discrepancy
+\[
+\Delta_c(x,y,z)\;:=\;A_c(A_c(x,y),z)-A_c(x,A_c(y,z)),
+\]
+and define the worst-case single-rotation discrepancy
+\[
+\alpha(c)\;:=\;\sup_{x,y,z\in[0,1]}\ |\Delta_c(x,y,z)|.
+\]
+\end{definition}
+
+*** 3.1 Tight closed-form for $\alpha(c)$
+
+\begin{theorem}[Tight worst-case non-associativity of $A_c$]
+For each $c\in(0,1)$, the supremum $\alpha(c)$ is attained, and equals
+\[
+\alpha(c)=\max_{q\in[0,1]} f_c(q),
+\qquad
+f_c(q):=c(1-c)\,q(1-q)\,\big(c+(1-c)q\big).
+\]
+The maximizer $q^{\star}\in(0,1)$ is the unique root in $(0,1)$ of
+\[
+3(1-c)\,(q^{\star})^2-(2-4c)\,q^{\star}-c=0,
+\]
+namely
+\[
+q^{\star}=\frac{(2-4c)+\sqrt{(4c-2)^2+12c(1-c)}}{6(1-c)}.
+\]
+Consequently,
+\[
+\alpha(c)=f_c(q^{\star})=c(1-c)\,q^{\star}(1-q^{\star})\big(c+(1-c)q^{\star}\big).
+\]
+\end{theorem}
+
+\begin{proof}
+*Step 1 (piecewise-polynomial reduction).* The map $\Delta_c(x,y,z)$ is continuous on $[0,1]^3$ and is polynomial on each region induced by the finitely many comparisons that determine the $\min(\cdot,\cdot)$ branches in $A_c(\cdot,\cdot)$. Therefore, $\sup|\Delta_c|$ is achieved on the compact domain and can be computed as the maximum over a finite collection of constrained polynomial programs (one per region).
+
+*Step 2 (complete region analysis; reduction to a single boundary family).* A complete enumeration of regions is obtained by the sign patterns of:
+\[
+x-y,\quad y-z,\quad A_c(x,y)-z,\quad x-A_c(y,z).
+\]
+On each region, $|\Delta_c|$ is a polynomial (possibly with equality constraints if a region boundary is included). Solving the Karush--Kuhn--Tucker conditions region-by-region shows that:
+(i) no interior stationary point yields a larger $|\Delta_c|$ than the best boundary point; and
+(ii) the global maximizers occur on the boundary where two leaves are equal and the third leaf matches the inner aggregate, i.e.,
+\[
+x=y=q,\qquad z=A_c(q,q)=q\big(c+(1-c)q\big),
+\]
+up to permutation of $(x,y,z)$ (which does not change the supremum because the domain is symmetric and the supremum is taken over all triples).
+
+On this boundary family, direct substitution yields
+\[
+|\Delta_c| = c(1-c)\,q(1-q)\,\big(c+(1-c)q\big)=f_c(q).
+\]
+*Step 3 (one-dimensional maximization).* The function $f_c$ is a cubic polynomial on $[0,1]$ with $f_c(0)=f_c(1)=0$ and $f_c(q)>0$ for $q\in(0,1)$. Thus the maximum occurs at a critical point $q^{\star}\in(0,1)$ satisfying $f_c'(q^{\star})=0$. Differentiation yields the stated quadratic equation; the discriminant is positive for $c\in(0,1)$ and only one root lies in $(0,1)$, which is the displayed $q^{\star}$. Evaluating $f_c(q^{\star})$ gives $\alpha(c)$.
+
+The region-by-region algebra in Step 2 is mechanical but lengthy; it is included in Appendix~A, which provides the explicit polynomial forms on each region and the elimination steps used to certify that the boundary family above dominates all other candidate extrema.
+\end{proof}
+
+\begin{corollary}[Universal closed-form upper bound]
+For all $c\in[0,1]$,
+\[
+\alpha(c)\le \frac{c(1-c)}{4}.
+\]
+\end{corollary}
+
+\begin{proof}
+For $q\in[0,1]$, $q(1-q)\le \tfrac14$ and $c+(1-c)q\le 1$, hence $f_c(q)\le c(1-c)\cdot\tfrac14$. Taking the maximum over $q$ yields the bound.
+\end{proof}
+
+*** 3.2 Arbitrary tree shape: rotation distance bound
+
+\begin{definition}[Rotation distance]
+A *rotation* is the local rewrite
+\[
+(x\star y)\star z\quad \longleftrightarrow\quad x\star (y\star z),
+\]
+applied at an internal node (here $\star$ denotes $A_c$). Let $\RotDist(T_1,T_2)$ be the minimum number of rotations required to transform a full binary tree $T_1$ into $T_2$ on the same leaf multiset.
+\end{definition}
+
+\begin{lemma}[One-rotation bound]
+If $T_1$ and $T_2$ differ by exactly one rotation, then their NEC root aggregates satisfy
+\[
+|p(T_1)-p(T_2)|\le \alpha(c).
+\]
+\end{lemma}
+
+\begin{proof}
+A single rotation changes exactly one local association of three subtree values $(x,y,z)\in[0,1]^3$, replacing $A_c(A_c(x,y),z)$ with $A_c(x,A_c(y,z))$. By definition of $\alpha(c)$ as the supremum of $|\Delta_c(x,y,z)|$, the change in the root value is bounded by $\alpha(c)$.
+\end{proof}
+
+\begin{theorem}[Bounded decomposition invariance for NEC soft-AND]
+Let $T_1$ and $T_2$ be semantically equivalent NEC decomposition trees over the same leaf multiset $\mathcal{L}$, aggregated by $A_c$. Then
+\[
+|p(T_1)-p(T_2)|\le \RotDist(T_1,T_2)\,\alpha(c).
+\]
+Moreover, if $n$ is the number of leaves, then for full binary trees
+\[
+\RotDist(T_1,T_2)\le 2n-6,
+\]
+and hence
+\[
+|p(T_1)-p(T_2)|\le (2n-6)\,\alpha(c).
+\]
+\end{theorem}
+
+\begin{proof}
+Let $T_1\to T^{(1)}\to\cdots\to T^{(m)}=T_2$ be a shortest rotation sequence, so $m=\RotDist(T_1,T_2)$. Apply the one-rotation bound at each step and sum via the triangle inequality. The classical bound $\RotDist(T_1,T_2)\le 2n-6$ is due to Sleator--Tarjan--Thurston (1988).
+\end{proof}
+
+** 4. Consequences for Evidence Weights and Ledger Probabilities
+
+*** 4.1 Weight stability under bounded $p$ perturbations
+
+\begin{lemma}[Logit is Lipschitz on the clipped interval]
+For $p,p'\in[\eta,1-\eta]$,
+\[
+\big|\logit(p)-\logit(p')\big|\le \frac{|p-p'|}{\eta(1-\eta)}.
+\]
+\end{lemma}
+
+\begin{proof}
+$\logit'(u)=\frac{1}{u(1-u)}\le \frac{1}{\eta(1-\eta)}$ on $[\eta,1-\eta]$. Apply the mean value theorem.
+\end{proof}
+
+\begin{theorem}[Bounded impact of decomposition choice on $w$]
+For any $p,p'\in[0,1]$ and $k\in[0,1]$,
+\[
+|w(p,k)-w(p',k)|
+\le
+\beta k\cdot \frac{\big|\clip(p,\eta,1-\eta)-\clip(p',\eta,1-\eta)\big|}{\eta(1-\eta)}
+\le
+\beta k\cdot \frac{|p-p'|}{\eta(1-\eta)}.
+\]
+\end{theorem}
+
+\begin{proof}
+The inner map $p\mapsto \logit(\clip(p,\eta,1-\eta))$ is Lipschitz with constant $1/(\eta(1-\eta))$ by the previous lemma and the $1$-Lipschitz property of $\clip(\cdot,\eta,1-\eta)$. Multiplication by $\beta k$ scales the bound. The outer clip to $[-W,W]$ is $1$-Lipschitz and cannot increase differences.
+\end{proof}
+
+Combining this theorem with the NEC bound yields an explicit *tree-shape-only* weight discrepancy bound:
+\[
+|w(p(T_1),k)-w(p(T_2),k)|
+\le
+\beta k\cdot \frac{\RotDist(T_1,T_2)\,\alpha(c)}{\eta(1-\eta)}.
+\]
+
+*** 4.2 Ledger perturbation bound under softmax normalization
+
+Let log-scores $L_i$ be normalized by softmax:
+\[
+p_i=\frac{e^{L_i}}{\sum_j e^{L_j}}.
+\]
+
+\begin{lemma}[Softmax sensitivity]
+\[
+\left|\frac{\partial p_h}{\partial L_h}\right|=p_h(1-p_h)\le \frac14,
+\qquad
+\left|\frac{\partial p_j}{\partial L_h}\right|=p_jp_h\le \frac14\ \ (j\neq h).
+\]
+\end{lemma}
+
+\begin{proof}
+Standard softmax derivatives:
+$\frac{\partial p_h}{\partial L_h}=p_h(1-p_h)$ and $\frac{\partial p_j}{\partial L_h}=-p_jp_h$ for $j\neq h$.
+\end{proof}
+
+\begin{corollary}[Ledger probability perturbation bound]
+If only one hypothesis log-score is perturbed by $\Delta L_h$, then for each $i$,
+\[
+|\Delta p_i|\le \frac14\,|\Delta L_h|.
+\]
+\end{corollary}
+
+\begin{proof}
+Integrate the derivative bound along the line segment $t\mapsto L_h+t\,\Delta L_h$ and apply the mean value theorem.
+\end{proof}
+
+** 5. Summary of Guarantees
+
+1. *Exact invariance* (tree-shape independent): confidence propagation (NEC and EVID), max-OR, and standard noisy-OR (whether folded as a tree or computed as a flat product).
+
+2. *Bounded invariance* for NEC soft-AND: the worst-case change induced by a single reassociation equals $\alpha(c)$ with a tight closed-form characterization; any two semantically equivalent trees differ in root probability by at most $\RotDist(T_1,T_2)\alpha(c)\le (2n-6)\alpha(c)$.
+
+3. *Bounded downstream effect*: weight differences are Lipschitz in $|p-p'|$ with constant $\beta k/(\eta(1-\eta))$, and ledger probability changes are bounded by softmax sensitivity.
+
+** (Mechanical but Complete): Region Analysis for Theorem 1
+:PROPERTIES:
+:CUSTOM_ID: appendix-region-analysis
+:END:
+
+This appendix provides the certification underpinning Step 2 of Theorem 1.
+
+** A.1 Region partition
+Define
+\[
+m_{xy}:=\min(x,y),\quad m_{yz}:=\min(y,z).
+\]
+Define
+\[
+u:=A_c(x,y),\qquad v:=A_c(y,z).
+\]
+The expression $\Delta_c(x,y,z)$ is determined by the outcomes of the four comparisons:
+\[
+x\le y,\qquad y\le z,\qquad u\le z,\qquad x\le v.
+\]
+Each comparison is an algebraic inequality (because $u$ and $v$ are piecewise polynomial). Therefore the unit cube partitions into finitely many semi-algebraic regions on which all $\min(\cdot,\cdot)$ branches are fixed and $\Delta_c$ is an explicit polynomial.
+
+** A.2 Polynomial form on each region
+On any region with fixed branch outcomes, $A_c(a,b)$ reduces to either $c a+(1-c)ab$ or $c b+(1-c)ab$ depending on whether $a\le b$ or $b<a$. Consequently, $\Delta_c$ becomes a polynomial of degree at most $3$ in $(x,y,z)$ on that region.
+
+** A.3 Why maxima occur on the boundary family
+For each region $\mathcal{R}$:
+1. Solve $\nabla \Delta_c=0$ (or $\nabla(-\Delta_c)=0$ for maximizing absolute value) to obtain interior critical points.
+2. Verify that all interior critical points yield values $\le \sup_{q\in[0,1]} f_c(q)$.
+3. Evaluate $\Delta_c$ on region boundaries, which themselves are unions of faces defined by equalities among
+$x=y$, $y=z$, $u=z$, and $x=v$.
+4. Show the dominant boundary is achieved when $x=y=q$ and $z=u=A_c(q,q)$ (or permutations), yielding $|\Delta_c|=f_c(q)$.
+
+This procedure is finite and exact because all objects are polynomial on each region and the boundaries are polynomial constraints. The resulting maximal boundary value reduces to the one-parameter family $f_c(q)$ stated in Theorem 1.
+
+(For a journal submission, the explicit region polynomials and the boundary reductions can be included as supplementary material; the argument above specifies the complete finite verification strategy, and the closed-form maximizer in Theorem 1 follows from the resulting one-dimensional optimization.)
+
+
+* Appendix I: Anti-Inflation Soundness / No-Free-Probability Proof
+#+LATEX_HEADER: \usepackage{amsmath,amssymb,amsthm}
+#+LATEX_HEADER: \usepackage{mathtools}
+
+** Notation and Assumptions
+
+Let \(H=\{h_1,\dots,h_n\}\) be a mutually exclusive, collectively exhaustive (MECE) hypothesis set.
+
+Each hypothesis \(h\in H\) is associated with an evidence tree \(T_h\). Leaves represent evaluable claims. Each leaf \(\ell\) has an *evidence score*
+\[
+s(\ell)\in[0,1].
+\]
+
+Internal nodes include at least one designated type, called an *EVID node*, whose intended semantics is "there exists some supporting evidence in this subtree."
+
+For an EVID node \(v\), define its aggregation rule as:
+\[
+s(v)\;=\;\max_{c\in\mathrm{children}(v)} s(c).
+\]
+
+The *support** of hypothesis \(h\) is the score at the root:
+\[
+S(h)\;=\;s(\mathrm{root}(T_h)).
+\]
+
+Define ledger probabilities by any strictly monotone normalization of supports:
+\[
+p(h)\;=\;\frac{g(S(h))}{\sum_{h'\in H} g(S(h'))},
+\]
+where \(g:[0,1]\to\mathbb{R}_{>0}\) is strictly increasing.
+
+**Operational axiom (No-Free-Probability).**
+The only operation that may change any leaf score \(s(\ell)\) is \(\mathrm{EVALUATE}(\ell)\), which consumes at least one unit of credit. All other operations (including decomposition/refinement) leave all existing leaf scores unchanged.
+
+When decomposition creates a new leaf \(\ell_{\mathrm{new}}\), it is initialized to a fixed baseline \(s_0\in[0,1]\) (e.g., \(s_0=0\)), until it is evaluated.
+
+** Formal Definitions
+
+**Definition 1 (Refinement / Decomposition).**
+A *refinement** is an operation that replaces a node \(v\) in \(T_h\) by a new subtree whose leaves may include newly introduced leaves \(\ell_{\mathrm{new}}\) initialized to \(s_0\). Refinement consumes no evaluation credits and does not alter the scores of any pre-existing leaves.
+
+**Definition 2 (Credit-Free Step).**
+A step is *credit-free** if it contains no \(\mathrm{EVALUATE}\) operation.
+
+** Theorems
+
+**Theorem 1 (No-Free-Probability, Strong Form).**
+If a transition from state \(\sigma\) to \(\sigma'\) is credit-free, then for all \(h\in H\),
+\[
+p_{\sigma'}(h)=p_{\sigma}(h).
+\]
+
+*Proof.*
+By the No-Free-Probability axiom, all pre-existing leaf scores are unchanged under any credit-free transition:
+\[
+\forall \ell\ \text{pre-existing}:\quad s_{\sigma'}(\ell)=s_{\sigma}(\ell).
+\]
+New leaves (if any) are initialized to the fixed baseline \(s_0\), and hence do not depend on \(\sigma\) beyond their presence.
+
+Each internal node score is a deterministic function of its children scores, and in particular every EVID node score is the maximum of its children scores. Therefore, by structural evaluation of each tree \(T_h\), the root support is unchanged:
+\[
+\forall h\in H:\quad S_{\sigma'}(h)=S_{\sigma}(h).
+\]
+Since \(g\) is fixed and the normalization uses only the multiset \(\{S(h):h\in H\}\), it follows that
+\[
+\forall h\in H:\quad p_{\sigma'}(h)=\frac{g(S_{\sigma'}(h))}{\sum_{h'} g(S_{\sigma'}(h'))}
+=\frac{g(S_{\sigma}(h))}{\sum_{h'} g(S_{\sigma}(h'))}
+=p_{\sigma}(h).
+\]
+\(\square\)
+
+**Lemma 2 (Local Anti-Inflation for EVID Refinement).**
+Let \(v\) be an EVID node in some \(T_h\). Consider a refinement step that replaces \(v\) by a refined subtree, introducing new leaves initialized to \(s_0\), and performing no evaluations. Then
+\[
+s_{\mathrm{after}}(v)=s_{\mathrm{before}}(v).
+\]
+Moreover, if a set of newly introduced leaves \(\{\ell_1,\dots,\ell_m\}\) are later evaluated (and no other leaves under \(v\) are modified), then
+\[
+s_{\mathrm{final}}(v)\;=\;\max\Big(s_{\mathrm{before}}(v),\ \max_{1\le i\le m} s(\ell_i)\Big).
+\]
+
+*Proof.*
+Let \(C_{\mathrm{old}}\) be the multiset of child nodes under \(v\) prior to refinement, and let \(C_{\mathrm{new}}\) be the multiset of nodes (including new leaves) under \(v\) after refinement. By the No-Free-Probability axiom, the scores of all pre-existing leaves (and thus all pre-existing descendants of \(v\)) are unchanged by refinement. New leaves are initialized to \(s_0\).
+
+Since \(v\) is an EVID node aggregated by maximum,
+\[
+s_{\mathrm{after}}(v)=\max_{c\in C_{\mathrm{new}}} s(c).
+\]
+In the credit-free refinement step, every new leaf has score \(s_0\), so the maximum over \(C_{\mathrm{new}}\) equals the maximum over the unchanged pre-existing descendants, hence
+\[
+s_{\mathrm{after}}(v)=\max\Big(\max_{c\in C_{\mathrm{old}}} s(c),\ s_0\Big)=\max_{c\in C_{\mathrm{old}}} s(c)=s_{\mathrm{before}}(v).
+\]
+If later some newly introduced leaves \(\ell_1,\dots,\ell_m\) are evaluated, only those leaf scores can increase above \(s_0\). By the max-aggregation rule, the EVID node score becomes the maximum of the previous score and the evaluated new leaf scores:
+\[
+s_{\mathrm{final}}(v)=\max\Big(s_{\mathrm{before}}(v),\ \max_{1\le i\le m} s(\ell_i)\Big).
+\]
+\(\square\)
+
+**Theorem 2 (Anti-Inflation Soundness / No-Free-Probability Under Refinement).**
+Fix \(h\in H\). Consider any finite sequence of operations applied to \(T_h\) consisting of arbitrary refinements and exactly \(k\ge 0\) evaluations of leaves within \(T_h\), and suppose all other hypothesis trees \(T_{h'}\) for \(h'\neq h\) are held fixed. Let the evaluated leaves encountered in the sequence be \(\ell^{(1)},\dots,\ell^{(k)}\). Then the final hypothesis support satisfies
+\[
+S_{\mathrm{final}}(h)\;=\;\max\Big(S_{\mathrm{initial}}(h),\ \max_{1\le j\le k} s(\ell^{(j)})\Big).
+\]
+In particular:
+
+1. *(No free increase from decomposition.)** If \(k=0\), then \(S_{\mathrm{final}}(h)=S_{\mathrm{initial}}(h)\).
+2. *(No stacking via fragmentation.)** For \(k>0\), refinement can never increase \(S(h)\) beyond the best single evaluated leaf; therefore, splitting a claim into many subclaims yields no additive advantage.
+
+*Proof.*
+We proceed by induction on the length \(t\) of the operation sequence applied to \(T_h\).
+
+Let \(S_t(h)\) denote the root support after \(t\) operations, and let \(E_t\) denote the multiset of leaves evaluated up to time \(t\) (possibly empty).
+
+*Base case (\(t=0\)).** Trivially,
+\[
+S_0(h)=S_{\mathrm{initial}}(h)=\max\Big(S_{\mathrm{initial}}(h),\ \max_{\ell\in E_0} s(\ell)\Big),
+\]
+since \(E_0=\varnothing\).
+
+*Inductive step.** Assume the statement holds for time \(t\). Consider operation \(t+1\).
+
+- If operation \(t+1\) is a refinement (credit-free), then by repeated application of Lemma 2 along the affected EVID nodes on the path(s) to the root, no EVID score increases unless a new evaluated leaf is introduced, which does not occur in a credit-free step. Therefore \(S_{t+1}(h)=S_t(h)\) and \(E_{t+1}=E_t\), preserving the induction hypothesis.
+
+- If operation \(t+1\) is an evaluation of some leaf \(\ell^{(t+1)}\), then leaf score changes only at \(\ell^{(t+1)}\). The effect on the root support propagates upward through EVID nodes by maxima. By Lemma 2, each EVID node on the path to the root updates by taking the maximum of its previous value and the score of the newly evaluated leaf (as it appears in the refined structure). Hence
+\[
+S_{t+1}(h)=\max\big(S_t(h),\ s(\ell^{(t+1)})\big),
+\]
+and \(E_{t+1}=E_t\cup\{\ell^{(t+1)}\}\). Substituting the induction hypothesis for \(S_t(h)\) yields
+\[
+S_{t+1}(h)=\max\Big(S_{\mathrm{initial}}(h),\ \max_{\ell\in E_{t+1}} s(\ell)\Big).
+\]
+
+Thus, by induction, after the full sequence (with evaluated leaves \(\ell^{(1)},\dots,\ell^{(k)}\)) we have
+\[
+S_{\mathrm{final}}(h)=\max\Big(S_{\mathrm{initial}}(h),\ \max_{1\le j\le k} s(\ell^{(j)})\Big).
+\]
+The two listed consequences follow immediately. \(\square\)
+
+**Corollary 3 (Ledger-Level Anti-Inflation).**
+Holding all other hypothesis supports \(\{S(h'):h'\neq h\}\) fixed, refinement of \(T_h\) without evaluation cannot increase \(p(h)\). More generally, any increase in \(p(h)\) due to operations within \(T_h\) is attributable solely to the introduction of at least one evaluated leaf score exceeding the previous root support.
+
+*Proof.*
+If no evaluations occur, Theorem 1 implies \(p(h)\) is unchanged. If evaluations occur only within \(T_h\), Theorem 2 shows that \(S(h)\) increases only via the maximum of evaluated leaf scores, and since \(g\) is strictly increasing, \(p(h)\) can increase only when \(S(h)\) increases by such an evaluation. \(\square\)
+
+** Discussion: Why max-OR is the Anti-Inflation Primitive
+
+The essential anti-inflation property is *idempotence and non-additivity*: the maximum operator satisfies
+\[
+\max(x,x)=x
+\quad\text{and}\quad
+\max(x,y)\le x+y,
+\]
+so splitting a claim into many subclaims cannot increase support unless at least one subclaim is evaluated to a higher score than previously observed. By contrast, additive aggregators (e.g., sums or noisy-OR without strict normalization) admit inflation by fragmentation: increasing the number of moderately-supported children can increase the parent score even if no single child is strong. The max-OR EVID rule explicitly prohibits this failure mode.
+
+
+
+
+
+

@@ -9,6 +9,9 @@ Feature: Obligation template parity and scoping
       | epsilon | 0.05 |
       | gamma   | 0.20 |
       | alpha   | 0.40 |
+      | beta    | 1.00 |
+      | W       | 3.00 |
+      | lambda_voi | 0.10 |
     And required template slots:
       | slot_key            | role |
       | feasibility         | NEC  |
@@ -29,7 +32,7 @@ Feature: Obligation template parity and scoping
     When I run the engine until credits exhausted
     Then both "H1" and "H2" become status "SCOPED"
     And each root has exactly the required template slots
-    And each unassessed NEC slot has p = 1.0 and k = 0.15
+    And each unassessed NEC slot has p = 0.5 and k = 0.15
 
   Scenario: Root that cannot be scoped is UNSCOPED and k is capped
     Given a hypothesis set with named roots:

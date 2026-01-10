@@ -16,6 +16,7 @@ except Exception:  # pragma: no cover - fallback for behave versions without Pen
         """Fallback pending exception for Behave versions without Pending."""
 
 from abductio_core.application.dto import RootSpec, SessionConfig, SessionRequest
+from abductio_core.domain.canonical import canonical_id_for_statement
 from abductio_core.application.ports import RunSessionDeps
 from abductio_core.application.result import SessionResult
 from abductio_core.application.use_cases.run_session import run_session
@@ -43,12 +44,19 @@ class StepWorld:
     derived_k: Optional[float] = None
     guardrail_applied: bool = False
     initial_ledger: Dict[str, float] = field(default_factory=dict)
+    child_id_map: Dict[str, Dict[str, str]] = field(default_factory=dict)
 
     def mark_pending(self, message: str) -> None:
         raise Pending(message)
 
     def set_config(self, values: Dict[str, str]) -> None:
-        self.config = {key: float(value) for key, value in values.items()}
+        parsed: Dict[str, Any] = {}
+        for key, value in values.items():
+            try:
+                parsed[key] = float(value)
+            except (TypeError, ValueError):
+                parsed[key] = str(value)
+        self.config = parsed
 
     def set_required_slots(self, table: List[Dict[str, str]]) -> None:
         self.required_slots = table
@@ -81,15 +89,30 @@ class StepWorld:
         coupling: Optional[float],
         children: List[Dict[str, str]],
     ) -> None:
+        mapped_children = []
+        slot_map = self.child_id_map.setdefault(slot_key, {})
+        for child in children:
+            statement = str(child.get("statement", ""))
+            alias = str(child.get("child_id") or child.get("id") or "")
+            canonical = canonical_id_for_statement(statement) if statement else alias
+            if alias:
+                slot_map[alias] = canonical
+            mapped = dict(child)
+            mapped.setdefault("falsifiable", True)
+            mapped.setdefault("test_procedure", "Check evidence for child statement")
+            mapped.setdefault("overlap_with_siblings", [])
+            mapped["child_id"] = canonical
+            mapped.pop("id", None)
+            mapped_children.append(mapped)
         self.decomposer_script.setdefault("slot_decompositions", {})[slot_key] = {
             "type": decomp_type,
             "coupling": coupling,
-            "children": children,
+            "children": mapped_children,
         }
 
     def set_evaluator_outcome(self, node_key: str, outcome: Dict[str, Any]) -> None:
-        normalized = node_key.strip()
-        self.evaluator_script.setdefault("outcomes", {})[normalized] = outcome
+        normalized = self._normalize_node_key(node_key)
+        self.evaluator_script.setdefault("outcomes", {})[normalized] = self._normalize_outcome(outcome)
 
     def set_evaluator_outcomes(self, table: List[Dict[str, str]]) -> None:
         outcomes: Dict[str, Dict[str, Any]] = {}
@@ -97,11 +120,32 @@ class StepWorld:
             node_key = row.get("node_key") or row.get("node")
             if not node_key:
                 continue
-            outcomes[str(node_key).strip()] = row
+            outcomes[self._normalize_node_key(str(node_key))] = self._normalize_outcome(dict(row))
         self.evaluator_script["outcomes"] = outcomes
 
     def set_rubric(self, rubric: Dict[str, int]) -> None:
         self.rubric = rubric
+
+    def _normalize_outcome(self, outcome: Dict[str, Any]) -> Dict[str, Any]:
+        normalized = dict(outcome)
+        if "evidence_ids" not in normalized and "evidence_refs" in normalized:
+            ref = str(normalized.get("evidence_refs") or "").strip()
+            normalized["evidence_ids"] = [] if ref in {"", "(empty)"} else [ref]
+        if "evidence_ids" in normalized and isinstance(normalized.get("evidence_ids"), str):
+            refs = str(normalized.get("evidence_ids") or "").strip()
+            if refs in {"", "(empty)"}:
+                normalized["evidence_ids"] = []
+            else:
+                normalized["evidence_ids"] = [item.strip() for item in refs.split(",") if item.strip()]
+        if "evidence_ids" not in normalized:
+            normalized["evidence_ids"] = []
+        if "evidence_quality" not in normalized:
+            normalized["evidence_quality"] = "direct" if normalized["evidence_ids"] else "none"
+        normalized.setdefault("reasoning_summary", "BDD evaluator stub.")
+        normalized.setdefault("defeaters", ["None noted."])
+        normalized.setdefault("uncertainty_source", "BDD evaluator stub.")
+        normalized.setdefault("assumptions", [])
+        return normalized
 
     def set_ledger(self, table: List[Dict[str, str]]) -> None:
         self.ledger = {row["id"]: float(row["p_ledger"]) for row in table}
@@ -115,11 +159,41 @@ class StepWorld:
     def set_slot_initial_p(self, node_key: str, p_value: float) -> None:
         self.decomposer_script.setdefault("slot_initial_p", {})[node_key] = p_value
 
-    def set_child_evaluated(self, child_id: str, p_value: float, evidence_refs: str) -> None:
-        self.evaluator_script.setdefault("child_evaluations", {})[child_id] = {
+    def set_child_evaluated(self, child_id: str, p_value: float, evidence_ids: List[str]) -> None:
+        canonical = self._resolve_child_alias(child_id)
+        self.evaluator_script.setdefault("child_evaluations", {})[canonical] = {
             "p": p_value,
-            "evidence_refs": evidence_refs,
+            "A": 1,
+            "B": 1,
+            "C": 1,
+            "D": 1,
+            "evidence_ids": evidence_ids,
+            "evidence_quality": "direct" if evidence_ids else "none",
+            "reasoning_summary": "Supported by listed evidence.",
+            "defeaters": ["None noted."],
+            "uncertainty_source": "BDD test stub.",
+            "assumptions": [],
         }
+
+    def _normalize_node_key(self, node_key: str) -> str:
+        normalized = str(node_key).strip()
+        parts = normalized.split(":")
+        if len(parts) < 3:
+            return normalized
+        slot_key = ":".join(parts[:2])
+        alias = parts[2]
+        mapped = self.child_id_map.get(slot_key, {}).get(alias)
+        if mapped:
+            return f"{slot_key}:{mapped}"
+        return normalized
+
+    def _resolve_child_alias(self, child_id: str) -> str:
+        alias = str(child_id).strip()
+        matches = {mapping.get(alias) for mapping in self.child_id_map.values() if alias in mapping}
+        matches.discard(None)
+        if len(matches) == 1:
+            return next(iter(matches))
+        return alias
 
     def run_engine(self, mode: str) -> None:
         run_mode: Optional[str] = None
@@ -228,6 +302,10 @@ class StepWorld:
             epsilon=float(self.epsilon_override if self.epsilon_override is not None else self.config.get("epsilon", 0.0)),
             gamma=float(self.config.get("gamma", 0.0)),
             alpha=float(self.config.get("alpha", 0.0)),
+            beta=float(self.config.get("beta", 1.0)),
+            W=float(self.config.get("W", 3.0)),
+            lambda_voi=float(self.config.get("lambda_voi", 0.1)),
+            world_mode=str(self.config.get("world_mode", "open")),
         )
         root_specs = [
             RootSpec(
@@ -238,6 +316,17 @@ class StepWorld:
             for row in roots
         ]
         credits = int(self.credits or 0)
+        evidence_ids: List[str] = []
+        for outcome in self.evaluator_script.get("outcomes", {}).values():
+            if isinstance(outcome, dict):
+                ids = outcome.get("evidence_ids")
+                if isinstance(ids, list):
+                    evidence_ids.extend([str(item) for item in ids if isinstance(item, str)])
+        for outcome in self.evaluator_script.get("child_evaluations", {}).values():
+            if isinstance(outcome, dict):
+                ids = outcome.get("evidence_ids")
+                if isinstance(ids, list):
+                    evidence_ids.extend([str(item) for item in ids if isinstance(item, str)])
         return SessionRequest(
             scope=scope,
             roots=root_specs,
@@ -248,6 +337,10 @@ class StepWorld:
             run_count=run_count,
             run_target=run_target,
             initial_ledger=self.ledger or None,
+            evidence_items=[
+                {"id": evidence_id, "source": "bdd", "text": f"Evidence {evidence_id}."}
+                for evidence_id in sorted(set(evidence_ids))
+            ],
             pre_scoped_roots=sorted(self.decomposer_script.get("scoped_roots", [])),
             slot_k_min=self.decomposer_script.get("slot_k_min"),
             slot_initial_p=self.decomposer_script.get("slot_initial_p"),

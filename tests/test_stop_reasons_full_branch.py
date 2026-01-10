@@ -31,7 +31,19 @@ class LowConfidenceEvaluator:
     """Produces k=0.15 so FRONTIER_CONFIDENT cannot trigger."""
 
     def evaluate(self, node_key: str) -> Dict[str, Any]:
-        return {"p": 0.9, "A": 1, "B": 0, "C": 0, "D": 0, "evidence_refs": "ref1"}
+        return {
+            "p": 0.9,
+            "A": 1,
+            "B": 0,
+            "C": 0,
+            "D": 0,
+            "evidence_ids": ["EV-1"],
+            "evidence_quality": "direct",
+            "reasoning_summary": "Supported by EV-1.",
+            "defeaters": ["No direct defeaters observed."],
+            "uncertainty_source": "Sparse evidence packet.",
+            "assumptions": [],
+        }
 
 
 def _deps() -> RunSessionDeps:
@@ -46,10 +58,11 @@ def test_stop_reason_no_hypotheses_when_no_named_roots() -> None:
     req = SessionRequest(
         scope="no hypotheses",
         roots=[],
-        config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40),
+        config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open"),
         credits=5,
         required_slots=[{"slot_key": "feasibility", "role": "NEC"}],
         run_mode="until_stops",
+        evidence_items=[{"id": "EV-1", "source": "test", "text": "Evidence item 1."}],
     )
     res = run_session(req, _deps()).to_dict_view()
     assert res["stop_reason"] == "NO_HYPOTHESES"
@@ -59,11 +72,12 @@ def test_stop_reason_op_limit_reached() -> None:
     req = SessionRequest(
         scope="op limit",
         roots=[RootSpec("H1", "Mechanism A", "x")],
-        config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40),
+        config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open"),
         credits=10,
         required_slots=[{"slot_key": "feasibility", "role": "NEC"}],
         run_mode="operations",
         run_count=1,
+        evidence_items=[{"id": "EV-1", "source": "test", "text": "Evidence item 1."}],
     )
     res = run_session(req, _deps()).to_dict_view()
     assert res["stop_reason"] == "OP_LIMIT_REACHED"
@@ -74,10 +88,11 @@ def test_stop_reason_no_legal_op_after_decomp_and_eval() -> None:
     req = SessionRequest(
         scope="no legal op",
         roots=[RootSpec("H1", "Mechanism A", "x")],
-        config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40),
+        config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open"),
         credits=10,
         required_slots=[{"slot_key": "feasibility", "role": "NEC"}],
         run_mode="until_stops",
+        evidence_items=[{"id": "EV-1", "source": "test", "text": "Evidence item 1."}],
     )
     res = run_session(req, _deps()).to_dict_view()
     assert res["stop_reason"] == "NO_LEGAL_OP"

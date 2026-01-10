@@ -12,7 +12,7 @@ class EvaluatorPort(Protocol):
 
 
 class DecomposerPort(Protocol):
-    def decompose(self, root_id: str) -> Dict[str, Any]:
+    def decompose(self, target_id: str) -> Dict[str, Any]:
         ...
 
 

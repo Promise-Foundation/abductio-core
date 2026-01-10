@@ -42,7 +42,7 @@ def test_e2e_llm_integration_smoke_realistic_usage() -> None:
             RootSpec(root_id="H1", statement="Mechanism A", exclusion_clause="Not explained by any other root"),
             RootSpec(root_id="H2", statement="Mechanism B", exclusion_clause="Not explained by any other root"),
         ],
-        config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40),
+        config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open"),
         credits=4,
         required_slots=[{"slot_key": "feasibility", "role": "NEC"}],
         run_mode="until_credits_exhausted",

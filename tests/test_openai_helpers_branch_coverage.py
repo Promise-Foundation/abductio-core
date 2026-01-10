@@ -97,7 +97,8 @@ def test_complete_json_uses_responses_api_success(monkeypatch) -> None:
     _install_fake_openai(monkeypatch, _FakeOpenAI(responses_text=json.dumps({"ok": True})))
     client = m.OpenAIJsonClient(model="gpt-4.1-mini")
     out = client.complete_json(system="s", user="u")
-    assert out == {"ok": True}
+    assert out["ok"] is True
+    assert "_provenance" in out
 
 
 def test_complete_json_falls_back_to_chat_completions(monkeypatch) -> None:
@@ -150,4 +151,5 @@ def test_complete_json_retries_after_invalid_json(monkeypatch) -> None:
     monkeypatch.setattr(m.time, "sleep", lambda _: None)
     client = m.OpenAIJsonClient(model="gpt-4.1-mini", max_retries=2, retry_backoff_s=0.0)
     out = client.complete_json(system="s", user="u")
-    assert out == {"ok": True}
+    assert out["ok"] is True
+    assert "_provenance" in out

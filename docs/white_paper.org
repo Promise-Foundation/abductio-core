@@ -29,6 +29,33 @@ ABDUCTIO MVP addresses this by requiring:
 1) every hypothesis to be defined as a stand-alone mechanism, and
 2) every hypothesis to be evaluated under the same obligation template and the same credit schedule, independent of ordering.
 
+* 1.1 Scope vs Hypotheses: A Functional Distinction
+ABDUCTIO evaluates a MECE set of *hypotheses* about a *scope*. The scope is the
+question, phenomenon, or case under evaluation - it defines what the hypothesis set
+is partitioning. This is a *functional* distinction, not an ontological one.
+
+Examples:
+
+- **Scope**: "Germany's GDP trajectory in 2026"
+  **Hypotheses**: {grow, flat, shrink, other}
+
+- **Scope**: "Why did the Ariel School incident occur?"
+  **Hypotheses**: {hoax, misidentified_aircraft, shared_hallucination,
+                   unknown_phenomenon, other}
+
+The same statement can play different roles depending on the level of analysis.
+"The economy will grow" is:
+- A *hypothesis* when evaluating "What will happen to GDP?"
+- A *scope* when evaluating "Why would the economy grow?"
+
+This recursive structure (any hypothesis can spawn its own hypothesis set) enables
+deep uncertainty modeling in future extensions. For MVP, the scope is simply the
+session-level frame that defines what the named hypotheses and H_other are alternatives *to*.
+
+Without an explicit scope, MECE accounting becomes ambiguous: H_other means
+"other explanation of what?" The scope answers this question and makes audit
+trails readable.
+
 * 2. Core Requirement: Permutation Invariance
 ** 2.1 Informal statement
 Given the same hypothesis set, the same evidence, and the same credit budget, the final \((p,k)\) assigned to any hypothesis must not depend on:
@@ -90,6 +117,19 @@ Role = Literal["NEC", "EVID"]
 DecompType = Literal["AND", "OR"]
 OrMode = Literal["EXCLUSIVE", "INCLUSIVE"]
 Scope = Literal["LOCAL_ONLY", "GLOBAL_TO_TEMPLATE_SLOT", "GLOBAL_TO_ROOT"]
+
+@dataclass
+class EvaluationSession:
+    """
+    A scoped hypothesis evaluation run.
+
+    The scope defines what the MECE hypothesis set is about.
+    It's not itself a hypothesis - it's the frame for the partition.
+    """
+    scope: str                              # "Germany's 2026 GDP trajectory"
+    hypothesis_set: HypothesisSet           # The MECE partition being evaluated
+    config: SessionConfig                   # tau, epsilon, gamma, alpha
+    credits_budget: int                     # Total operations allowed
 
 @dataclass
 class Node:
@@ -359,15 +399,16 @@ Constraints:
 * 16. MVP Algorithm (Pseudocode)
 #+begin_src text
 inputs:
-  claim text
-  (optional) rivals list
+  scope text                    # what the hypotheses are about
+  roots: List[RootSpec]         # named hypotheses with exclusion clauses
   credits B
   tau, epsilon, gamma, alpha
-  canonical_id = hash(statement)
 
 initialize:
-  build named roots H1..Hn (claim + 3–5 single-mechanism rivals)
-  add H_other
+  for each root in roots:
+    canonical_id[root] = hash(root.statement)
+  build named roots H1..Hn from roots
+  add H_other with statement "Other" and exclusion "Not any named root"
   set uniform priors: p_i=(1-gamma)/n ; p_other=gamma
   set all k=0.15
   set all status=UNSCOPED initially (until template instantiated)
@@ -434,6 +475,39 @@ Given identical inputs, the engine performs the same operations in the same cano
 - Evidence objects with explicit likelihood impacts.
 - Specialized decomposers per domain (medicine, security, historical events).
 
+*** Recursive MECE Sets (Future)
+
+Any obligation node can spawn a local MECE hypothesis set when uncertainty
+is better modeled as competing scenarios rather than a single requirement.
+
+Example: Within "Germany will grow" -> "External environment" slot, instead of
+a vague NEC statement, spawn:
+- **Local scope**: "External economic environment for Germany in 2026"
+- **Local hypotheses**: {improves, stable, deteriorates, other}
+
+Each local set has its own:
+- Ledger with H_other absorber
+- Template obligations (or simplified template)
+- Credit allocation (with beta fraction cap to prevent infinite descent)
+
+The parent node's satisfaction score becomes:
+\[
+p(\text{parent}) = \sum_{s \in \text{satisfying scenarios}} p_{\text{local\_ledger}}(s)
+\]
+
+This enables:
+- Modeling of nested uncertainties matching expert reasoning patterns
+- Explicit representation of assumption dependencies
+- Protection against hidden vagueness at arbitrary depth
+
+Design requirements:
+- Deterministic roll-up from local ledger to parent p
+- Same permutation invariance at every level
+- Depth limits and credit allocation rules to bound complexity
+- Clear audit trail showing which local scenarios drive parent scores
+
+See future documentation for full recursive MECE specification.
+
 * Appendix A: Minimal “Well-Defined Hypothesis” Checklist
 A root hypothesis must include:
 - A mechanism statement (stand-alone).
@@ -443,14 +517,39 @@ A root hypothesis must include:
 
 If it cannot, mark UNSCOPED and cap k.
 
-* Appendix B: Canonical ID
-Canonical ordering uses:
-\[
-\text{canonical\_id}(h)=\text{SHA256}(\text{normalized\_statement\_text})
-\]
-Normalization removes extra whitespace and lowercases text.
+* Appendix B: Canonical ID and Permutation Invariance
 
-This ensures permutation invariance even if input ordering changes.
+ABDUCTIO uses content-based canonical IDs to break ties deterministically without
+depending on input order.
+
+For any hypothesis statement:
+\[
+\text{canonical\_id}(h) = \text{SHA256}(\text{normalize}(h.\text{statement}))
+\]
+
+Where normalization:
+1. Converts to lowercase
+2. Collapses whitespace (multiple spaces/tabs/newlines -> single space)
+3. Strips leading/trailing whitespace
+
+This ensures:
+- Identical statements produce identical IDs regardless of formatting
+- IDs are stable across sessions
+- Frontier ordering is deterministic: when multiple hypotheses tie for max p_ledger,
+  they're ordered by canonical_id, not by the order they were provided
+- Recursion-ready: child nodes can use parent_key:child_id format while maintaining
+  canonical ordering within each level
+
+Example:
+#+begin_src python
+statement1 = "Economy will   grow\n  next year"
+statement2 = "economy will grow next year"
+# normalize(statement1) == normalize(statement2)
+# canonical_id(statement1) == canonical_id(statement2)
+#+end_src
+
+This prevents permutation-breaking when the same hypothesis is phrased slightly
+differently or when input sources vary in whitespace conventions.
 
 * Appendix C: Coupling buckets (within-slot AND)
 Choose c as max of:
