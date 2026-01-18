@@ -1,7 +1,7 @@
 """Scenario state for Behave step definitions.
 
-This stays within the application layer so steps do not reach into domain
-or infrastructure code.
+Lives in tests/ so the shipped library stays free of BDD/test dependencies.
+Steps should interact with abductio_core via its public application API.
 """
 
 from __future__ import annotations
