@@ -45,6 +45,8 @@ class StepWorld:
     guardrail_applied: bool = False
     initial_ledger: Dict[str, float] = field(default_factory=dict)
     child_id_map: Dict[str, Dict[str, str]] = field(default_factory=dict)
+    framing_a: Optional[str] = None
+    framing_b: Optional[str] = None
 
     def mark_pending(self, message: str) -> None:
         raise Pending(message)
@@ -199,6 +201,7 @@ class StepWorld:
         run_mode: Optional[str] = None
         run_count: Optional[int] = None
         run_target: Optional[str] = None
+        framing: Optional[str] = None
         if mode.startswith("start_session:"):
             scope = mode.split(":", 1)[1]
             roots = self.roots
@@ -211,6 +214,18 @@ class StepWorld:
             scope = self.config.get("scope", "Untitled scope")
             roots = self.roots
             run_mode = "until_stops"
+        elif mode.startswith("framing_a:"):
+            scope = self.config.get("scope", "Untitled scope")
+            roots = self.roots
+            run_mode = "until_stops"
+            framing = mode.split(":", 1)[1]
+            self.framing_a = framing
+        elif mode.startswith("framing_b:"):
+            scope = self.config.get("scope", "Untitled scope")
+            roots = self.roots
+            run_mode = "until_stops"
+            framing = mode.split(":", 1)[1]
+            self.framing_b = framing
         elif mode == "run_set_a":
             scope = self.config.get("scope", "Untitled scope")
             roots = self.roots_a
@@ -253,18 +268,25 @@ class StepWorld:
             run_mode=run_mode,
             run_count=run_count,
             run_target=run_target,
+            framing=framing,
         )
         deps = self._build_deps()
         self.initial_ledger = session_request.initial_ledger or {}
         if not self.initial_ledger:
             count_named = len(roots)
-            gamma = float(self.config.get("gamma", 0.0))
-            base_p = (1.0 - gamma) / count_named if count_named else 0.0
+            gamma_noa = float(self.config.get("gamma_noa", 0.0))
+            gamma_und = float(self.config.get("gamma_und", 0.0))
+            gamma_legacy = float(self.config.get("gamma", 0.0))
+            if gamma_noa == 0.0 and gamma_und == 0.0 and gamma_legacy > 0.0:
+                gamma_noa = gamma_legacy / 2.0
+                gamma_und = gamma_legacy / 2.0
+            base_p = (1.0 - (gamma_noa + gamma_und)) / count_named if count_named else 0.0
             self.initial_ledger = {row["id"]: base_p for row in roots}
-            self.initial_ledger["H_other"] = gamma if count_named else 1.0
+            self.initial_ledger["H_NOA"] = gamma_noa if count_named else 0.5
+            self.initial_ledger["H_UND"] = gamma_und if count_named else 0.5
         result = run_session(session_request, deps)
         result_view = result.to_dict_view()
-        if mode == "run_set_b":
+        if mode == "run_set_b" or mode.startswith("framing_b:"):
             self.replay_result = result_view
         else:
             self.result = result_view
@@ -276,6 +298,7 @@ class StepWorld:
                     run_mode=run_mode,
                     run_count=run_count,
                     run_target=run_target,
+                    framing=framing,
                 )
                 replay_deps = self._build_deps()
                 replay_result = run_session(replay_request, replay_deps)
@@ -296,16 +319,19 @@ class StepWorld:
         run_mode: Optional[str] = None,
         run_count: Optional[int] = None,
         run_target: Optional[str] = None,
+        framing: Optional[str] = None,
     ) -> SessionRequest:
         config = SessionConfig(
             tau=float(self.config.get("tau", 0.0)),
             epsilon=float(self.epsilon_override if self.epsilon_override is not None else self.config.get("epsilon", 0.0)),
-            gamma=float(self.config.get("gamma", 0.0)),
+            gamma_noa=float(self.config.get("gamma_noa", 0.0)),
+            gamma_und=float(self.config.get("gamma_und", 0.0)),
             alpha=float(self.config.get("alpha", 0.0)),
             beta=float(self.config.get("beta", 1.0)),
             W=float(self.config.get("W", 3.0)),
             lambda_voi=float(self.config.get("lambda_voi", 0.1)),
             world_mode=str(self.config.get("world_mode", "open")),
+            gamma=float(self.config.get("gamma", 0.0)),
         )
         root_specs = [
             RootSpec(
@@ -327,7 +353,7 @@ class StepWorld:
                 ids = outcome.get("evidence_ids")
                 if isinstance(ids, list):
                     evidence_ids.extend([str(item) for item in ids if isinstance(item, str)])
-        return SessionRequest(
+        kwargs: Dict[str, Any] = dict(
             scope=scope,
             roots=root_specs,
             config=config,
@@ -337,6 +363,11 @@ class StepWorld:
             run_count=run_count,
             run_target=run_target,
             initial_ledger=self.ledger or None,
+            search_enabled=self.config.get("search_enabled"),
+            max_search_depth=self.config.get("max_search_depth"),
+            max_search_per_node=self.config.get("max_search_per_node"),
+            search_quota_per_slot=self.config.get("search_quota_per_slot"),
+            search_deterministic=self.config.get("search_deterministic"),
             evidence_items=[
                 {"id": evidence_id, "source": "bdd", "text": f"Evidence {evidence_id}."}
                 for evidence_id in sorted(set(evidence_ids))
@@ -346,6 +377,12 @@ class StepWorld:
             slot_initial_p=self.decomposer_script.get("slot_initial_p"),
             force_scope_fail_root=self.decomposer_script.get("force_scope_fail_root"),
         )
+        if framing is not None:
+            kwargs["framing"] = framing
+        fields = getattr(SessionRequest, "__dataclass_fields__", {})
+        if fields:
+            kwargs = {key: value for key, value in kwargs.items() if key in fields}
+        return SessionRequest(**kwargs)
 
     def _ensure_required_slots(self, root_id: Optional[str]) -> None:
         if not root_id:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+import re
 from typing import Any, Dict, List
 
 from behave import given, then, when
@@ -7,6 +9,9 @@ from behave import given, then, when
 from abductio_core.application.canonical import canonical_id_for_statement
 from abductio_core.application.use_cases.replay_session import replay_session
 from tests.bdd.steps.support.step_world import StepWorld
+
+RESIDUAL_IDS = {"H_NOA", "H_UND"}
+SEARCH_EVENT_MARKERS = ("SEARCH",)
 
 
 def get_world(context) -> StepWorld:
@@ -63,7 +68,6 @@ def _expected_slot_statements(world: StepWorld, root_id: str) -> Dict[str, str]:
     for row in scope_roots:
         if row.get("root_id") == root_id:
             return {
-                "feasibility": row.get("feasibility_statement", ""),
                 "availability": row.get("availability_statement", ""),
                 "fit_to_key_features": row.get("fit_statement", ""),
                 "defeater_resistance": row.get("defeater_statement", ""),
@@ -80,6 +84,65 @@ def _parse_numeric_expr(value: str) -> float:
     for part in parts:
         result *= float(part)
     return result
+
+
+def _float_close(a: float, b: float, tol: float = 1e-6) -> bool:
+    return abs(float(a) - float(b)) <= tol
+
+
+def _parse_ln_ratio(expr: str) -> float:
+    match = re.fullmatch(r"\s*ln\(\s*([0-9]*\.?[0-9]+)\s*/\s*([0-9]*\.?[0-9]+)\s*\)\s*", expr)
+    if not match:
+        raise ValueError(f"Unsupported ln ratio expression: {expr!r}")
+    x = float(match.group(1))
+    y = float(match.group(2))
+    return math.log(x / y)
+
+
+def _latest_event(world: StepWorld, event_type: str) -> Dict[str, Any] | None:
+    if not world.result:
+        return None
+    events = [e for e in world.result.get("audit", []) if e.get("event_type") == event_type]
+    return events[-1] if events else None
+
+
+def _events(world: StepWorld, event_type: str) -> List[Dict[str, Any]]:
+    if not world.result:
+        return []
+    return [e for e in world.result.get("audit", []) if e.get("event_type") == event_type]
+
+
+def _find_event_for_root(world: StepWorld, event_type: str, root_id: str, slot_key: str | None = None) -> Dict[str, Any] | None:
+    for e in reversed(_events(world, event_type)):
+        payload = e.get("payload", {})
+        if not isinstance(payload, dict):
+            continue
+        if payload.get("root_id") != root_id:
+            continue
+        if slot_key is not None and payload.get("slot_key") != slot_key:
+            continue
+        return e
+    return None
+
+
+def _search_events(world: StepWorld) -> List[Dict[str, Any]]:
+    if not world.result:
+        return []
+    events = world.result.get("audit", []) or []
+    return [e for e in events if any(marker in str(e.get("event_type", "")) for marker in SEARCH_EVENT_MARKERS)]
+
+
+def _get_payload_number(payload: Dict[str, Any], *keys: str) -> float | None:
+    for key in keys:
+        value = payload.get(key)
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value.strip())
+            except ValueError:
+                continue
+    return None
 
 
 def _rubric_from_table(table) -> Dict[str, int]:
@@ -141,6 +204,120 @@ def given_decomposer_scope_all(context) -> None:
 def given_decomposer_scope_root(context, root_id: str) -> None:
     world = get_world(context)
     world.set_decomposer_scope_roots([{"root_id": root_id}])
+
+
+@given("evidence search is enabled with max depth 2 and per-node quota 1")
+def given_search_enabled_depth_quota(context) -> None:
+    world = get_world(context)
+    world.config["search_enabled"] = True
+    world.config["max_search_depth"] = 2
+    world.config["max_search_per_node"] = 1
+
+
+@given("evidence search is enabled with per-slot quota 1")
+def given_search_enabled_slot_quota(context) -> None:
+    world = get_world(context)
+    world.config["search_enabled"] = True
+    world.config["search_quota_per_slot"] = 1
+
+
+@given("evidence search is enabled with deterministic queries")
+def given_search_enabled_deterministic(context) -> None:
+    world = get_world(context)
+    world.config["search_enabled"] = True
+    world.config["search_deterministic"] = True
+    world.config["max_search_depth"] = 1
+    world.config["max_search_per_node"] = 1
+
+
+@then("the audit log includes SEARCH operations")
+def then_audit_includes_search(context) -> None:
+    world = get_world(context)
+    events = _search_events(world)
+    if not events:
+        world.mark_pending("SEARCH operation not implemented in engine")
+    assert events, "Expected SEARCH operations in audit log"
+
+
+@then("each SEARCH operation records a search snapshot hash")
+def then_search_records_snapshot_hash(context) -> None:
+    world = get_world(context)
+    events = _search_events(world)
+    if not events:
+        world.mark_pending("SEARCH operation not implemented in engine")
+    missing = []
+    for event in events:
+        payload = event.get("payload", {})
+        if not isinstance(payload, dict):
+            missing.append(event)
+            continue
+        if not any(key in payload for key in ("evidence_packet_hash", "search_snapshot_hash", "snapshot_hash")):
+            missing.append(event)
+    assert not missing, "Expected SEARCH payload to include a snapshot hash"
+
+
+@then('search credits for slot "{slot_key}" are equal across hypotheses')
+def then_search_quota_equal(context, slot_key: str) -> None:
+    world = get_world(context)
+    events = _search_events(world)
+    if not events:
+        world.mark_pending("SEARCH operation not implemented in engine")
+    counts: Dict[str, int] = {}
+    for event in events:
+        payload = event.get("payload", {})
+        if not isinstance(payload, dict):
+            continue
+        if payload.get("slot_key") != slot_key:
+            continue
+        root_id = payload.get("root_id") or payload.get("hypothesis_id")
+        if not root_id:
+            continue
+        counts[root_id] = counts.get(root_id, 0) + 1
+    if not counts:
+        world.mark_pending("SEARCH events missing slot_key/root_id fields")
+    values = set(counts.values())
+    assert len(values) == 1, f"Search credits not equal across hypotheses for slot {slot_key}: {counts}"
+
+
+@then("search queries are derived from scope, hypothesis, slot, and depth")
+def then_search_queries_derived(context) -> None:
+    world = get_world(context)
+    events = _search_events(world)
+    if not events:
+        world.mark_pending("SEARCH operation not implemented in engine")
+    for event in events:
+        payload = event.get("payload", {})
+        if not isinstance(payload, dict):
+            continue
+        query = payload.get("query") or payload.get("query_text")
+        if not query:
+            raise AssertionError("SEARCH payload missing query text")
+        if "slot_key" not in payload or "root_id" not in payload or "depth" not in payload:
+            raise AssertionError("SEARCH payload missing derivation fields (slot_key/root_id/depth)")
+
+
+@then("search budgets do not change based on interim ledger scores")
+def then_search_budgets_non_adaptive(context) -> None:
+    world = get_world(context)
+    events = _search_events(world)
+    if not events:
+        world.mark_pending("SEARCH operation not implemented in engine")
+    counts: Dict[str, Dict[str, int]] = {}
+    for event in events:
+        payload = event.get("payload", {})
+        if not isinstance(payload, dict):
+            continue
+        slot_key = payload.get("slot_key")
+        root_id = payload.get("root_id") or payload.get("hypothesis_id")
+        if not slot_key or not root_id:
+            continue
+        counts.setdefault(slot_key, {})
+        counts[slot_key][root_id] = counts[slot_key].get(root_id, 0) + 1
+    if not counts:
+        raise AssertionError("SEARCH payload missing slot/root info for budget checks")
+    for slot_key, slot_counts in counts.items():
+        values = set(slot_counts.values())
+        assert len(values) == 1, f"Search budgets appear adaptive for slot {slot_key}: {slot_counts}"
 
 
 @given('a deterministic decomposer that fails to scope root "{root_id}"')
@@ -226,7 +403,7 @@ def given_deterministic_evaluator_rubric(context) -> None:
 def given_deterministic_evaluator_one(context) -> None:
     world = get_world(context)
     roots = world.roots or [{"id": "H1"}]
-    slot_key = world.required_slots[0]["slot_key"] if world.required_slots else "feasibility"
+    slot_key = world.required_slots[0]["slot_key"] if world.required_slots else "availability"
     outcomes = [
         {
             "node_key": f"{root['id']}:{slot_key}",
@@ -309,16 +486,17 @@ def given_only_child_evaluated(context, child_id: str, p_value: float, refs: str
     world.set_child_evaluated(child_id, p_value, evidence_ids)
 
 
-@given("the ledger is externally corrupted so that sum(named_roots) = 1.2 and H_other = -0.2")
+@given("the ledger is externally corrupted so that sum(named_roots) = 1.2 and H_NOA/H_UND are negative")
 def given_ledger_corrupted(context) -> None:
     world = get_world(context)
     named_roots = [row["id"] for row in world.roots]
     if not named_roots:
-        world.ledger = {"H_other": -0.2}
+        world.ledger = {"H_NOA": -0.1, "H_UND": -0.1}
         return
     per_root = 1.2 / len(named_roots)
     world.ledger = {root_id: per_root for root_id in named_roots}
-    world.ledger["H_other"] = -0.2
+    world.ledger["H_NOA"] = -0.1
+    world.ledger["H_UND"] = -0.1
 
 
 @given("I ran a session and captured its audit trace")
@@ -369,6 +547,20 @@ def when_run_until_credits_exhausted(context) -> None:
 def when_run_until_stops(context) -> None:
     world = get_world(context)
     world.run_engine("until_stops")
+
+@when("I run the engine")
+def when_run_engine_default(context) -> None:
+    world = get_world(context)
+    world.run_engine("until_stops")
+
+
+@when('I run the engine with framing text "{framing}" until it stops')
+def when_run_until_stops_with_framing(context, framing: str) -> None:
+    world = get_world(context)
+    if world.result is None:
+        world.run_engine(f"framing_a:{framing}")
+    else:
+        world.run_engine(f"framing_b:{framing}")
 
 
 @when('I run the engine for exactly {count:d} operations')
@@ -447,10 +639,10 @@ def then_session_contains_root(context, root_id: str) -> None:
     if not world.result:
         world.mark_pending("Session result not available")
     assert root_id in world.result.get("roots", {})
-    if root_id == "H_other":
+    if root_id in RESIDUAL_IDS:
         named_ids = {row["id"] for row in world.roots}
-        assert "H_other" not in named_ids
-        assert len(world.result.get("roots", {})) == len(named_ids) + 1
+        assert not (RESIDUAL_IDS & named_ids)
+        assert len(world.result.get("roots", {})) == len(named_ids) + len(RESIDUAL_IDS)
 
 
 @then('the session does not contain root "{root_id}"')
@@ -476,25 +668,45 @@ def then_named_root_p_ledger(context) -> None:
     world = get_world(context)
     if not world.result:
         world.mark_pending("Session result not available")
-    gamma = float(world.config.get("gamma", 0.0))
-    named_roots = [root_id for root_id in world.result["roots"] if root_id != "H_other"]
+    gamma_noa = float(world.config.get("gamma_noa", 0.0))
+    gamma_und = float(world.config.get("gamma_und", 0.0))
+    if gamma_noa == 0.0 and gamma_und == 0.0:
+        gamma_legacy = float(world.config.get("gamma", 0.0))
+        gamma_noa = gamma_legacy / 2.0
+        gamma_und = gamma_legacy / 2.0
+    named_roots = [root_id for root_id in world.result["roots"] if root_id not in RESIDUAL_IDS]
     count_named = len(named_roots)
-    expected = (1.0 - gamma) / count_named if count_named else 0.0
+    expected = (1.0 - gamma_noa - gamma_und) / count_named if count_named else 0.0
     for root_id in named_roots:
         actual = world.result["ledger"].get(root_id)
         assert actual is not None
         assert abs(actual - expected) <= 1e-9
 
 
-@then('H_other has p_ledger = gamma')
-def then_h_other_gamma(context) -> None:
+@then('H_NOA has p_ledger = gamma_noa')
+def then_h_noa_gamma(context) -> None:
     world = get_world(context)
     if not world.result:
         world.mark_pending("Session result not available")
-    gamma = float(world.config.get("gamma", 0.0))
-    actual = world.result["ledger"].get("H_other")
+    gamma_noa = float(world.config.get("gamma_noa", 0.0))
+    if gamma_noa == 0.0:
+        gamma_noa = float(world.config.get("gamma", 0.0)) / 2.0
+    actual = world.result["ledger"].get("H_NOA")
     assert actual is not None
-    assert abs(actual - gamma) <= 1e-9
+    assert abs(actual - gamma_noa) <= 1e-9
+
+
+@then('H_UND has p_ledger = gamma_und')
+def then_h_und_gamma(context) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    gamma_und = float(world.config.get("gamma_und", 0.0))
+    if gamma_und == 0.0:
+        gamma_und = float(world.config.get("gamma", 0.0)) / 2.0
+    actual = world.result["ledger"].get("H_UND")
+    assert actual is not None
+    assert abs(actual - gamma_und) <= 1e-9
 
 
 @then('every root starts with k_root = 0.15')
@@ -515,7 +727,7 @@ def then_named_root_status(context, status: str) -> None:
     if not world.result:
         world.mark_pending("Session result not available")
     for root_id, root in world.result.get("roots", {}).items():
-        if root_id == "H_other":
+        if root_id in RESIDUAL_IDS:
             continue
         assert root.get("status") == status
         if status == "UNSCOPED":
@@ -528,7 +740,7 @@ def then_canonical_id_recorded(context) -> None:
     if not world.result:
         world.mark_pending("Session result not available")
     for root_id, root in world.result.get("roots", {}).items():
-        if root_id == "H_other":
+        if root_id in RESIDUAL_IDS:
             continue
         expected = canonical_id_for_statement(root["statement"])
         assert root.get("canonical_id") == expected
@@ -542,12 +754,12 @@ def then_canonical_id_ordering(context) -> None:
     canonical_a = {
         root_id: root.get("canonical_id")
         for root_id, root in world.result.get("roots", {}).items()
-        if root_id != "H_other"
+        if root_id not in RESIDUAL_IDS
     }
     canonical_b = {
         root_id: root.get("canonical_id")
         for root_id, root in world.replay_result.get("roots", {}).items()
-        if root_id != "H_other"
+        if root_id not in RESIDUAL_IDS
     }
     assert canonical_a == canonical_b
 
@@ -571,7 +783,7 @@ def then_each_root_required_slots(context) -> None:
     required = {row["slot_key"] for row in world.required_slots}
     required_roles = {row["slot_key"]: row.get("role", "NEC") for row in world.required_slots}
     for root_id, root in world.result["roots"].items():
-        if root_id == "H_other":
+        if root_id in RESIDUAL_IDS:
             continue
         slots = set(root.get("obligations", {}).keys())
         assert slots == required
@@ -589,7 +801,7 @@ def then_unassessed_slots_default(context, p_value: float, k_value: float) -> No
     if not world.result:
         world.mark_pending("Session result not available")
     for root_id, root in world.result["roots"].items():
-        if root_id == "H_other":
+        if root_id in RESIDUAL_IDS:
             continue
         for node in root.get("obligations", {}).values():
             assert abs(node.get("p", 0.0) - p_value) <= 1e-9
@@ -690,7 +902,7 @@ def then_all_named_roots_scoped(context) -> None:
     if not world.result:
         world.mark_pending("Session result not available")
     for root_id, root in world.result["roots"].items():
-        if root_id == "H_other":
+        if root_id in RESIDUAL_IDS:
             continue
         assert root.get("status") == "SCOPED"
 
@@ -702,21 +914,32 @@ def then_named_root_p_unchanged(context, tolerance: str) -> None:
         world.mark_pending("Session result not available")
     tolerance_value = float(tolerance)
     for root_id, root in world.result["roots"].items():
-        if root_id == "H_other":
+        if root_id in RESIDUAL_IDS:
             continue
         initial = world.initial_ledger.get(root_id, 0.0)
         actual = world.result.get("ledger", {}).get(root_id, 0.0)
         assert abs(actual - initial) <= tolerance_value
 
 
-@then('H_other p_ledger is unchanged from its initial value within {tolerance}')
-def then_h_other_p_unchanged(context, tolerance: str) -> None:
+@then('H_NOA p_ledger is unchanged from its initial value within {tolerance}')
+def then_h_noa_p_unchanged(context, tolerance: str) -> None:
     world = get_world(context)
     if not world.result:
         world.mark_pending("Session result not available")
     tolerance_value = float(tolerance)
-    initial = world.initial_ledger.get("H_other", 0.0)
-    actual = world.result.get("ledger", {}).get("H_other", 0.0)
+    initial = world.initial_ledger.get("H_NOA", 0.0)
+    actual = world.result.get("ledger", {}).get("H_NOA", 0.0)
+    assert abs(actual - initial) <= tolerance_value
+
+
+@then('H_UND p_ledger is unchanged from its initial value within {tolerance}')
+def then_h_und_p_unchanged(context, tolerance: str) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    tolerance_value = float(tolerance)
+    initial = world.initial_ledger.get("H_UND", 0.0)
+    actual = world.result.get("ledger", {}).get("H_UND", 0.0)
     assert abs(actual - initial) <= tolerance_value
 
 
@@ -750,7 +973,10 @@ def then_audit_multiplier(context) -> None:
     world = get_world(context)
     if not world.result:
         world.mark_pending("Session result not available")
-    assert any(event["event_type"] == "MULTIPLIER_COMPUTED" for event in world.result.get("audit", []))
+    assert any(
+        event["event_type"] == "DELTA_W_APPLIED" and "m" in event.get("payload", {})
+        for event in world.result.get("audit", [])
+    )
 
 
 @then("the audit log includes p_prop(H1) = p_base(H1) * m_H1")
@@ -788,26 +1014,33 @@ def then_audit_normalized_ledger(context) -> None:
     world = get_world(context)
     if not world.result:
         world.mark_pending("Session result not available")
-    assert any(event["event_type"] == "LOG_LEDGER_NORMALIZED" for event in world.result.get("audit", []))
+    assert any(
+        event["event_type"] in {"INVARIANT_SUM_TO_ONE_CHECK", "OPEN_WORLD_GAMMA_UPDATED", "CLOSED_WORLD_RENORMALIZED"}
+        for event in world.result.get("audit", [])
+    )
 
 
-@then("H_other is set to 1 - sum(named_roots)")
-def then_h_other_absorber(context) -> None:
+@then("H_NOA and H_UND sum to 1 - sum(named_roots)")
+def then_residuals_absorber(context) -> None:
     world = get_world(context)
     if not world.result:
         world.mark_pending("Session result not available")
     ledger = world.result.get("ledger", {})
-    sum_named = sum(value for key, value in ledger.items() if key != "H_other")
+    sum_named = sum(value for key, value in ledger.items() if key not in RESIDUAL_IDS)
     expected = 1.0 - sum_named
-    assert abs(ledger.get("H_other", 0.0) - expected) <= 1e-9
+    residual = float(ledger.get("H_NOA", 0.0)) + float(ledger.get("H_UND", 0.0))
+    assert abs(residual - expected) <= 1e-9
 
 
-@then("the engine enforces the Other absorber invariant")
+@then("the engine enforces the open-world residuals invariant")
 def then_enforces_other_absorber(context) -> None:
     world = get_world(context)
     if not world.result:
         world.mark_pending("Session result not available")
-    assert any(event["event_type"] == "OTHER_ABSORBER_ENFORCED" for event in world.result.get("audit", []))
+    assert any(
+        event["event_type"] in {"OPEN_WORLD_RESIDUALS_ENFORCED", "OPEN_WORLD_GAMMA_UPDATED"}
+        for event in world.result.get("audit", [])
+    )
 
 
 @then("all p_ledger values are in [0,1]")
@@ -825,7 +1058,7 @@ def then_audit_branch_recorded(context) -> None:
     if not world.result:
         world.mark_pending("Session result not available")
     assert any(
-        event["event_type"] == "OTHER_ABSORBER_ENFORCED" and "branch" in event["payload"]
+        event["event_type"] in {"OPEN_WORLD_RESIDUALS_ENFORCED"} and "branch" in event["payload"]
         for event in world.result.get("audit", [])
     )
 
@@ -863,7 +1096,7 @@ def then_operation_order_canonical(context) -> None:
     roots = [
         root
         for root_id, root in world.result["roots"].items()
-        if root_id != "H_other"
+        if root_id not in RESIDUAL_IDS
     ]
     expected_order = [root["id"] for root in sorted(roots, key=lambda root: root["canonical_id"])]
     actual_order = [entry["target_id"] for entry in world.result.get("operation_log", [])]
@@ -885,7 +1118,7 @@ def then_final_ledger_identical(context, tolerance: str) -> None:
         world.mark_pending("Session results not available")
     tolerance_value = float(tolerance)
     for root_id, root in world.result["roots"].items():
-        if root_id == "H_other":
+        if root_id in RESIDUAL_IDS:
             continue
         other_root = world.replay_result["roots"].get(root_id)
         assert other_root is not None
@@ -893,15 +1126,16 @@ def then_final_ledger_identical(context, tolerance: str) -> None:
         assert abs(root.get("k_root", 0.0) - other_root.get("k_root", 0.0)) <= tolerance_value
 
 
-@then('the final H_other p_ledger is identical within {tolerance}')
-def then_final_h_other_identical(context, tolerance: str) -> None:
+@then('the final H_NOA and H_UND p_ledger are identical within {tolerance}')
+def then_final_residuals_identical(context, tolerance: str) -> None:
     world = get_world(context)
     if not world.result or not world.replay_result:
         world.mark_pending("Session results not available")
     tolerance_value = float(tolerance)
-    actual = world.result.get("ledger", {}).get("H_other", 0.0)
-    expected = world.replay_result.get("ledger", {}).get("H_other", 0.0)
-    assert abs(actual - expected) <= tolerance_value
+    for residual_id in RESIDUAL_IDS:
+        actual = world.result.get("ledger", {}).get(residual_id, 0.0)
+        expected = world.replay_result.get("ledger", {}).get(residual_id, 0.0)
+        assert abs(actual - expected) <= tolerance_value
 
 
 @then("the sequence of executed operations is identical when compared by canonical target_id")
@@ -912,7 +1146,7 @@ def then_operations_identical(context) -> None:
     canonical_map = {
         root_id: root["canonical_id"]
         for root_id, root in world.result["roots"].items()
-        if root_id != "H_other"
+        if root_id not in RESIDUAL_IDS
     }
     seq_a = [canonical_map.get(entry["target_id"], entry["target_id"]) for entry in world.result.get("operation_log", [])]
     seq_b = [
@@ -930,7 +1164,7 @@ def then_soft_and_expected(context, slot_key: str, expected: str, tolerance: str
     expected_value = float(expected)
     tolerance_value = float(tolerance)
     root_id = world.roots[0]["id"] if world.roots else next(
-        root for root in world.result.get("roots", {}) if root != "H_other"
+        root for root in world.result.get("roots", {}) if root not in RESIDUAL_IDS
     )
     slot_name = slot_key.split(":", 1)[1] if ":" in slot_key else slot_key
     node = world.result["roots"][root_id]["obligations"][slot_name]
@@ -1094,3 +1328,263 @@ def then_api_calls_use_case(context) -> None:
 def then_api_response_from_session_result(context) -> None:
     world = get_world(context)
     assert world.result is not None
+
+
+@then('the selected target is "{target_id}"')
+def then_selected_target_is(context, target_id: str) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    ops = world.result.get("operation_log", [])
+    assert ops, "expected at least one operation"
+    assert str(ops[-1].get("target_id")) == target_id
+
+
+@then("the final ledger equals")
+@then("the final ledger equals:")
+def then_final_ledger_equals(context) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    expected = {row["id"]: float(row["p_ledger"]) for row in table_rows(context.table)}
+    actual = {key: float(val) for key, val in (world.result.get("ledger", {}) or {}).items()}
+    for key, exp in expected.items():
+        assert key in actual, f"missing ledger key {key!r}; actual keys={sorted(actual)}"
+        assert _float_close(actual[key], exp, tol=1e-6), f"{key}: expected {exp}, got {actual[key]}"
+
+
+@then('the audit log records delta_w = {expr} for root "{root_id}" within {tolerance}')
+def then_audit_delta_w_expr(context, expr: str, root_id: str, tolerance: str) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    tol = float(tolerance)
+    expected = _parse_ln_ratio(expr)
+    event = _find_event_for_root(world, "DELTA_W_APPLIED", root_id)
+    assert event is not None, "expected DELTA_W_APPLIED event for root"
+    payload = event.get("payload", {})
+    assert isinstance(payload, dict)
+    actual = _get_payload_number(payload, "delta_w", "delta_w_clipped", "deltaW")
+    assert actual is not None, f"DELTA_W_APPLIED payload missing delta_w: {payload}"
+    assert abs(actual - expected) <= tol, f"expected delta_w={expected} +/- {tol}, got {actual}"
+
+
+@then('the audit log records p_prop({root_id}) = {p_base:f} * exp(beta*delta_w) within {tolerance}')
+def then_audit_p_prop_expr(context, root_id: str, p_base: float, tolerance: str) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    tol = float(tolerance)
+    beta = float(world.config.get("beta", 1.0))
+    expected_delta_w = math.log(0.90 / 0.50)
+    expected = float(p_base) * math.exp(beta * expected_delta_w)
+    event = _find_event_for_root(world, "DELTA_W_APPLIED", root_id)
+    assert event is not None, "expected DELTA_W_APPLIED event for root"
+    payload = event.get("payload", {})
+    assert isinstance(payload, dict)
+    actual = _get_payload_number(payload, "p_prop", "p_proposed", "p_prop_root")
+    assert actual is not None, f"DELTA_W_APPLIED payload missing p_prop: {payload}"
+    assert abs(actual - expected) <= tol, f"expected p_prop={expected} +/- {tol}, got {actual}"
+
+
+@then('the audit log records p_damped({root_id}) = (1-alpha)*{p_base:f} + alpha*p_prop({root_id}) within {tolerance}')
+def then_audit_p_damped_expr(context, root_id: str, p_base: float, tolerance: str) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    tol = float(tolerance)
+    alpha = float(world.config.get("alpha", 0.0))
+    beta = float(world.config.get("beta", 1.0))
+    expected_delta_w = math.log(0.90 / 0.50)
+    p_prop = float(p_base) * math.exp(beta * expected_delta_w)
+    expected = (1.0 - alpha) * float(p_base) + alpha * p_prop
+    event = _find_event_for_root(world, "DELTA_W_APPLIED", root_id)
+    payload = event.get("payload", {}) if event else {}
+    actual = None
+    if isinstance(payload, dict):
+        actual = _get_payload_number(payload, "p_damped", "p_new", "p_damped_root")
+    if actual is None:
+        event2 = _find_event_for_root(world, "DAMPING_APPLIED", root_id)
+        assert event2 is not None, "expected DAMPING_APPLIED event for root"
+        payload2 = event2.get("payload", {})
+        assert isinstance(payload2, dict)
+        actual = _get_payload_number(payload2, "p_new", "p_damped")
+    assert actual is not None
+    assert abs(actual - expected) <= tol, f"expected p_damped={expected} +/- {tol}, got {actual}"
+
+
+@then('the audit log records that delta_w was clipped to +W for root "{root_id}"')
+def then_audit_delta_w_clipped(context, root_id: str) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    event = _find_event_for_root(world, "DELTA_W_APPLIED", root_id)
+    assert event is not None, "expected DELTA_W_APPLIED event for root"
+    payload = event.get("payload", {})
+    assert isinstance(payload, dict)
+    clipped = payload.get("clipped") or payload.get("was_clipped") or payload.get("delta_w_was_clipped")
+    clip_dir = payload.get("clip_direction") or payload.get("clip_dir")
+    if clipped is True:
+        if clip_dir:
+            assert str(clip_dir) in {"+", "+W", "POS", "positive"}
+        return
+    W = float(world.config.get("W", 0.0))
+    delta = _get_payload_number(payload, "delta_w", "delta_w_clipped")
+    assert delta is not None
+    assert _float_close(delta, W, tol=1e-9), f"expected delta_w==+W ({W}), got {delta}"
+
+
+@then('the audit log records delta_w = {expected:f} within {tolerance}')
+def then_audit_delta_w_value(context, expected: float, tolerance: str) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    tol = float(tolerance)
+    event = _latest_event(world, "DELTA_W_APPLIED")
+    assert event is not None, "expected at least one DELTA_W_APPLIED"
+    payload = event.get("payload", {})
+    assert isinstance(payload, dict)
+    actual = _get_payload_number(payload, "delta_w", "delta_w_clipped")
+    assert actual is not None
+    assert abs(actual - float(expected)) <= tol
+
+
+@then('the audit log records that VOI scoring used lambda_voi = {lambda_voi:f}')
+def then_audit_voi_lambda(context, lambda_voi: float) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    events = _events(world, "VOI_SCORED")
+    assert events, "expected VOI_SCORED events"
+    found = False
+    for event in events:
+        payload = event.get("payload", {})
+        if not isinstance(payload, dict):
+            continue
+        value = _get_payload_number(payload, "lambda_voi", "lambdaVoI")
+        if value is None:
+            continue
+        if _float_close(value, lambda_voi, tol=1e-12):
+            found = True
+            break
+    assert found, f"no VOI_SCORED payload carried lambda_voi={lambda_voi}"
+
+
+@then('root "{root_id}" output includes exclusion_clause "{exclusion_clause}"')
+def then_root_exclusion_clause(context, root_id: str, exclusion_clause: str) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    root = world.result.get("roots", {}).get(root_id)
+    assert root is not None
+    assert root.get("exclusion_clause") == exclusion_clause
+
+
+@then('root "{root_id}" includes a weakest_slot field')
+def then_root_has_weakest_slot(context, root_id: str) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    root = world.result.get("roots", {}).get(root_id)
+    assert root is not None
+    assert "weakest_slot" in root
+
+
+@then('root "{root_id}" weakest_slot is "{slot_key}"')
+def then_root_weakest_slot_value(context, root_id: str, slot_key: str) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    root = world.result.get("roots", {}).get(root_id)
+    assert root is not None
+    weakest = root.get("weakest_slot")
+    if isinstance(weakest, dict):
+        assert weakest.get("slot") == slot_key
+    else:
+        assert weakest == slot_key
+
+
+@then("weakest_slot includes both p and k for that slot")
+def then_weakest_slot_includes_p_k(context) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    for root_id, root in world.result.get("roots", {}).items():
+        if root_id in RESIDUAL_IDS:
+            continue
+        weakest = root.get("weakest_slot")
+        assert isinstance(weakest, dict), "expected weakest_slot to be an object"
+        assert "p" in weakest and "k" in weakest and "slot" in weakest
+
+
+@then('the SessionResult includes an explanations section for "{root_id}"')
+def then_result_has_explanations(context, root_id: str) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    explanations = world.result.get("explanations")
+    assert isinstance(explanations, dict), "expected SessionResult.explanations to be a dict"
+    assert root_id in explanations
+
+
+@then('explanations for "{root_id}" reference evidence_id "{evidence_id}"')
+def then_explanations_reference_evidence(context, root_id: str, evidence_id: str) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    explanations = world.result.get("explanations", {})
+    blob = explanations.get(root_id)
+    text = ""
+    if isinstance(blob, str):
+        text = blob
+    elif isinstance(blob, dict):
+        text = str(blob)
+    else:
+        text = str(blob)
+    assert evidence_id in text
+
+
+@then('the required slots under "{root_a}" and "{root_b}" are identical')
+def then_required_slots_identical(context, root_a: str, root_b: str) -> None:
+    world = get_world(context)
+    if not world.result or not world.replay_result:
+        world.mark_pending("Session results not available")
+    ra = world.result.get("roots", {}).get(root_a, {})
+    rb = world.replay_result.get("roots", {}).get(root_b, {})
+    slots_a = set((ra.get("obligations") or {}).keys())
+    slots_b = set((rb.get("obligations") or {}).keys())
+    assert slots_a == slots_b
+
+
+@then('the audit log records the framing text as metadata only (no branching on framing)')
+def then_audit_framing_metadata_only(context) -> None:
+    world = get_world(context)
+    if not world.result or not world.replay_result:
+        world.mark_pending("Session results not available")
+    def _has_framing(res: Dict[str, Any]) -> bool:
+        audit = res.get("audit", []) or []
+        for event in audit:
+            if event.get("event_type") in {"FRAMING_RECORDED", "FRAMING_METADATA"}:
+                payload = event.get("payload", {})
+                if isinstance(payload, dict) and payload.get("framing"):
+                    return True
+        meta = res.get("metadata", {})
+        if isinstance(meta, dict) and meta.get("framing"):
+            return True
+        return False
+    assert _has_framing(world.result) or _has_framing(world.replay_result), "expected framing to be recorded as metadata"
+
+
+@then('audit event "{event_type}" payload includes')
+@then('audit event "{event_type}" payload includes:')
+def then_audit_event_payload_includes(context, event_type: str) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    event = _latest_event(world, event_type)
+    assert event is not None, f"missing audit event {event_type}"
+    payload = event.get("payload", {})
+    assert isinstance(payload, dict), f"{event_type} payload must be dict"
+    for row in context.table:
+        field = row["field"]
+        assert field in payload, f"{event_type} payload missing field {field!r}; payload keys={sorted(payload)}"

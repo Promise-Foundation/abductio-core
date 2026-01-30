@@ -14,7 +14,6 @@ Feature: Obligation template parity and scoping
       | lambda_voi | 0.10 |
     And required template slots:
       | slot_key            | role |
-      | feasibility         | NEC  |
       | availability        | NEC  |
       | fit_to_key_features | NEC  |
       | defeater_resistance | NEC  |
@@ -25,9 +24,9 @@ Feature: Obligation template parity and scoping
       | H1   | Mechanism A                    | Not explained by any other root |
       | H2   | Mechanism B                    | Not explained by any other root |
     And a deterministic decomposer that will scope roots with:
-      | root_id | feasibility_statement         | availability_statement     | fit_statement            | defeater_statement              |
-      | H1      | A is physically possible      | A present at time/place    | A explains key reports   | A survives main defeater        |
-      | H2      | B is physically possible      | B present at time/place    | B explains key reports   | B survives main defeater        |
+      | root_id | availability_statement     | fit_statement            | defeater_statement              |
+      | H1      | A present at time/place    | A explains key reports   | A survives main defeater        |
+      | H2      | B present at time/place    | B explains key reports   | B survives main defeater        |
     And credits 2
     When I run the engine until credits exhausted
     Then both "H1" and "H2" become status "SCOPED"

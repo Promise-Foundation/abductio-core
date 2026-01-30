@@ -8,12 +8,15 @@ from typing import Any, Dict, List, Optional
 class SessionConfig:
     tau: float
     epsilon: float
-    gamma: float
+    gamma_noa: float
+    gamma_und: float
     alpha: float
     beta: float
     W: float
     lambda_voi: float
     world_mode: str
+    # Backward-compatible alias for older callers/tests.
+    gamma: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -54,3 +57,9 @@ class SessionRequest:
     slot_k_min: Optional[Dict[str, float]] = None
     slot_initial_p: Optional[Dict[str, float]] = None
     force_scope_fail_root: Optional[str] = None
+    framing: Optional[str] = None
+    search_enabled: Optional[bool] = None
+    max_search_depth: Optional[int] = None
+    max_search_per_node: Optional[int] = None
+    search_quota_per_slot: Optional[int] = None
+    search_deterministic: Optional[bool] = None

@@ -13,7 +13,6 @@ Feature: Full auditability and deterministic replay
       | lambda_voi | 0.10 |
     And required template slots:
       | slot_key            | role |
-      | feasibility         | NEC  |
       | availability        | NEC  |
       | fit_to_key_features | NEC  |
       | defeater_resistance | NEC  |

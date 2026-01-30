@@ -14,7 +14,6 @@ Feature: Deterministic scheduling, frontier selection, and tie-breaking
       | lambda_voi | 0.10 |
     And required template slots:
       | slot_key            | role |
-      | feasibility         | NEC  |
       | availability        | NEC  |
       | fit_to_key_features | NEC  |
       | defeater_resistance | NEC  |
@@ -30,7 +29,8 @@ Feature: Deterministic scheduling, frontier selection, and tie-breaking
       | H1 | 0.30     |
       | H2 | 0.28     |
       | H3 | 0.10     |
-      | H_other | 0.32 |
+      | H_NOA | 0.16 |
+      | H_UND | 0.16 |
     And epsilon = 0.05
     And credits 1
     When I run the engine for exactly 1 operation
@@ -46,7 +46,8 @@ Feature: Deterministic scheduling, frontier selection, and tie-breaking
       | id | p_ledger |
       | H9 | 0.30     |
       | H1 | 0.30     |
-      | H_other | 0.40 |
+      | H_NOA | 0.20 |
+      | H_UND | 0.20 |
     And credits 2
     When I run the engine for exactly 2 operations
     Then the operation order follows canonical_id order of statements, not the provided ids

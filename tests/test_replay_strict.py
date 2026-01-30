@@ -79,7 +79,7 @@ def test_replay_matches_final_ledger_and_stop_reason() -> None:
             RootSpec("H1", "Mechanism A", "x"),
             RootSpec("H2", "Mechanism B", "x"),
         ],
-        config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open"),
+        config=SessionConfig(tau=0.70, epsilon=0.05, gamma_noa=0.10, gamma_und=0.10, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open", gamma=0.20),
         credits=6,
         required_slots=[{"slot_key": "feasibility", "role": "NEC"}],
         run_mode="until_credits_exhausted",

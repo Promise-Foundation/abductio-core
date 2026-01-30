@@ -52,7 +52,7 @@ Also expose:
 
 ReplaySession(audit_trace) -> SessionResult (or similar) for deterministic replay tests.
 
-ValidateHypothesisSet(roots) -> ValidationReport to surface anti-vagueness and “standalone hypothesis” issues early.
+Optional: ValidateHypothesisSet(roots) -> ValidationReport to surface anti-vagueness and “standalone hypothesis” issues early.
 
 Key discipline: the use case should be the only thing CLI/API calls.
 
@@ -68,9 +68,9 @@ RootHypothesis (id, statement, exclusion_clause, p_ledger, k_root, obligations m
 
 Node (id, statement, role NEC/EVID, p, k, rubric, children, decomp_type, or_mode, coupling, status, credits_spent, evidence refs)
 
-HypothesisSet (roots map including H_other)
+HypothesisSet (roots map including H_NOA / H_UND in open-world mode)
 
-Config (tau, epsilon, gamma, alpha, max_children, coupling buckets, conservative delta, max_depth)
+Config (tau, epsilon, gamma_NOA, gamma_UND, max_children, coupling buckets, conservative delta, max_depth)
 
 AuditEvent (typed event stream with deterministic numeric payloads)
 
@@ -90,13 +90,13 @@ apply_evaluation(hset, target, eval_result, config) -> hset
 
 aggregate_slot(node, config) -> (p, k)
 
-compute_multiplier(root) -> m
+compute_slot_weight(p, k, beta, W) -> w
 
-compute_p_prop(p_base, m) -> p_prop
+apply_delta_w(root, slot, w_new, w_applied) -> (delta_w, w_applied)
 
-apply_damping(p_current, p_prop, alpha) -> p_new
+normalize_ledger(log_ledger) -> ledger
 
-enforce_other_absorber(hset) -> hset
+update_open_world_residuals(hset) -> hset
 
 stop_check(state) -> StopReason|None
 
@@ -119,6 +119,11 @@ DeterministicDecomposer(scripted_decompositions)
 InMemoryAuditSink()
 
 This ensures BDD step defs never touch domain.
+
+Evidence access control (Section 10A):
+- Evaluator receives only evidence slices (no conclusions, no oracle
+access, no mechanism feasibility sources).
+- Scoring is restricted to Availability, Fit, and Defeater Resistance.
 
 5) Determinism as a first-class requirement
 
@@ -174,15 +179,16 @@ Session bootstrap and MECE initialization
 
 Canonical IDs stable
 
-Other absorber invariant enforcement routine
+Open-world residual initialization for H_NOA / H_UND
 
 Implementation steps:
 
 Domain: normalize_text, canonical_id.
 
-Domain: initialize roots + H_other, set priors using gamma.
+Domain: initialize roots + H_NOA / H_UND, set priors using
+reference-class base rates and \(\gamma_{\text{NOA}}, \gamma_{\text{UND}}\).
 
-Domain: enforce_other_absorber and “repair corrupted ledger” path.
+Domain: enforce sum-to-one and log initialization artifacts.
 
 Application: RunSession supports “start session only” (credits can be 0).
 
@@ -206,9 +212,10 @@ Root cannot be scoped → UNSCOPED and k capped
 
 Implementation steps:
 
-Domain: template spec (required slots) as config or policy.
+Domain: template spec (required slots) as config or policy:
+Availability (context), Fit to key features, Defeater resistance.
 
-Decompose-root behavior: instantiate slot nodes (NEC) with p=1.0, k=0.15.
+Decompose-root behavior: instantiate slot nodes (NEC) with p=0.5, k=0.15.
 
 If decomposer fails → mark UNSCOPED and cap k_root <= 0.40 (and slot caps if applicable).
 
@@ -250,7 +257,7 @@ untestable loops
 
 Milestone 4 — No-free-probability semantics (neutral NEC defaults) + basic aggregation
 
-Do this before evaluation because it defines how decompositions affect multipliers.
+Do this before evaluation because it defines how decompositions affect ledger updates.
 
 Features:
 
@@ -258,15 +265,16 @@ Scoping alone doesn’t change ledger
 
 Adding unassessed NEC children doesn’t penalize
 
-Slot aggregation treats unassessed NEC as p=1.0
+Unassessed slots remain at p=0.5, k=0.15 and contribute w=0
 
 Implementation steps:
 
-Domain: compute slot p from children with unassessed treated as 1.0.
+Domain: compute slot p from children; unassessed nodes default to p=0.5,
+k=0.15 and do not move the ledger.
 
-Ensure ledger updates only happen after evaluation (or after you explicitly compute p_prop).
+Ensure ledger updates only happen after EVALUATE via the delta-w rule.
 
-Audit: log the computed multiplier pieces even if they equal 1.0.
+Audit: log required-slot aggregation inputs even when neutral.
 
 Pitfalls prevented:
 
@@ -286,6 +294,10 @@ Conservative |Δp|<=0.05 when evidence_refs empty
 
 Root k_root derived conservatively (min of assessed NEC slots, plus UNSCOPED cap)
 
+Fit scoring criteria enforced: Coverage, Parsimony, Coherence (explanatory),
+Consistency, with measurement-model compatibility and link_type artifacts
+for decompositions (UNCLEAR caps parent k).
+
 Implementation steps:
 
 Domain: derive_k(rubric) mapping and guardrail.
@@ -302,25 +314,27 @@ evaluator accidentally “teleporting” beliefs without evidence
 
 inconsistent k behavior across nodes/roots
 
-Milestone 6 — Ledger update: multiplier → p_prop → damping → Other absorber
+Milestone 6 — Ledger update: delta-w log-space updates → normalization → open-world residuals
 
 This is the heart of the algorithm’s credence movement.
 
 Features:
 
-Compute multiplier across template slots
+Delta-w ledger rule: only EVALUATE can move the ledger
 
-p_prop computation and damped update with alpha
+Log-space updates with per-slot weight caps
 
-Other absorber enforcement logged
+Open-world residual update for H_NOA / H_UND (mismatch + underdetermination)
 
 Implementation steps:
 
-Domain: compute m_i = Π slot_p and p_prop = p_base * m_i.
+Domain: compute w_new = clip(beta * k * logit(p)) and apply delta-w vs
+w_applied for each required slot.
 
-define clearly what p_base is (usually current p_ledger at time of update; if you mean “at time of scoping,” persist it explicitly).
+Update log p(h) by sum of delta-w per evaluated slot, normalize ledger.
 
-Apply damping per root update and enforce absorber invariant.
+Apply H_NOA / H_UND updates as deterministic functions of logged mismatch
+and underdetermination signals.
 
 Audit: include every numeric value used.
 
@@ -435,12 +449,8 @@ adapter logic duplicating domain rules
 Anticipated pitfalls and concrete preventions
 Pitfall: “p_base” ambiguity causes drift and breaks audit replay
 
-Prevention: define p_base explicitly as either:
-
-Option A: always the current p_ledger at the moment of update (simplest, most local), or
-
-Option B: a stored “scoping baseline” frozen at the time a root becomes SCOPED (requires storing p_base_at_scope).
-Pick one early and write it into the domain policy + audit.
+Prevention: do not use p_base at all; use delta-w log updates and record
+w_applied per slot so replay is exact and permutation-invariant.
 
 Pitfall: Python dict ordering sneaks into determinism
 
@@ -471,9 +481,10 @@ all violations become explicit SessionErrors with audit events.
 
 Pitfall: OR nodes accidentally inflate probability
 
-Prevention: make OR aggregation for NEC explicit and conservative:
+Prevention: make OR aggregation explicit and conservative:
 
-for NEC OR inside a slot, define it clearly (e.g., max of assessed children; unassessed = neutral)
+for EVID OR inside a slot, define it clearly (max or noisy-OR) and ensure
+ledger updates only occur through evaluated NEC slots (Sections 7.3 / 11).
 
 forbid using EVID nodes to increase ledger directly (only attach to audit/explanations unless you later add explicit policy)
 

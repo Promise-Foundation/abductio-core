@@ -58,7 +58,7 @@ def test_stop_reason_no_hypotheses_when_no_named_roots() -> None:
     req = SessionRequest(
         scope="no hypotheses",
         roots=[],
-        config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open"),
+        config=SessionConfig(tau=0.70, epsilon=0.05, gamma_noa=0.10, gamma_und=0.10, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open", gamma=0.20),
         credits=5,
         required_slots=[{"slot_key": "feasibility", "role": "NEC"}],
         run_mode="until_stops",
@@ -72,7 +72,7 @@ def test_stop_reason_op_limit_reached() -> None:
     req = SessionRequest(
         scope="op limit",
         roots=[RootSpec("H1", "Mechanism A", "x")],
-        config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open"),
+        config=SessionConfig(tau=0.70, epsilon=0.05, gamma_noa=0.10, gamma_und=0.10, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open", gamma=0.20),
         credits=10,
         required_slots=[{"slot_key": "feasibility", "role": "NEC"}],
         run_mode="operations",
@@ -88,7 +88,7 @@ def test_stop_reason_no_legal_op_after_decomp_and_eval() -> None:
     req = SessionRequest(
         scope="no legal op",
         roots=[RootSpec("H1", "Mechanism A", "x")],
-        config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open"),
+        config=SessionConfig(tau=0.70, epsilon=0.05, gamma_noa=0.10, gamma_und=0.10, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open", gamma=0.20),
         credits=10,
         required_slots=[{"slot_key": "feasibility", "role": "NEC"}],
         run_mode="until_stops",

@@ -9,8 +9,8 @@ set of hypotheses about a question/phenomenon/case (the "scope") under credit co
 with permutation-invariant scheduling and mandatory template-based decomposition to
 prevent asymmetric scrutiny.
 
-Project status: core engine + FastAPI API layer. See `architecture.md` and
-`docs/white_paper.org` for the spec.
+Project status: core engine library. The HTTP API lives in `abductio-service`.
+See `architecture.md` and `docs/white_paper.org` for the spec.
 
 ## Install
 
@@ -150,10 +150,6 @@ pytest
 ```
 
 ## Docs
-
-API docs are served by the FastAPI app using Scalar:
-- `GET /docs` serves the Scalar UI
-- `GET /openapi.json` serves the OpenAPI schema
 
 Narrative/source docs live in `docs/` as Org/HTML/PDF assets. These are treated as
 source material, not a hosted docs site.

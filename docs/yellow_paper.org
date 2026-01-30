@@ -1,0 +1,594 @@
+#+TITLE: Abductio Yellow Paper
+#+SUBTITLE: A Formal, Recursive, Credit-Bounded System for Permutation-Invariant Hypothesis Evaluation with Deterministic Evidence Search, Typed Open-World Residuals, Applicability Gating, and Information-Theoretic + Modal Foundations
+#+AUTHOR: David Joseph (adaptable)
+#+DATE: 2026-01-27
+#+OPTIONS: toc:3 num:t
+#+LATEX_HEADER: \usepackage[margin=1in]{geometry}
+#+LATEX_HEADER: \usepackage{amsmath,amssymb,amsthm,mathtools}
+#+LATEX_HEADER: \usepackage{booktabs}
+#+LATEX_HEADER: \usepackage{tabularx}
+#+LATEX_HEADER: \usepackage{hyperref}
+#+LATEX_HEADER: \newtheorem{definition}{Definition}
+#+LATEX_HEADER: \newtheorem{lemma}{Lemma}
+#+LATEX_HEADER: \newtheorem{proposition}{Proposition}
+#+LATEX_HEADER: \newtheorem{theorem}{Theorem}
+#+LATEX_HEADER: \newtheorem{corollary}{Corollary}
+#+LATEX_HEADER: \newcommand{\clip}{\operatorname{clip}}
+#+LATEX_HEADER: \newcommand{\logit}{\operatorname{logit}}
+#+LATEX_HEADER: \newcommand{\softmax}{\operatorname{softmax}}
+#+LATEX_HEADER: \newcommand{\KL}{\operatorname{KL}}
+#+LATEX_HEADER: \newcommand{\Hent}{\operatorname{H}}
+#+LATEX_HEADER: \newcommand{\E}{\mathbb{E}}
+#+LATEX_HEADER: \newcommand{\R}{\mathcal{R}}
+#+LATEX_HEADER: \newcommand{\Id}{\mathrm{Id}}
+
+* Abstract
+Abductio is a formal system for evaluating a mutually-exclusive-and-collectively-exhaustive (MECE) *attempt* of named hypotheses under strict resource constraints and explicit open-world safeguards. The system enforces (i) *permutation invariance* (no focal privilege), (ii) *no-free-probability* (belief may change only via paid evaluation), (iii) *anti-inflation aggregation* (decomposition clarifies structure without manufacturing support), and (iv) *deterministic, symmetric evidence acquisition* (no hypothesis-conditioned searching).
+
+This Yellow Paper presents a self-contained mathematical formalization of *recursive Abductio*: any obligation node may spawn a nested MECE attempt (a local Abductio instance) when uncertainty is better modeled as competing scenarios. We resolve three principal robustness difficulties: (a) recursion-induced roll-up bias, (b) deterministic symmetric search vs. efficiency, and (c) typed residual “dumping.” The formalization integrates:
+1) a *modal semantics* (Kripke/Dynamic Epistemic Logic) for regimes, applicability, and obligation satisfaction across accessible worlds; and
+2) an *information-theoretic semantics* for evaluation weights as bounded code-length / log-evidence contributions with validity downweighting.
+
+We provide precise state-transition semantics, invariants, admissible roll-up operators, and core theorems (permutation invariance, no-free-probability, refinement invariance under recursion, bounded impact of non-associative soft-AND, and residual safety).
+
+* 1. Scope and Goals
+** 1.1 Objective
+Given:
+- a *scope* statement $S$,
+- a finite set of named *root hypotheses* $H=\{h_1,\dots,h_n\}$ (a MECE attempt relative to $S$),
+- an initial evidence packet $E_0$ (possibly incomplete),
+- a credit budget $B\in\mathbb{N}$,
+Abductio computes an auditable output $(p(h),k(h))_{h\in H}$, optionally augmented by typed open-world residuals $h_{\mathrm{NOA}}, h_{\mathrm{UND}}$.
+
+** 1.2 Design constraints (normative)
+1. *Permutation invariance:* output does not depend on input ordering of hypotheses or printing order of operations.
+2. *Credit-boundedness:* only three operations consume credits: SEARCH, DECOMPOSE, EVALUATE.
+3. *No-free-probability:* ledger probabilities may change only on EVALUATE (never on SEARCH or DECOMPOSE).
+4. *Anti-inflation:* decomposition cannot increase support without paid evaluation; OR aggregation must prevent fragmentation-based probability inflation.
+5. *Open-world honesty:* mismatch and underdetermination are represented explicitly and preserved against “best-of-bad-set” overconfidence.
+6. *Deterministic, symmetric evidence acquisition:* evidence retrieval cannot adapt to interim hypothesis scores in a way that enables p-hacking.
+7. *Recursion:* any obligation node may spawn a local Abductio instance; recursion must preserve the above invariants.
+
+* 2. Mathematical Preliminaries
+** 2.1 Notation
+- $H$: set of named hypotheses (roots) for a scope $S$.
+- $\R$: finite regime taxonomy.
+- $E$: evidence packet (finite multiset of evidence objects).
+- $p$: ledger probability distribution over hypotheses (and possibly residuals).
+- $k$: confidence score in $[0,1]$.
+- $v$: validity scalar in $[0,1]$.
+- $w$: signed bounded weight in $[-W,W]$.
+- $\eta$: logit clamp parameter, $\eta\in(0,\tfrac12)$.
+
+** 2.2 Evidence objects
+\begin{definition}[Evidence object]
+An evidence object is a tuple
+\[
+e = (\mathrm{id},\ \mathrm{source},\ \mathrm{text},\ \mathrm{published\_at},\ \mathrm{retrieved\_at},\ \mathrm{hash}).
+\]
+An evidence packet $E$ is a finite multiset of such objects. The packet hash $\mathrm{Hash}(E)$ is a deterministic hash of a canonical serialization (sorted by $\mathrm{id}$ and stable fields).
+\end{definition}
+
+** 2.3 Canonical keys (permutation invariance primitive)
+\begin{definition}[Canonical key]
+For any string $\sigma$, define $\mathrm{norm}(\sigma)$ by lowercasing, trimming, and collapsing whitespace. Define
+\[
+\mathrm{cid}(\sigma):=(\mathrm{SHA256}(\mathrm{norm}(\sigma)),\ \mathrm{norm}(\sigma)).
+\]
+A hypothesis $h$ has key $\mathrm{key}(h)=\mathrm{cid}(h.\mathrm{statement})$.
+\end{definition}
+
+*Normative requirement:* all hypothesis collections are stored as maps keyed by $\mathrm{key}(\cdot)$ and iterated only in sorted key order.
+
+* 3. Modal Semantics: Regimes, Applicability, and Obligations
+This section supplies a semantic foundation for “in-regime,” “applicable,” and “necessary condition” claims.
+
+** 3.1 Kripke frame with regimes
+\begin{definition}[Regime-labeled Kripke frame]
+A regime-labeled frame is $(W,\{\to_r\}_{r\in\R})$ where $W$ is a set of worlds and each $\to_r\subseteq W\times W$ is an accessibility relation representing “worlds consistent with regime $r$.”
+\end{definition}
+
+** 3.2 Evidence as public announcement (dynamic epistemic update)
+Let $\mathcal{M}=(W,\{\to_r\}_{r\in\R},V)$ be a model with valuation $V$ assigning truth to atomic propositions.
+
+\begin{definition}[Evidence filter]
+Given evidence packet $E$, define a predicate $\Phi_E(w)$ meaning “world $w$ is consistent with $E$” (implementation-defined but auditable). The evidence update yields the restricted model
+\[
+\mathcal{M}\!\upharpoonright\!E := (W_E,\{\to^E_r\}_{r\in\R},V|_{W_E}),
+\quad W_E:=\{w\in W:\Phi_E(w)\},
+\quad \to^E_r:=\to_r\cap(W_E\times W_E).
+\]
+\end{definition}
+
+** 3.3 Obligations as modal constraints
+Obligation slots are interpreted as modalized claims about a hypothesis-mechanism.
+
+For a hypothesis $h$ and obligation slot $s$ define a formula $\varphi_{h,s}$.
+- “Necessary condition satisfied” is treated as a *robustness* claim:
+\[
+\mathcal{M}\!\upharpoonright\!E,\ w \models \Box_{\R_E}\varphi_{h,s}
+\]
+for an evidence-conditioned regime mixture $\R_E$ (defined below).
+
+** 3.4 Regime posterior and mixture modality
+Abductio uses a finite regime taxonomy $\R$ and a posterior $P(r\mid E)$.
+
+\begin{definition}[Regime posterior]
+A regime posterior is a distribution $P(\cdot\mid E)$ over $\R$, deterministically computed from $E$ by an auditable procedure. (The procedure may be heuristic but must log its inputs and outputs.)
+\end{definition}
+
+\begin{definition}[Mixture necessity]
+Define the *mixture necessity score* for formula $\psi$ as
+\[
+\Box_{P(\cdot\mid E)}\psi \;:=\; \sum_{r\in\R} P(r\mid E)\cdot \mathbf{1}\{\forall w'\ (w\to^E_r w' \Rightarrow \mathcal{M}\!\upharpoonright\!E,w'\models \psi)\}.
+\]
+This yields a value in $[0,1]$; it is $1$ iff $\psi$ holds necessarily in every regime-accessible world, and $0$ if it fails necessity in every regime.
+\end{definition}
+
+This construction provides a semantics for “robustly satisfied across likely regimes,” which is precisely what applicability gating and “necessary” slots aim to capture.
+
+* 4. Information-Theoretic Semantics: Weights as Bounded Code-Length Deltas
+Abductio is not assumed Bayesian; however, its log-space ledger updates admit an information-theoretic interpretation as bounded log-evidence / code-length improvements.
+
+** 4.1 Ledger as a coding distribution
+Let $p(h)$ be the ledger distribution over hypotheses. Interpret $-\log p(h)$ as a code-length for selecting $h$.
+
+** 4.2 Slot evaluation as bounded log-evidence
+Each evaluated slot produces $(p_{h,s},k_{h,s},v_{h,s})$ and a signed weight
+\[
+w_{h,s}=\clip\!\Big(\beta\,k'_{h,s}\cdot \logit(\clip(p_{h,s},\eta,1-\eta)),\ -W,\ W\Big)
+\]
+with $k'_{h,s}$ defined in Section 8. The weight is a bounded approximation to a log Bayes factor or, equivalently, a bounded code-length delta favoring or disfavoring $h$.
+
+** 4.3 VOI and entropy (used only for scheduling proxies)
+Define ledger entropy (named roots only):
+\[
+\Hent(p):=-\sum_{h} p(h)\log p(h).
+\]
+Abductio may use deterministic proxies for expected $\Delta\Hent$ to prioritize evaluations, but *must not* use hypothesis-conditioned evidence search.
+
+* 5. Data Model
+** 5.1 Core objects
+\begin{definition}[Root hypothesis]
+A root hypothesis is a tuple
+\[
+h=(\mathrm{key},\ \mathrm{statement},\ \mathrm{exclusion},\ A_h),
+\]
+where $A_h:\R\to[0,1]$ is an applicability profile.
+\end{definition}
+
+\begin{definition}[Obligation template]
+Fix a finite slot set $\mathcal{S}$ (e.g., Feasibility, Availability, Fit, Defeater). Every named root must instantiate all required slots in $\mathcal{S}$.
+\end{definition}
+
+\begin{definition}[Node and decomposition]
+Each slot node may be decomposed into children with type $\wedge$ (NEC/AND) or $\vee$ (EVID/OR). Nodes hold:
+- assessment $p(v)\in(0,1)$ with default $0.5$,
+- confidence $k(v)\in[0,1]$ with default $0.15$,
+- validity inputs (evidence ids, quote spans, entailment labels, claim type),
+- optional *recursion* pointer to a local Abductio instance.
+\end{definition}
+
+** 5.2 Credit model
+Only these operations consume credit:
+- $\mathrm{DECOMPOSE}(\cdot)$
+- $\mathrm{SEARCH}(\cdot)$
+- $\mathrm{EVALUATE}(\cdot)$
+
+All other computations (aggregation, normalization, scheduling computations) are free but logged.
+
+* 6. State Space and Transition Semantics
+This section gives the publishable “machine semantics” of Abductio.
+
+** 6.1 Session state
+\begin{definition}[Session state]
+A session state is a tuple
+\[
+\Sigma = (S,\ H,\ \R,\ E,\ \theta,\ B,\ \Pi,\ \Gamma,\ \Omega,\ L)
+\]
+where:
+- $S$ is the scope text,
+- $H$ is a finite map of named roots keyed by canonical keys,
+- $\R$ is the regime taxonomy,
+- $E$ is the current evidence packet,
+- $\theta$ are configuration constants (including $\beta,W,\eta$ and thresholds),
+- $B$ is remaining credits,
+- $\Pi$ is the ledger distribution $p$ over roots (and residuals if enabled),
+- $\Gamma$ is applied-weight memory $w_{\mathrm{applied}}[h,s]$,
+- $\Omega$ is structural state (decomposition trees, recursion instances, search counters),
+- $L$ is the audit log.
+\end{definition}
+
+** 6.2 Deterministic transition function
+\begin{definition}[One-step transition]
+The transition function $\mathrm{step}:\Sigma\to\Sigma$ is deterministic. If $B=0$, $\mathrm{step}(\Sigma)=\Sigma$.
+Otherwise:
+1) choose a target (hypothesis, slot, node) by a deterministic scheduler (Section 11),
+2) choose an operation (SEARCH/DECOMPOSE/EVALUATE) by deterministic rules (Section 10),
+3) apply the operation, logging all artifacts,
+4) decrement $B$ by the operation’s cost,
+5) enforce invariants (Section 12).
+\end{definition}
+
+*Normative:* determinism includes tie-breaking (always by canonical keys), fixed reduction order, and deterministic numeric handling.
+
+* 7. Ledger Update Rule (Symmetric Log-Space with Delta-w Memory)
+** 7.1 Weight map
+\begin{definition}[Weight mapping]
+Given $(p_{h,s},k'_{h,s})$ define
+\[
+w_{h,s}:=\clip\!\Big(\beta\,k'_{h,s}\cdot \logit(\clip(p_{h,s},\eta,1-\eta)),\ -W,\ W\Big).
+\]
+\end{definition}
+
+** 7.2 Delta-w (no-free-probability enforcement)
+\begin{definition}[Delta-w update]
+For each required slot $s\in\mathcal{S}$ maintain memory $\Gamma(h,s)=w_{\mathrm{applied}}[h,s]\in[-W,W]$.
+On EVALUATE of $(h,s)$:
+\[
+\Delta w:=w_{h,s}-\Gamma(h,s),
+\quad
+\tilde p(h):=p(h)\,e^{\Delta w},
+\quad
+\tilde p(g):=p(g)\ \ (g\neq h),
+\quad
+p':=\mathrm{Normalize}(\tilde p).
+\]
+Then set $\Gamma(h,s)\leftarrow w_{h,s}$ and $p\leftarrow p'$.
+\end{definition}
+
+DECOMPOSE and SEARCH must not modify $p$ or $\Gamma$.
+
+* 8. Validity Weighting and Claim-Type Leverage
+** 8.1 Validity scalar
+Each evaluated node yields a validity scalar $v_{h,s}\in[0,1]$ computed from auditable grounding and entailment artifacts.
+
+One acceptable default:
+- grounding $g\in[0,1]$,
+- entailment $\tau\in[0,1]$,
+- regime-consistency $\sigma\in[0,1]$ (from applicability and regime posterior),
+\[
+v=\clip(\alpha_g g+\alpha_\tau \tau+\alpha_\sigma \sigma,\ 0,\ 1),
+\quad \alpha_g+\alpha_\tau+\alpha_\sigma=1.
+\]
+
+** 8.2 Claim-type leverage
+Let $m_{\mathrm{type}}\in(0,1]$ be a deterministic multiplier:
+\[
+m_{\mathrm{type}}=
+\begin{cases}
+1.00,& \text{DIRECT\_FACT}\\
+0.80,& \text{NEGATIVE\_EVIDENCE}\\
+0.60,& \text{INFERENCE}\\
+0.20,& \text{GENERIC\_FEASIBILITY}.
+\end{cases}
+\]
+
+** 8.3 Effective confidence
+Define effective confidence
+\[
+k'_{h,s}:=k_{h,s}\cdot v^\lambda\cdot m_{\mathrm{type}},
+\]
+with $\lambda\ge 1$ configurable. This applies *exactly once per EVALUATE*.
+
+*Robustness difficulty addressed:* validity weighting can over-penalize messy domains. Mitigation is formal: the system separates (i) $p_{h,s}$ as a judgment and (ii) $v$ as auditable “how well grounded,” and applies downweighting only to update magnitude, not to displayed slot assessment itself. This preserves expressivity while controlling ledger movement.
+
+* 9. Applicability Gating and Typed Open-World Residuals
+** 9.1 Scope score and soft cap
+Given regime posterior $P(r\mid E)$ and applicability $A_h(r)$:
+\[
+s(h):=\sum_{r\in\R} P(r\mid E)A_h(r)\in[0,1].
+\]
+Impose a soft cap:
+\[
+p(h)\le \rho_{\min}+(\rho_{\max}-\rho_{\min})\,s(h),
+\]
+followed by renormalization (logged). Caps apply only to named hypotheses.
+
+** 9.2 Typed residuals
+Abductio supports OPEN_WORLD with typed residuals:
+- $h_{\mathrm{NOA}}$: none-of-the-above (library mismatch),
+- $h_{\mathrm{UND}}$: underdetermined (insufficient/contradictory evidence).
+
+Two modes are permitted:
+
+*** Mode B (recommended): active residual hypotheses
+Include $h_{\mathrm{NOA}},h_{\mathrm{UND}}$ as ordinary hypotheses in the ledger with their own (optional) obligations and updates. They may be updated only via EVALUATE (or via a deterministic “residual policy” that is logged and depends only on logged mismatch indices, not on hypothesis identity).
+
+*** Mode A: absorber masses
+Maintain $\gamma_{\mathrm{NOA}},\gamma_{\mathrm{UND}}$ and force
+\[
+p(h_{\mathrm{NOA}})=\gamma_{\mathrm{NOA}},\quad p(h_{\mathrm{UND}})=\gamma_{\mathrm{UND}},
+\quad \sum_{h\in H_{\mathrm{named}}}p(h)=1-\gamma_{\mathrm{NOA}}-\gamma_{\mathrm{UND}}.
+\]
+
+** 9.3 Residual dumping prevention (normative)
+Residuals must not become an unearned trash can. Enforce:
+
+\begin{definition}[Residual admissibility]
+Let $M:=1-\max_{h\in H_{\mathrm{named}}} s(h)$ (mismatch index).
+Let $U:=\clip\big(\frac{1}{N}\sum_{\text{evals}}(1-v_{h,s}),0,1\big)$ (underdetermination index).
+Residual increases are permitted only if $M$ or $U$ exceed configured thresholds. Otherwise residual mass is *nonincreasing* across EVALUATE steps.
+\end{definition}
+
+This rule is deterministic and auditably tied to mismatch/validity rather than to convenience.
+
+* 10. Decomposition and Aggregation (Anti-Inflation + Bounded Non-Associativity)
+** 10.1 EVID/OR anti-inflation
+For EVID nodes, the default aggregator is
+\[
+p_{\vee}=\max_j p_j,
+\]
+optionally with a capped noisy-OR:
+\[
+p_{\mathrm{noisy}}=1-\prod_j (1-p_j)^d,\qquad
+p_{\vee}=\min\big(\max_j p_j,\ p_{\mathrm{noisy}}\big).
+\]
+This prevents fragmentation from increasing parent support without any child being strongly supported.
+
+** 10.2 NEC/AND soft-AND with coupling
+For NEC nodes, define for two inputs:
+\[
+A_c(x,y)=c\min(x,y)+(1-c)xy,\qquad c\in[0,1].
+\]
+Extend by folding in canonical order of child keys.
+
+** 10.3 Bounded non-associativity
+Soft-AND is not associative for $c\in(0,1)$; thus tree shape can matter. Abductio resolves this robustly by:
+1) requiring canonical folding order (deterministic),
+2) proving a global bound on discrepancies between semantically equivalent tree shapes,
+3) logging coupling $c$ and fold order.
+
+(An explicit bound appears in Appendix A.)
+
+* 11. Deterministic Scheduling and Deterministic Symmetric Search
+** 11.1 Priority function (VOI-lite proxy)
+Define for each named hypothesis $h$:
+\[
+\mathrm{priority}(h)
+=\Big(p(h)(1-p(h))+\lambda_{\mathrm{voi}}/|H|\Big)\cdot (1-k(h))\cdot s(h)\cdot \phi(h),
+\]
+with deterministic tie-break by canonical key.
+
+This proxy is interpretable as: “high uncertainty $\times$ low confidence $\times$ in-scope.”
+
+** 11.2 Frontier and cycle discipline
+Let $h^\star$ be the argmax priority. Define frontier band
+\[
+F:=\{h:\ \mathrm{priority}(h)\ge \mathrm{priority}(h^\star)-\epsilon\},
+\]
+iterated in sorted key order, round-robin, one operation per hypothesis per cycle.
+
+This ensures symmetry and blocks focal privilege.
+
+** 11.3 Deterministic symmetric search
+SEARCH is a first-class credit operation that may add evidence to $E$ but must not change $p$.
+
+\begin{definition}[Symmetric search quota]
+Fix per-slot quotas $Q_s$ and max depth $D$. Maintain counters $C_{\mathrm{search}}(h,s,d)$.
+A SEARCH on $(h,s,d)$ is permitted iff:
+1) $d\le D$,
+2) $C_{\mathrm{search}}(h,s,d) < Q_s$,
+3) for all $h'$ with same slot and depth, $C_{\mathrm{search}}(h',s,d)$ is not less than $C_{\mathrm{search}}(h,s,d)$ by more than $1$ (round-robin parity).
+\end{definition}
+
+\begin{definition}[Deterministic query generation]
+SEARCH queries are deterministically generated from
+\[
+(S,\ h.\mathrm{statement},\ s.\mathrm{statement},\ d,\ \mathrm{role}).
+\]
+Results are admitted only if snapshotted and hashed into $E$ with deterministic ordering and immutable text storage.
+\end{definition}
+
+*Robustness difficulty addressed:* efficiency vs determinism. This system permits *adaptive allocation* only with respect to coverage deficits and confidence (slot $k$), not with respect to whether interim results support a leader. This preserves safety against p-hacking while still focusing on uncertainty.
+
+* 12. Recursion: Nested Abductio Instances (Local MECE Attempts)
+Recursion is the principal extension and the main source of subtle inflation risks. This section provides the strongest safe formalization.
+
+** 12.1 When recursion is allowed
+A node $v$ (typically a slot or a child claim) may spawn a local scope $S_v$ and local hypotheses $H_v$ if and only if:
+1) $v$ is flagged as “scenario-uncertainty” (auditable criterion),
+2) the local set is a MECE attempt relative to $S_v$,
+3) local instance inherits the same invariants (Sections 6–11),
+4) recursion depth $\le D_{\max}$ and local credit budget $\le B_{\max}(d)$.
+
+** 12.2 Local instance definition
+\begin{definition}[Local Abductio instance]
+A local instance is a session $\Sigma_v$ with:
+- scope $S_v$,
+- roots $H_v$ (plus optional residuals),
+- evidence packet initially $E$ (or a deterministic slice),
+- budget $B_v$ carved deterministically from the parent.
+\end{definition}
+
+** 12.3 The roll-up operator (parent satisfaction from local ledger)
+Let $p_v$ be the final local ledger distribution over $H_v$.
+
+A parent node $v$ declares a deterministic *satisfaction set* $T_v\subseteq H_v$ (“which scenarios satisfy $v$”).
+
+\begin{definition}[Roll-up as measure of satisfying scenarios]
+Define
+\[
+\mathcal{R}(v):=\sum_{h\in T_v} p_v(h).
+\]
+Set the parent node’s displayed assessment $p(v)$ to $\mathcal{R}(v)$.
+\end{definition}
+
+This roll-up is conservative in the correct sense: it is the probability mass of a subset of a distribution, hence in $[0,1]$, and cannot exceed $1$.
+
+** 12.4 Refinement invariance (critical: prevents roll-up inflation via splitting)
+A major recursion hazard is “scenario splitting”: adding more satisfying scenarios could raise $\sum_{h\in T_v}p_v(h)$ *without any new evaluation*.
+
+Abductio prevents this by defining hypothesis refinement as *measure-preserving partition refinement*.
+
+\begin{definition}[Measure-preserving refinement]
+Let a local hypothesis $h\in H_v$ be refined into children $h^{(1)},\dots,h^{(m)}$ forming a partition of $h$’s meaning. A refinement step replaces $h$ with these children and assigns initial ledger mass
+\[
+p_v(h^{(j)}) := p_v(h)\cdot \alpha_j,\qquad \alpha_j\ge 0,\ \sum_{j=1}^m \alpha_j=1,
+\]
+with $(\alpha_j)$ fixed deterministically (e.g., uniform or a logged structural prior) and *no* other masses changed.
+\end{definition}
+
+\begin{theorem}[Refinement invariance of roll-up (no-free-probability under recursion)]
+Consider a local instance with roll-up set $T_v$. If the instance undergoes any sequence of DECOMPOSE and SEARCH operations (and measure-preserving refinements), but no EVALUATE, then:
+1) the local ledger $p_v$ over semantic regions is unchanged (up to refinement partitioning), and
+2) the roll-up $\mathcal{R}(v)=\sum_{h\in T_v}p_v(h)$ is unchanged.
+\end{theorem}
+
+\begin{proof}
+SEARCH and DECOMPOSE do not modify ledger by no-free-probability. Refinement replaces one hypothesis mass $p_v(h)$ by child masses summing to $p_v(h)$. If $h\in T_v$ then all its children are declared either all satisfying or satisfying status is inherited deterministically by the partition mapping; in either case, the total satisfying mass contributed by that region is preserved. Summing over all regions yields invariance.
+\end{proof}
+
+This theorem is the key robust fix for recursion-induced roll-up bias.
+
+** 12.5 Credit causality across levels
+Local evaluations may influence the parent only via the parent’s own EVALUATE step(s). Concretely:
+- running local Abductio is a form of DECOMPOSE+SEARCH inside the node, producing a displayed $p(v)$;
+- the parent ledger changes only when the parent spends an EVALUATE credit and applies Delta-$w$ using $p(v)$ and $k(v)$ (or using a deterministic mapping from local $k$ to parent $k$).
+
+This preserves global no-free-probability.
+
+* 13. Core Invariants and Theorems
+** 13.1 Permutation invariance
+\begin{theorem}[Permutation invariance (input-order)]
+Let $\pi$ be any permutation of the input list of root hypotheses. If initialization stores roots by canonical keys and all iteration/tie-breaking is by those keys, then the run output is identical:
+\[
+\mathrm{Run}(S,H,E_0,B,\theta)=\mathrm{Run}(S,\pi(H),E_0,B,\theta).
+\]
+\end{theorem}
+
+\begin{proof}
+Initialization yields identical keyed maps. The transition function $\mathrm{step}$ is deterministic and consults only keyed state. Therefore each step is identical and so is the final state.
+\end{proof}
+
+** 13.2 No-free-probability
+\begin{theorem}[No-free-probability]
+In any session (including nested instances), ledger probabilities $p$ can change only on EVALUATE steps. SEARCH and DECOMPOSE leave $p$ unchanged.
+\end{theorem}
+
+\begin{proof}
+Immediate from the transition semantics: only EVALUATE applies Delta-$w$ to $p$.
+\end{proof}
+
+** 13.3 Anti-inflation for EVID aggregation
+\begin{theorem}[Max-OR anti-inflation]
+For an EVID node aggregated by $p_\vee=\max_j p_j$, introducing additional unassessed children with default $p=0.5$ cannot increase the parent score beyond the strongest existing child; hence decomposition cannot inflate EVID support absent evaluation.
+\end{theorem}
+
+** 13.4 Bounded effect of NEC soft-AND non-associativity
+See Appendix A for a tight bound on rotation-induced discrepancies and their propagation to weights and ledger via Lipschitz bounds.
+
+** 13.5 Residual safety
+\begin{theorem}[Residual monotonicity under admissibility rule]
+Under the residual admissibility rule (Section 9.3), if mismatch $M$ and underdetermination $U$ are below thresholds, then residual mass is nonincreasing across EVALUATE steps.
+\end{theorem}
+
+\begin{proof}
+Residual update policy is a deterministic monotone function of $(M,U)$ with zero increase when both are below thresholds.
+\end{proof}
+
+* 14. Algorithm (Normative Pseudocode)
+#+begin_src text
+INPUT: scope S, roots H (statements + exclusions + applicability), evidence E0, credits B, config θ, regimes R
+INIT:
+  store roots as map keyed by cid(statement)
+  optionally add residual hypotheses NOA, UND
+  set initial ledger p (uniform over named; residual split if enabled)
+  set all slot nodes to p=0.5, k=0.15, validity blank
+  set w_applied[h,s]=0 for required slots
+  set search counters C_search[h,s,d]=0
+  set evidence hash H0 = Hash(E0)
+
+LOOP while B>0:
+  compute regime posterior P(r|E) deterministically, log it
+  compute scope scores s(h) = Σ_r P(r|E)A_h(r)
+  enforce scope soft caps on named hypotheses (log caps & renorm)
+  compute priority(h) = (p(1-p)+λ/|H|)(1-k(h))s(h)φ(h)
+  define frontier band F and iterate in canonical key order
+
+  for h in F (one operation each, round-robin):
+    choose target slot s*: lowest k among required slots (tie-break canonical)
+    choose operation deterministically:
+      if root unscoped or missing template -> DECOMPOSE(root)
+      else if recursion warranted for node v and depth allows -> DECOMPOSE(v) into local instance (belief-neutral)
+      else if coverage deficit and symmetric quota permits -> SEARCH(h,s*,depth)
+      else if can decompose s* and k(s*)<τ -> DECOMPOSE(s*)
+      else -> EVALUATE(s*)  # only op that moves ledger
+
+    apply operation:
+      SEARCH: retrieve evidence deterministically, snapshot+hash, add to E, log; do NOT change p
+      DECOMPOSE: add children / local instance; do NOT change p
+      EVALUATE: obtain (p_node, k_node, validity artifacts)
+        compute v and m_type, compute k' = k*v^λ*m_type
+        compute w_new = clip(β k' logit(clip(p_node,η,1-η)),-W,W)
+        Δw = w_new - w_applied[h,s*]
+        p(h) *= exp(Δw); normalize; set w_applied[h,s*]=w_new
+        update root confidence k(h) deterministically from slots
+        update residuals via admissibility policy; log all arithmetic
+
+    B -= 1
+    enforce invariants (no-free-probability, quota parity, min-eval-share, etc.)
+END
+OUTPUT: (p(h),k(h)) + full audit log + evidence snapshots
+#+end_src
+
+* 15. Interpretation Contract (Claims Policy)
+1) $p(h)$ is a *session-scoped credence allocation* over a MECE attempt, not automatically a calibrated probability of truth.
+2) $k(h)$ measures robustness of the assessment under re-audit/adversarial checking.
+3) Only paid evaluations (EVALUATE) may move the ledger.
+4) High $p(h)$ with low applicability $s(h)$ is a flagged anomaly, not a confident conclusion.
+
+* 16. Configuration Defaults (Illustrative)
+- required slots: Feasibility, Availability, Fit, Defeater
+- $\beta=1$, $W=3$, $\eta=10^{-6}$
+- $\tau=0.70$ (target slot confidence)
+- $\epsilon=0.05$ (frontier band)
+- $\lambda_{\mathrm{voi}}=0.1$
+- $\rho_{\min}=0.02,\ \rho_{\max}=0.90$
+- recursion depth cap $D_{\max}=2$
+- symmetric search quotas $Q_s=1$ per slot per hypothesis per depth
+- residual thresholds: $\theta_M,\theta_U$ conservative (domain-tuned)
+
+* Appendix A: Tight Bound for NEC Soft-AND Non-Associativity (Summary)
+This appendix states a publishable bound for the NEC aggregator
+\[
+A_c(x,y)=c\min(x,y)+(1-c)xy.
+\]
+Different binary-tree shapes over the same leaf multiset can yield different root values when $c\in(0,1)$.
+
+Define the associator discrepancy
+\[
+\Delta_c(x,y,z)=A_c(A_c(x,y),z)-A_c(x,A_c(y,z)).
+\]
+Define $\alpha(c)=\sup_{x,y,z\in[0,1]}|\Delta_c(x,y,z)|$.
+
+One tight characterization (sufficient for engineering bounds and proofs) is:
+\[
+\alpha(c)=\max_{q\in[0,1]} c(1-c)\,q(1-q)\big(c+(1-c)q\big),
+\]
+and the universal bound
+\[
+\alpha(c)\le \frac{c(1-c)}{4}.
+\]
+
+If two full binary trees with $n$ leaves differ by rotation distance at most $2n-6$, then their root discrepancy is bounded by
+\[
+|p(T_1)-p(T_2)|\le (2n-6)\alpha(c).
+\]
+
+Since the weight map $w(p,k)$ is Lipschitz in $p$ on $[\eta,1-\eta]$, the induced weight discrepancy is bounded and therefore so is the induced perturbation in normalized ledger probabilities via softmax sensitivity.
+
+* Appendix B: Recursion Safety Checklist (Normative)
+A recursive node $v$ is admissible only if:
+1) local hypothesis refinement is measure-preserving,
+2) local SEARCH is symmetric and deterministic,
+3) local DECOMPOSE/SEARCH are belief-neutral,
+4) parent ledger movement occurs only on parent EVALUATE,
+5) roll-up $\mathcal{R}(v)$ is subset-mass of a distribution,
+6) recursion depth and node count are capped and logged.
+
+* Appendix C: Minimal Formal Interfaces (Implementation Contracts)
+- Evaluator: returns $(p,k)$ plus grounding artifacts, entailment labels, claim type, defeaters, assumptions.
+- Decomposer: returns children with types NEC/EVID and deterministic coupling/overlap metadata.
+- Searcher: returns deterministic ordered evidence items + snapshot hash; must persist immutable text for replay.
+

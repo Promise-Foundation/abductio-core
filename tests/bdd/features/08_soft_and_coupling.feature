@@ -7,7 +7,6 @@ Feature: Soft-AND aggregation with coupling buckets
   Background:
     Given required template slots:
       | slot_key            | role |
-      | feasibility         | NEC  |
       | availability        | NEC  |
       | fit_to_key_features | NEC  |
       | defeater_resistance | NEC  |

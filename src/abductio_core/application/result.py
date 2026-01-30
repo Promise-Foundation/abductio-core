@@ -23,6 +23,8 @@ class SessionResult:
     credits_remaining: int = 0
     total_credits_spent: int = 0
     operation_log: List[Dict[str, Any]] = field(default_factory=list)
+    explanations: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict_view(self) -> Dict[str, Any]:
         return {
@@ -34,4 +36,6 @@ class SessionResult:
             "credits_remaining": self.credits_remaining,
             "total_credits_spent": self.total_credits_spent,
             "operation_log": list(self.operation_log),
+            "explanations": dict(self.explanations),
+            "metadata": dict(self.metadata),
         }

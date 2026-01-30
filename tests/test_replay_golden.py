@@ -14,6 +14,7 @@ def test_replay_from_golden_audit_fixture() -> None:
     assert result["stop_reason"] == "CREDITS_EXHAUSTED"
     assert abs(result["ledger"]["H1"] - 0.35) <= 1e-9
     assert abs(result["ledger"]["H2"] - 0.45) <= 1e-9
-    assert abs(result["ledger"]["H_other"] - 0.20) <= 1e-9
+    assert abs(result["ledger"]["H_NOA"] - 0.10) <= 1e-9
+    assert abs(result["ledger"]["H_UND"] - 0.10) <= 1e-9
     assert abs(sum(result["ledger"].values()) - 1.0) <= 1e-9
     assert len(result["operation_log"]) == 2

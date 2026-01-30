@@ -18,9 +18,9 @@ Feature: Cost model and operation legality
       | id   | statement          | exclusion_clause                |
       | H1   | Mechanism A        | Not explained by any other root |
     And a deterministic decomposer that will scope roots with:
-      | root_id | feasibility_statement    | availability_statement | fit_statement         | defeater_statement      |
-      | H1      | A possible              | A available           | A fits               | A resists defeater     |
-    And a deterministic evaluator that returns for node "H1:feasibility":
+      | root_id | availability_statement | fit_statement         | defeater_statement      |
+      | H1      | A available           | A fits               | A resists defeater     |
+    And a deterministic evaluator that returns for node "H1:availability":
       | p | 0.90 |
       | A | 2    |
       | B | 1    |
@@ -46,7 +46,6 @@ Feature: Cost model and operation legality
   Scenario: Stop condition B (frontier all meet tau) is respected
     Given required template slots:
       | slot_key            | role |
-      | feasibility         | NEC  |
       | availability        | NEC  |
       | fit_to_key_features | NEC  |
       | defeater_resistance | NEC  |

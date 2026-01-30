@@ -71,7 +71,7 @@ def _run(roots: List[RootSpec]) -> Dict[str, Any]:
     req = SessionRequest(
         scope="determinism strict",
         roots=roots,
-        config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open"),
+        config=SessionConfig(tau=0.70, epsilon=0.05, gamma_noa=0.10, gamma_und=0.10, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open", gamma=0.20),
         credits=8,
         required_slots=[{"slot_key": "feasibility", "role": "NEC"}],
         run_mode="until_credits_exhausted",
@@ -91,7 +91,11 @@ def test_operation_sequence_invariant_under_root_order() -> None:
     res_a = _run(roots_a)
     res_b = _run(roots_b)
 
-    canon = {r["id"]: canonical_id_for_statement(r["statement"]) for r in res_a["roots"].values() if r["id"] != "H_other"}
+    canon = {
+        r["id"]: canonical_id_for_statement(r["statement"])
+        for r in res_a["roots"].values()
+        if r["id"] not in {"H_NOA", "H_UND"}
+    }
 
     def normalize(op: Dict[str, Any]) -> str:
         tid = str(op["target_id"])

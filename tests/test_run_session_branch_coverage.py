@@ -61,7 +61,7 @@ def _base_request() -> SessionRequest:
     return SessionRequest(
         scope="test",
         roots=[RootSpec("H1", "Mechanism A", "x")],
-        config=SessionConfig(tau=0.7, epsilon=0.05, gamma=0.2, alpha=0.4, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open"),
+        config=SessionConfig(tau=0.7, epsilon=0.05, gamma_noa=0.10, gamma_und=0.10, alpha=0.4, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open", gamma=0.2),
         credits=1,
         required_slots=None,
         run_mode="start_only",
@@ -73,7 +73,25 @@ def test_validate_request_errors() -> None:
     with pytest.raises(ValueError):
         rs._validate_request(req.__class__(**{**req.__dict__, "credits": -1}))
     with pytest.raises(ValueError):
-        rs._validate_request(req.__class__(**{**req.__dict__, "config": SessionConfig(1.2, 0.1, 0.2, 0.3, 1.0, 3.0, 0.1, "open")}))
+        rs._validate_request(
+            req.__class__(
+                **{
+                    **req.__dict__,
+                    "config": SessionConfig(
+                        tau=1.2,
+                        epsilon=0.1,
+                        gamma_noa=0.1,
+                        gamma_und=0.1,
+                        alpha=0.3,
+                        beta=1.0,
+                        W=3.0,
+                        lambda_voi=0.1,
+                        world_mode="open",
+                        gamma=0.2,
+                    ),
+                }
+            )
+        )
     with pytest.raises(ValueError):
         rs._validate_request(
             req.__class__(**{**req.__dict__, "roots": [RootSpec("", "S", "x")]})
@@ -357,7 +375,14 @@ def test_evaluations_children_slot_missing_all_roots_stop(monkeypatch) -> None:
 
     root = RootHypothesis(root_id="H1", statement="S", exclusion_clause="x", canonical_id="cid", status="SCOPED")
     root.obligations = FlakyObligations("H1:feasibility")  # type: ignore[assignment]
-    hset = rs.HypothesisSet(roots={"H1": root, "H_other": RootHypothesis("H_other", "Other", "", "cid2")}, ledger={"H1": 1.0, "H_other": 0.0})
+    hset = rs.HypothesisSet(
+        roots={
+            "H1": root,
+            "H_NOA": RootHypothesis("H_NOA", "None of the above", "", "cid2"),
+            "H_UND": RootHypothesis("H_UND", "Underdetermined", "", "cid3"),
+        },
+        ledger={"H1": 1.0, "H_NOA": 0.0, "H_UND": 0.0},
+    )
 
     def _fake_init(_request):
         return hset

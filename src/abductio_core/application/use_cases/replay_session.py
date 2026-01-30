@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import math
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from abductio_core.application.dto import EvidenceItem, RootSpec, SessionConfig, SessionRequest
 from abductio_core.application.result import SessionResult, StopReason
 from abductio_core.application.use_cases import run_session as rs
-from abductio_core.domain.invariants import H_OTHER_ID, enforce_absorber
+from abductio_core.domain.invariants import H_NOA_ID, H_UND_ID, enforce_open_world
 from abductio_core.domain.model import Node, RootHypothesis
 
 
@@ -67,16 +68,16 @@ def _legacy_replay(audit_trace: Iterable[Dict[str, object]]) -> SessionResult:
             p_new = payload.get("p_new")
             if isinstance(rid, str) and isinstance(p_new, (int, float)):
                 ledger[rid] = float(p_new)
-                named = [r for r in required_root_ids if r != H_OTHER_ID]
-                if named and H_OTHER_ID in required_root_ids:
-                    enforce_absorber(ledger, named)
+                named = [r for r in required_root_ids if r not in {H_NOA_ID, H_UND_ID}]
+                if named and (H_NOA_ID in required_root_ids or H_UND_ID in required_root_ids):
+                    enforce_open_world(ledger, named)
         elif et == "LOG_LEDGER_NORMALIZED":
             logged = payload.get("ledger")
             if isinstance(logged, dict):
                 ledger = {str(k): float(v) for k, v in logged.items() if isinstance(v, (int, float))}
-                named = [r for r in required_root_ids if r != H_OTHER_ID]
-                if named and H_OTHER_ID in required_root_ids:
-                    enforce_absorber(ledger, named)
+                named = [r for r in required_root_ids if r not in {H_NOA_ID, H_UND_ID}]
+                if named and (H_NOA_ID in required_root_ids or H_UND_ID in required_root_ids):
+                    enforce_open_world(ledger, named)
         elif et == "NAMED_LEDGER_NORMALIZED":
             logged = payload.get("ledger")
             if isinstance(logged, dict):
@@ -89,9 +90,9 @@ def _legacy_replay(audit_trace: Iterable[Dict[str, object]]) -> SessionResult:
                 except ValueError:
                     stop_reason = None
 
-    named = [r for r in required_root_ids if r != H_OTHER_ID]
-    if named and H_OTHER_ID in required_root_ids:
-        enforce_absorber(ledger, named)
+    named = [r for r in required_root_ids if r not in {H_NOA_ID, H_UND_ID}]
+    if named and (H_NOA_ID in required_root_ids or H_UND_ID in required_root_ids):
+        enforce_open_world(ledger, named)
 
     return SessionResult(
         roots={k: dict(v) for k, v in roots.items()},
@@ -117,7 +118,7 @@ def _build_request(payload: Dict[str, object]) -> Tuple[SessionRequest, Dict[str
         if not isinstance(entry, dict):
             continue
         root_id = entry.get("root_id")
-        if not isinstance(root_id, str) or root_id == H_OTHER_ID:
+        if not isinstance(root_id, str) or root_id in {H_NOA_ID, H_UND_ID}:
             continue
         root_specs.append(
             RootSpec(
@@ -129,12 +130,14 @@ def _build_request(payload: Dict[str, object]) -> Tuple[SessionRequest, Dict[str
     config = SessionConfig(
         tau=float(config_payload.get("tau", 0.7)),
         epsilon=float(config_payload.get("epsilon", 0.05)),
-        gamma=float(config_payload.get("gamma", 0.2)),
+        gamma_noa=float(config_payload.get("gamma_noa", 0.0)),
+        gamma_und=float(config_payload.get("gamma_und", 0.0)),
         alpha=float(config_payload.get("alpha", 0.0)),
         beta=float(config_payload.get("beta", 1.0)),
         W=float(config_payload.get("W", 3.0)),
         lambda_voi=float(config_payload.get("lambda_voi", 0.1)),
         world_mode=str(config_payload.get("world_mode", "open")),
+        gamma=float(config_payload.get("gamma", 0.2)),
     )
     evidence_items_payload = payload.get("evidence_items") if isinstance(payload.get("evidence_items"), list) else []
     evidence_index: Dict[str, EvidenceItem] = {}
@@ -161,6 +164,7 @@ def _build_request(payload: Dict[str, object]) -> Tuple[SessionRequest, Dict[str
         slot_k_min=dict(slot_k_min),
         slot_initial_p=dict(slot_initial_p),
         evidence_items=list(evidence_index.values()),
+        framing=payload.get("framing") if isinstance(payload.get("framing"), str) else None,
     )
     return request, evidence_index
 
@@ -188,7 +192,7 @@ def replay_session(audit_trace: Iterable[Dict[str, object]]) -> SessionResult:
     operation_log: List[Dict[str, object]] = []
     stop_reason: Optional[StopReason] = None
     w_applied: Dict[Tuple[str, str], float] = {}
-    named_root_ids = [rid for rid in hypothesis_set.roots if rid != H_OTHER_ID]
+    named_root_ids = [rid for rid in hypothesis_set.roots if rid not in {H_NOA_ID, H_UND_ID}]
 
     class _NullAuditSink:
         def append(self, _event) -> None:
@@ -200,8 +204,7 @@ def replay_session(audit_trace: Iterable[Dict[str, object]]) -> SessionResult:
     def apply_ledger_update(root: RootHypothesis) -> None:
         beta = float(request.config.beta)
         weight_cap = float(request.config.W)
-        previous_ledger = dict(hypothesis_set.ledger)
-        log_ledger = {key: rs._safe_log(float(value)) for key, value in hypothesis_set.ledger.items()}
+        p_base = float(hypothesis_set.ledger.get(root.root_id, 0.0))
         total_delta = 0.0
         for slot_key in required_slot_keys:
             node_key = root.obligations.get(slot_key)
@@ -210,7 +213,9 @@ def replay_session(audit_trace: Iterable[Dict[str, object]]) -> SessionResult:
             node = nodes.get(node_key)
             if not node or not node.assessed:
                 continue
-            w_new = rs._clip(beta * float(node.k) * rs._logit(float(node.p)), -weight_cap, weight_cap)
+            p = rs._clip(float(node.p), 1e-6, 1.0 - 1e-6)
+            ratio = p / 0.5
+            w_new = rs._clip(math.log(ratio), -weight_cap, weight_cap)
             key = (root.root_id, slot_key)
             w_prev = w_applied.get(key, 0.0)
             delta = w_new - w_prev
@@ -218,23 +223,18 @@ def replay_session(audit_trace: Iterable[Dict[str, object]]) -> SessionResult:
             if abs(delta) > 0.0:
                 log_ledger[root.root_id] = log_ledger.get(root.root_id, rs._safe_log(0.0)) + delta
             w_applied[key] = w_new
-        _ = total_delta
-        hypothesis_set.ledger = rs._normalize_log_ledger(log_ledger)
-        if H_OTHER_ID in hypothesis_set.ledger:
-            enforce_absorber(hypothesis_set.ledger, named_root_ids)
+        p_prop = p_base * math.exp(beta * total_delta)
         alpha = float(request.config.alpha)
-        if alpha > 0.0:
-            blended = {}
-            for key in set(previous_ledger) | set(hypothesis_set.ledger):
-                blended[key] = alpha * float(previous_ledger.get(key, 0.0)) + (1.0 - alpha) * float(
-                    hypothesis_set.ledger.get(key, 0.0)
-                )
-            total = sum(blended.values())
-            if total > 0.0:
-                blended = {k: v / total for k, v in blended.items()}
-            hypothesis_set.ledger = blended
-            if H_OTHER_ID in hypothesis_set.ledger:
-                enforce_absorber(hypothesis_set.ledger, named_root_ids)
+        p_damped = (1.0 - alpha) * p_base + alpha * p_prop
+        hypothesis_set.ledger[root.root_id] = p_damped
+        if request.config.world_mode == "closed":
+            total_named = sum(hypothesis_set.ledger.get(rid, 0.0) for rid in named_root_ids)
+            if total_named > 1.0 and total_named > 0.0:
+                for rid in named_root_ids:
+                    hypothesis_set.ledger[rid] = hypothesis_set.ledger.get(rid, 0.0) / total_named
+        else:
+            if H_NOA_ID in hypothesis_set.ledger or H_UND_ID in hypothesis_set.ledger:
+                enforce_open_world(hypothesis_set.ledger, named_root_ids)
 
     def evaluate_from_event(root: RootHypothesis, node_key: str, payload: Dict[str, object]) -> None:
         node = nodes.get(node_key)
@@ -412,9 +412,9 @@ def replay_session(audit_trace: Iterable[Dict[str, object]]) -> SessionResult:
                 except ValueError:
                     stop_reason = None
 
-    named = [r for r in hypothesis_set.roots if r != H_OTHER_ID]
-    if named and H_OTHER_ID in hypothesis_set.roots:
-        enforce_absorber(hypothesis_set.ledger, named)
+    named = [r for r in hypothesis_set.roots if r not in {H_NOA_ID, H_UND_ID}]
+    if named and (H_NOA_ID in hypothesis_set.roots or H_UND_ID in hypothesis_set.roots):
+        enforce_open_world(hypothesis_set.ledger, named)
 
     nodes_view = {
         node_key: {

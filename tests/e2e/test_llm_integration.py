@@ -42,7 +42,7 @@ def test_e2e_llm_integration_smoke_realistic_usage() -> None:
             RootSpec(root_id="H1", statement="Mechanism A", exclusion_clause="Not explained by any other root"),
             RootSpec(root_id="H2", statement="Mechanism B", exclusion_clause="Not explained by any other root"),
         ],
-        config=SessionConfig(tau=0.70, epsilon=0.05, gamma=0.20, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open"),
+        config=SessionConfig(tau=0.70, epsilon=0.05, gamma_noa=0.10, gamma_und=0.10, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open", gamma=0.20),
         credits=4,
         required_slots=[{"slot_key": "feasibility", "role": "NEC"}],
         run_mode="until_credits_exhausted",
@@ -55,10 +55,11 @@ def test_e2e_llm_integration_smoke_realistic_usage() -> None:
     assert "ledger" in view
     assert "audit" in view
     assert "operation_log" in view
-    assert "H_other" in view["roots"]
+    assert "H_NOA" in view["roots"]
+    assert "H_UND" in view["roots"]
     assert abs(sum(view["ledger"].values()) - 1.0) <= 1e-9
 
-    named_roots = [rid for rid in view["roots"] if rid != "H_other"]
+    named_roots = [rid for rid in view["roots"] if rid not in {"H_NOA", "H_UND"}]
     assert set(named_roots) == {"H1", "H2"}
     for root_id in named_roots:
         root = view["roots"][root_id]

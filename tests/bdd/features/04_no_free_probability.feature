@@ -14,7 +14,6 @@ Feature: No-free-probability semantics
       | lambda_voi | 0.10 |
     And required template slots:
       | slot_key            | role |
-      | feasibility         | NEC  |
       | availability        | NEC  |
       | fit_to_key_features | NEC  |
       | defeater_resistance | NEC  |
@@ -29,7 +28,8 @@ Feature: No-free-probability semantics
     When I run the engine for exactly 2 operations
     Then all named roots are SCOPED
     And each named root p_ledger is unchanged from its initial value within 1e-9
-    And H_other p_ledger is unchanged from its initial value within 1e-9
+    And H_NOA p_ledger is unchanged from its initial value within 1e-9
+    And H_UND p_ledger is unchanged from its initial value within 1e-9
 
   Scenario: Adding additional NEC children inside a slot does not penalize until evaluated
     Given a hypothesis set with named roots:

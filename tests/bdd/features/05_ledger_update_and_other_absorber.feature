@@ -1,6 +1,6 @@
 # tests/bdd/features/05_ledger_update_and_other_absorber.feature
-Feature: Ledger updates, damping, and Other absorber invariant
-  Ledger updates must be auditable, deterministic, and keep probabilities summing to 1 with H_other absorbing slack.
+Feature: Ledger updates, damping, and open-world residuals
+  Ledger updates must be auditable, deterministic, and keep probabilities summing to 1 with H_NOA/H_UND absorbing slack.
 
   Background:
     Given default config:
@@ -13,7 +13,6 @@ Feature: Ledger updates, damping, and Other absorber invariant
       | lambda_voi | 0.10 |
     And required template slots:
       | slot_key            | role |
-      | feasibility         | NEC  |
       | availability        | NEC  |
       | fit_to_key_features | NEC  |
       | defeater_resistance | NEC  |
@@ -23,7 +22,7 @@ Feature: Ledger updates, damping, and Other absorber invariant
       | id   | statement       | exclusion_clause                |
       | H1   | Mechanism A     | Not explained by any other root |
     And a deterministic decomposer that will scope root "H1"
-    And a deterministic evaluator that returns for node "H1:feasibility":
+    And a deterministic evaluator that returns for node "H1:availability":
       | p | 0.50 |
       | A | 2    |
       | B | 1    |
@@ -32,20 +31,20 @@ Feature: Ledger updates, damping, and Other absorber invariant
       | evidence_ids | ref1 |
     And credits 2
     When I run the engine until credits exhausted
-    Then the audit log includes a delta-w update for root "H1" slot "feasibility"
+    Then the audit log includes a delta-w update for root "H1" slot "availability"
     And the audit log includes a normalized ledger update
     And the ledger probabilities sum to 1.0 within 1e-9
-    And H_other is set to 1 - sum(named_roots)
+    And H_NOA and H_UND sum to 1 - sum(named_roots)
 
   Scenario: Engine repairs corrupted ledger using the invariant enforcement routine
     Given a hypothesis set with named roots:
       | id   | statement       | exclusion_clause                |
       | H1   | Mechanism A     | Not explained by any other root |
       | H2   | Mechanism B     | Not explained by any other root |
-    And the ledger is externally corrupted so that sum(named_roots) = 1.2 and H_other = -0.2
+    And the ledger is externally corrupted so that sum(named_roots) = 1.2 and H_NOA/H_UND are negative
     And credits 0
     When I start a session for scope "Invariant repair"
-    Then the engine enforces the Other absorber invariant
+    Then the engine enforces the open-world residuals invariant
     And all p_ledger values are in [0,1]
     And the ledger probabilities sum to 1.0 within 1e-9
     And the audit log records which branch was taken (S<=1 or S>1)
