@@ -8,7 +8,7 @@ fi
 
 version="$1"
 
-RELEASE_VERSION="$version" python - <<'PY'
+RELEASE_VERSION="$version" python3 - <<'PY'
 from pathlib import Path
 import re
 import os

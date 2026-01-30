@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 from typing import Dict, Iterable, List, Optional, Tuple
 
@@ -18,6 +20,10 @@ def _clamp_probability(value: float) -> float:
 
 def _clip(value: float, lower: float, upper: float) -> float:
     return max(lower, min(upper, value))
+
+
+def _normalize_whitespace(text: str) -> str:
+    return " ".join(str(text).split())
 
 
 def _logit(p: float) -> float:
@@ -42,6 +48,38 @@ def _normalize_log_ledger(log_ledger: Dict[str, float]) -> Dict[str, float]:
     lse = _logsumexp(log_ledger.values())
     return {key: math.exp(value - lse) for key, value in log_ledger.items()}
 
+def _evidence_item_payload(item: EvidenceItem) -> Dict[str, object]:
+    return {
+        "id": item.id,
+        "source": item.source,
+        "text": item.text,
+        "location": item.location,
+        "metadata": dict(item.metadata),
+    }
+
+
+def _hash_json_payload(payload: Dict[str, object]) -> str:
+    serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _hash_evidence_item(item: EvidenceItem) -> str:
+    return _hash_json_payload(_evidence_item_payload(item))
+
+
+def _hash_evidence_packet(evidence_index: Dict[str, EvidenceItem]) -> str:
+    ordered = []
+    for evidence_id in sorted(evidence_index.keys()):
+        item = evidence_index[evidence_id]
+        ordered.append(f"{evidence_id}:{_hash_evidence_item(item)}")
+    digest = hashlib.sha256("|".join(ordered).encode("utf-8")).hexdigest()
+    return digest
+
+
+def _hash_search_snapshot(items: List[EvidenceItem]) -> str:
+    ordered = [f"{item.id}:{_hash_evidence_item(item)}" for item in sorted(items, key=lambda i: i.id)]
+    return hashlib.sha256("|".join(ordered).encode("utf-8")).hexdigest()
+
 
 def _validate_request(request: SessionRequest) -> None:
     if request.credits < 0:
@@ -54,6 +92,8 @@ def _validate_request(request: SessionRequest) -> None:
         value = getattr(request.config, attr)
         if not (0.0 <= value <= 1.0):
             raise ValueError(f"{attr} must be within [0,1]")
+    if request.config.gamma_noa + request.config.gamma_und > 1.0:
+        raise ValueError("gamma_noa + gamma_und must be <= 1")
     if request.config.beta < 0.0:
         raise ValueError("beta must be non-negative")
     if request.config.W <= 0.0:
@@ -62,6 +102,8 @@ def _validate_request(request: SessionRequest) -> None:
         raise ValueError("lambda_voi must be non-negative")
     if request.config.world_mode not in {"open", "closed"}:
         raise ValueError("world_mode must be 'open' or 'closed'")
+    if not (0.0 <= float(request.config.rho_eval_min) <= 1.0):
+        raise ValueError("rho_eval_min must be within [0,1]")
     for root in request.roots:
         if not root.root_id:
             raise ValueError("root_id is required")
@@ -116,8 +158,8 @@ def _evidence_index(request: SessionRequest) -> Dict[str, EvidenceItem]:
 def _node_statement_map(decomposition: Dict[str, str]) -> Dict[str, str]:
     return {
         "availability": decomposition.get("availability_statement", ""),
-        "fit_to_key_features": decomposition.get("fit_statement", ""),
-        "defeater_resistance": decomposition.get("defeater_statement", ""),
+        "fit_to_key_features": decomposition.get("fit_to_key_features_statement", ""),
+        "defeater_resistance": decomposition.get("defeater_resistance_statement", ""),
     }
 
 
@@ -575,6 +617,7 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
     required_slot_keys = _required_slot_keys(request)
     required_slot_roles = _required_slot_roles(request)
     evidence_index = _evidence_index(request)
+    evidence_packet_hash = _hash_evidence_packet(evidence_index)
 
     named_root_ids = [rid for rid in hypothesis_set.roots if rid not in {H_NOA_ID, H_UND_ID}]
     deps.audit_sink.append(
@@ -603,22 +646,15 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
                     "W": request.config.W,
                     "lambda_voi": request.config.lambda_voi,
                     "world_mode": request.config.world_mode,
+                    "rho_eval_min": request.config.rho_eval_min,
                 },
                 "required_slots": request.required_slots or [],
                 "framing": request.framing,
                 "initial_ledger": dict(request.initial_ledger or {}),
                 "slot_k_min": dict(request.slot_k_min or {}),
                 "slot_initial_p": dict(request.slot_initial_p or {}),
-                "evidence_items": [
-                    {
-                        "id": item.id,
-                        "source": item.source,
-                        "text": item.text,
-                        "location": item.location,
-                        "metadata": dict(item.metadata),
-                    }
-                    for item in evidence_index.values()
-                ],
+                "evidence_items": [_evidence_item_payload(item) for item in evidence_index.values()],
+                "evidence_packet_hash": evidence_packet_hash,
             },
         )
     )
@@ -661,8 +697,13 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
             )
         )
 
+    log_ledger: Dict[str, float] = {}
+    for rid in named_root_ids:
+        log_ledger[rid] = _safe_log(float(hypothesis_set.ledger.get(rid, 0.0)))
+
     credits_remaining = int(request.credits)
     total_credits_spent = 0
+    credits_evaluated = 0
     operation_log: List[Dict[str, object]] = []
 
     run_mode = request.run_mode or "until_credits_exhausted"
@@ -677,52 +718,102 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
     node_evidence_ids: Dict[str, List[str]] = {}
     node_explanations: Dict[str, Dict[str, object]] = {}
 
-    def record_op(op_type: str, target_id: str, before: int, after: int) -> None:
+    def record_op(
+        op_type: str, target_id: str, before: int, after: int, extra: Optional[Dict[str, object]] = None
+    ) -> None:
         operation_log.append({"op_type": op_type, "target_id": target_id, "credits_before": before, "credits_after": after})
-        deps.audit_sink.append(AuditEvent("OP_EXECUTED", {"op_type": op_type, "target_id": target_id, "credits_before": before, "credits_after": after}))
+        payload = {"op_type": op_type, "target_id": target_id, "credits_before": before, "credits_after": after}
+        if extra:
+            payload.update(extra)
+        deps.audit_sink.append(AuditEvent("OP_EXECUTED", payload))
 
     w_applied: Dict[Tuple[str, str], float] = {}
 
-    def perform_search_ops() -> None:
-        nonlocal credits_remaining, total_credits_spent
+    search_plan: List[Tuple[str, str, int, int]] = []
+    search_cursor = 0
+
+    def _build_search_plan() -> None:
+        nonlocal search_plan
         if not getattr(request, "search_enabled", False):
+            search_plan = []
             return
         quota = int(getattr(request, "search_quota_per_slot", 0) or getattr(request, "max_search_per_node", 0) or 0)
-        if quota <= 0:
-            return
         max_depth = int(getattr(request, "max_search_depth", 0) or 0)
+        if quota <= 0 or max_depth < 0:
+            search_plan = []
+            return
         named_roots = [hypothesis_set.roots[rid] for rid in named_root_ids if rid in hypothesis_set.roots]
         if not named_roots or not required_slot_keys:
+            search_plan = []
             return
-        per_depth_ops = len(named_roots) * len(required_slot_keys) * quota
-        if per_depth_ops <= 0:
-            return
-        max_depths = max(1, credits_remaining // per_depth_ops)
-        depth_count = min(max_depth + 1, max_depths)
-        if depth_count <= 0:
-            return
-        for depth in range(depth_count):
+        root_order = sorted(named_roots, key=lambda root: root.canonical_id)
+        plan: List[Tuple[str, str, int, int]] = []
+        for depth in range(max_depth + 1):
             for slot_key in required_slot_keys:
-                for root in named_roots:
-                    for _ in range(quota):
-                        if credits_remaining <= 0:
-                            return
-                        query = _build_search_query(request.scope, root, slot_key, depth)
-                        snapshot_hash = canonical_id_for_statement(
-                            f"{query}|{root.root_id}|{slot_key}|{depth}"
-                        )
-                        payload = {
-                            "root_id": root.root_id,
-                            "slot_key": slot_key,
-                            "depth": depth,
-                            "query": query,
-                            "search_snapshot_hash": snapshot_hash,
-                        }
-                        deps.audit_sink.append(AuditEvent("SEARCH_EXECUTED", payload))
-                        before = credits_remaining
-                        credits_remaining -= 1
-                        total_credits_spent += 1
-                        record_op("SEARCH", f"{root.root_id}:{slot_key}:{depth}", before, credits_remaining)
+                for root in root_order:
+                    for idx in range(quota):
+                        plan.append((root.root_id, slot_key, depth, idx))
+        search_plan = plan
+
+    def _next_search_target() -> Optional[Tuple[str, str, int, int]]:
+        nonlocal search_cursor
+        if search_cursor >= len(search_plan):
+            return None
+        target = search_plan[search_cursor]
+        search_cursor += 1
+        return target
+
+    def _execute_search(root_id: str, slot_key: str, depth: int, quota_index: int) -> None:
+        nonlocal credits_remaining, total_credits_spent, evidence_packet_hash
+        root = hypothesis_set.roots.get(root_id)
+        if not root or credits_remaining <= 0:
+            return
+        query = _build_search_query(request.scope, root, slot_key, depth)
+        metadata = {
+            "root_id": root_id,
+            "slot_key": slot_key,
+            "depth": depth,
+            "quota_index": quota_index,
+            "deterministic": bool(getattr(request, "search_deterministic", False)),
+        }
+        limit = 1
+        items = deps.searcher.search(query, limit=limit, metadata=metadata) or []
+        if len(items) > limit:
+            items = items[:limit]
+        snapshot_hash = _hash_search_snapshot(items)
+        new_ids: List[str] = []
+        for item in items:
+            if item.id not in evidence_index:
+                evidence_index[item.id] = item
+                new_ids.append(item.id)
+        evidence_packet_hash = _hash_evidence_packet(evidence_index)
+        payload = {
+            "root_id": root_id,
+            "slot_key": slot_key,
+            "depth": depth,
+            "query": query,
+            "search_snapshot_hash": snapshot_hash,
+            "new_evidence_ids": new_ids,
+            "evidence_packet_hash": evidence_packet_hash,
+        }
+        deps.audit_sink.append(AuditEvent("SEARCH_EXECUTED", payload))
+        before = credits_remaining
+        credits_remaining -= 1
+        total_credits_spent += 1
+        record_op(
+            "SEARCH",
+            f"{root_id}:{slot_key}:{depth}:{quota_index}",
+            before,
+            credits_remaining,
+            {
+                "root_id": root_id,
+                "slot_key": slot_key,
+                "depth": depth,
+                "query": query,
+                "search_snapshot_hash": snapshot_hash,
+                "evidence_packet_hash": evidence_packet_hash,
+            },
+        )
 
     def _slot_weight(node: Node, weight_cap: float) -> float:
         if not node.assessed:
@@ -796,7 +887,7 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
             )
         )
 
-    perform_search_ops()
+    _build_search_plan()
 
     def apply_ledger_update(root: RootHypothesis) -> None:
         weight_cap = float(request.config.W)
@@ -833,13 +924,21 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
             )
 
         beta = float(request.config.beta)
-        p_prop = p_base * math.exp(beta * total_delta)
         alpha = float(request.config.alpha)
+        log_ledger[root.root_id] = log_ledger.get(root.root_id, _safe_log(p_base)) + (beta * total_delta)
+        prop_named = _normalize_log_ledger(log_ledger) if log_ledger else {}
+        p_prop = float(prop_named.get(root.root_id, p_base))
         p_damped = (1.0 - alpha) * p_base + alpha * p_prop
         deps.audit_sink.append(
             AuditEvent(
                 "P_PROP_COMPUTED",
-                {"root_id": root.root_id, "p_base": p_base, "total_delta_w": total_delta, "p_prop": p_prop},
+                {
+                    "root_id": root.root_id,
+                    "p_base": p_base,
+                    "total_delta_w": total_delta,
+                    "p_prop": p_prop,
+                    "log_ledger": dict(log_ledger),
+                },
             )
         )
         for payload in slot_updates:
@@ -857,7 +956,27 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
             deps.audit_sink.append(AuditEvent("DELTA_W_APPLIED", payload))
 
         p_new = float(p_damped)
-        hypothesis_set.ledger[root.root_id] = p_new
+        if prop_named and len(named_root_ids) > 1:
+            remaining_prop = 1.0 - p_prop
+            remaining_new = 1.0 - p_new
+            if remaining_prop <= 0.0:
+                for rid in named_root_ids:
+                    if rid != root.root_id:
+                        prop_named[rid] = remaining_new / max(1, len(named_root_ids) - 1)
+            else:
+                scale = remaining_new / remaining_prop
+                for rid in named_root_ids:
+                    if rid != root.root_id:
+                        prop_named[rid] = prop_named.get(rid, 0.0) * scale
+            prop_named[root.root_id] = p_new
+        elif prop_named:
+            prop_named[root.root_id] = p_new
+        else:
+            prop_named = {root.root_id: p_new}
+
+        for rid in named_root_ids:
+            if rid in prop_named:
+                hypothesis_set.ledger[rid] = prop_named[rid]
         if request.config.world_mode == "closed":
             total_named = sum(hypothesis_set.ledger.get(rid, 0.0) for rid in named_root_ids)
             if total_named > 1.0:
@@ -868,6 +987,8 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
                 )
         else:
             _update_open_world_residuals()
+        for rid in named_root_ids:
+            log_ledger[rid] = _safe_log(float(hypothesis_set.ledger.get(rid, 0.0)))
         deps.audit_sink.append(
             AuditEvent("INVARIANT_SUM_TO_ONE_CHECK", {"total": sum(hypothesis_set.ledger.values())})
         )
@@ -889,7 +1010,30 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
         if node is None:
             return
 
-        outcome = deps.evaluator.evaluate(node_key) or {}
+        parts = node_key.split(":")
+        root_id = parts[0] if parts else ""
+        slot_key = parts[1] if len(parts) > 1 else ""
+        child_id = ":".join(parts[2:]) if len(parts) > 2 else ""
+        parent_statement = root.statement
+        if child_id:
+            parent_key = ":".join(parts[:2])
+            parent_node = nodes.get(parent_key)
+            if parent_node:
+                parent_statement = parent_node.statement
+        context = {
+            "root_id": root_id,
+            "root_statement": root.statement,
+            "slot_key": slot_key,
+            "child_id": child_id,
+            "parent_statement": parent_statement,
+            "role": node.role,
+        }
+        outcome = deps.evaluator.evaluate(
+            node_key,
+            node.statement,
+            context,
+            list(evidence_index.values()),
+        ) or {}
         previous_p = float(node.p)
         proposed_p = float(outcome.get("p", previous_p))
         evidence_ids = outcome.get("evidence_ids")
@@ -914,9 +1058,10 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
                     quote_mismatches.append(str(evidence_id or "missing"))
                     continue
                 item = evidence_index.get(str(evidence_id))
-                if item and item.text and str(exact_quote) not in item.text:
-                    quotes_valid = False
-                    quote_mismatches.append(str(evidence_id))
+                if item and item.text:
+                    if _normalize_whitespace(str(exact_quote)) not in _normalize_whitespace(item.text):
+                        quotes_valid = False
+                        quote_mismatches.append(str(evidence_id))
 
         if not has_refs:
             delta = max(min(proposed_p - previous_p, 0.05), -0.05)
@@ -1000,6 +1145,7 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
                         "k_caps": k_caps,
                         "validity": node.validity,
                     },
+                    "evidence_packet_hash": evidence_packet_hash,
                     "llm": outcome.get("_provenance"),
                 },
             )
@@ -1111,6 +1257,26 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
                 stop_reason = StopReason.FRONTIER_CONFIDENT
                 break
 
+            rho = float(request.config.rho_eval_min)
+            eval_share = credits_evaluated / total_credits_spent if total_credits_spent > 0 else 1.0
+            if run_mode not in {"evaluation", "evaluations_children"}:
+                search_target = None
+                if search_plan:
+                    if eval_share >= rho:
+                        search_target = _next_search_target()
+                    else:
+                        eval_available = False
+                        for root in frontier:
+                            nxt = _legal_next_for_root(root, required_slot_keys, request.config.tau, nodes, credits_remaining)
+                            if nxt and nxt[0] == "EVALUATE":
+                                eval_available = True
+                                break
+                        if not eval_available:
+                            search_target = _next_search_target()
+                if search_target:
+                    _execute_search(*search_target)
+                    continue
+
             if run_mode == "evaluation":
                 target_root = frontier[rr_index % len(frontier)]
                 rr_index += 1
@@ -1130,6 +1296,7 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
                 total_credits_spent += 1
                 target_root.credits_spent += 1
                 evaluate_node(target_root, node_key)
+                credits_evaluated += 1
                 record_op("EVALUATE", node_key, before, credits_remaining)
                 continue
 
@@ -1157,6 +1324,14 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
                     if not selected_slot:
                         stop_reason = StopReason.NO_LEGAL_OP
                         break
+                    if selected_slot not in target_root.obligations:
+                        if available:
+                            selected_slot = available[0]
+                        else:
+                            if all(not any(k in r.obligations for k in required_slot_keys) for r in frontier):
+                                stop_reason = StopReason.NO_LEGAL_OP
+                                break
+                            continue
                     slot_key_node = target_root.obligations.get(selected_slot)
                     slot = nodes.get(slot_key_node) if slot_key_node else None
                 if not slot:
@@ -1177,6 +1352,7 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
                         total_credits_spent += 1
                         target_root.credits_spent += 1
                         evaluate_node(target_root, child_key)
+                        credits_evaluated += 1
                         record_op("EVALUATE", child_key, before, credits_remaining)
                     if stop_reason is not None:
                         break
@@ -1186,6 +1362,7 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
                     total_credits_spent += 1
                     target_root.credits_spent += 1
                     evaluate_node(target_root, slot.node_key)
+                    credits_evaluated += 1
                     record_op("EVALUATE", slot.node_key, before, credits_remaining)
                 continue
 
@@ -1219,6 +1396,10 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
                 )
                 candidates.append((voi, root.canonical_id, op_type, target_id, root))
 
+            if eval_share < rho:
+                eval_candidates = [row for row in candidates if row[2] == "EVALUATE"]
+                if eval_candidates:
+                    candidates = eval_candidates
             if not candidates:
                 stop_reason = StopReason.NO_LEGAL_OP
                 break
@@ -1252,6 +1433,7 @@ def run_session(request: SessionRequest, deps: RunSessionDeps) -> SessionResult:
                 record_op("DECOMPOSE", target_id, before, credits_remaining)
             else:
                 evaluate_node(target_root, target_id)
+                credits_evaluated += 1
                 record_op("EVALUATE", target_id, before, credits_remaining)
 
             if run_mode == "operations" and op_limit is not None and total_credits_spent >= int(op_limit):

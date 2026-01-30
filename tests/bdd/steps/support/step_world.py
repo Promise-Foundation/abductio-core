@@ -22,6 +22,7 @@ from abductio_core.application.result import SessionResult
 from abductio_core.application.use_cases.run_session import run_session
 from tests.bdd.steps.support.deterministic_decomposer import DeterministicDecomposer
 from tests.bdd.steps.support.deterministic_evaluator import DeterministicEvaluator
+from tests.bdd.steps.support.deterministic_searcher import DeterministicSearcher
 from tests.bdd.steps.support.in_memory_audit import InMemoryAuditSink
 
 
@@ -34,6 +35,7 @@ class StepWorld:
     roots_b: List[Dict[str, Any]] = field(default_factory=list)
     decomposer_script: Dict[str, Any] = field(default_factory=dict)
     evaluator_script: Dict[str, Any] = field(default_factory=dict)
+    searcher_script: Dict[str, Any] = field(default_factory=dict)
     credits: Optional[int] = None
     ledger: Dict[str, float] = field(default_factory=dict)
     epsilon_override: Optional[float] = None
@@ -77,6 +79,9 @@ class StepWorld:
 
     def set_decomposer_scope_roots(self, table: Optional[List[Dict[str, str]]] = None) -> None:
         self.decomposer_script["scope_roots"] = table or "all"
+
+    def enable_search_autogen(self) -> None:
+        self.searcher_script["autogen"] = True
 
     def set_decomposer_fail_root(self, root_id: str) -> None:
         fail_roots = set(self.decomposer_script.get("fail_roots", set()))
@@ -331,6 +336,7 @@ class StepWorld:
             W=float(self.config.get("W", 3.0)),
             lambda_voi=float(self.config.get("lambda_voi", 0.1)),
             world_mode=str(self.config.get("world_mode", "open")),
+            rho_eval_min=float(self.config.get("rho_eval_min", 0.5)),
             gamma=float(self.config.get("gamma", 0.0)),
         )
         root_specs = [
@@ -405,9 +411,11 @@ class StepWorld:
     def _build_deps(self) -> RunSessionDeps:
         evaluator = DeterministicEvaluator(self.evaluator_script)
         decomposer = DeterministicDecomposer(self.decomposer_script)
+        searcher = DeterministicSearcher(self.searcher_script)
         audit_sink = InMemoryAuditSink()
         return RunSessionDeps(
             evaluator=evaluator,
             decomposer=decomposer,
             audit_sink=audit_sink,
+            searcher=searcher,
         )

@@ -11,6 +11,7 @@ from abductio_core.application.use_cases import run_session as rs
 from abductio_core.domain.audit import AuditEvent
 from abductio_core.domain.canonical import canonical_id_for_statement
 from abductio_core.domain.model import Node, RootHypothesis
+from tests.support.noop_searcher import NoopSearcher
 
 
 @dataclass
@@ -45,7 +46,13 @@ class ChildDecomposer:
 
 @dataclass
 class NoopEvaluator:
-    def evaluate(self, node_key: str) -> Dict[str, Any]:
+    def evaluate(
+        self,
+        node_key: str,
+        statement: str = "",
+        context: Dict[str, Any] | None = None,
+        evidence_items: List[Any] | None = None,
+    ) -> Dict[str, Any]:
         return {}
 
 
@@ -54,6 +61,7 @@ def _deps() -> RunSessionDeps:
         evaluator=NoopEvaluator(),
         decomposer=NoopDecomposer(),
         audit_sink=MemAudit(),
+        searcher=NoopSearcher(),
     )
 
 
@@ -119,7 +127,12 @@ def test_aggregate_soft_and_no_assessed_children() -> None:
 
 def test_apply_node_decomposition_branches() -> None:
     audit = MemAudit()
-    deps = RunSessionDeps(evaluator=NoopEvaluator(), decomposer=NoopDecomposer(), audit_sink=audit)
+    deps = RunSessionDeps(
+        evaluator=NoopEvaluator(),
+        decomposer=NoopDecomposer(),
+        audit_sink=audit,
+        searcher=NoopSearcher(),
+    )
     nodes: Dict[str, Node] = {}
     assert rs._apply_node_decomposition(deps, "missing", {}, nodes) is False
 
@@ -231,7 +244,12 @@ def test_frontier_confident_and_legal_next_helpers() -> None:
 
 def test_decompose_root_skips_existing_slot() -> None:
     audit = MemAudit()
-    deps = RunSessionDeps(evaluator=NoopEvaluator(), decomposer=NoopDecomposer(), audit_sink=audit)
+    deps = RunSessionDeps(
+        evaluator=NoopEvaluator(),
+        decomposer=NoopDecomposer(),
+        audit_sink=audit,
+        searcher=NoopSearcher(),
+    )
     root = RootHypothesis(root_id="H1", statement="S", exclusion_clause="x", canonical_id="cid")
     nodes: Dict[str, Node] = {"H1:feasibility": Node(node_key="H1:feasibility", statement="existing", role="NEC")}
     root.obligations["feasibility"] = "H1:feasibility"
@@ -308,7 +326,12 @@ def test_evaluations_children_selected_slot_none_stops(monkeypatch) -> None:
         return None
 
     monkeypatch.setattr(rs, "_select_slot_lowest_k", _none_slot)
-    deps = RunSessionDeps(evaluator=NoopEvaluator(), decomposer=NoopDecomposer(), audit_sink=MemAudit())
+    deps = RunSessionDeps(
+        evaluator=NoopEvaluator(),
+        decomposer=NoopDecomposer(),
+        audit_sink=MemAudit(),
+        searcher=NoopSearcher(),
+    )
     req = _base_request()
     req = req.__class__(
         **{
@@ -330,10 +353,15 @@ def test_evaluations_children_slot_missing_continues(monkeypatch) -> None:
         if calls["count"] == 0:
             calls["count"] += 1
             return "missing"
-        return "feasibility"
+        return "availability"
 
     monkeypatch.setattr(rs, "_select_slot_lowest_k", _fake_slot)
-    deps = RunSessionDeps(evaluator=NoopEvaluator(), decomposer=NoopDecomposer(), audit_sink=MemAudit())
+    deps = RunSessionDeps(
+        evaluator=NoopEvaluator(),
+        decomposer=NoopDecomposer(),
+        audit_sink=MemAudit(),
+        searcher=NoopSearcher(),
+    )
     req = _base_request()
     req = req.__class__(
         **{
@@ -367,6 +395,8 @@ def test_evaluations_children_slot_missing_all_roots_stop(monkeypatch) -> None:
             return None
         def items(self):
             return []
+        def values(self):
+            return []
 
     def _missing_slot(*args, **kwargs):
         return "missing"
@@ -388,7 +418,12 @@ def test_evaluations_children_slot_missing_all_roots_stop(monkeypatch) -> None:
         return hset
 
     monkeypatch.setattr(rs, "_init_hypothesis_set", _fake_init)
-    deps = RunSessionDeps(evaluator=NoopEvaluator(), decomposer=NoopDecomposer(), audit_sink=MemAudit())
+    deps = RunSessionDeps(
+        evaluator=NoopEvaluator(),
+        decomposer=NoopDecomposer(),
+        audit_sink=MemAudit(),
+        searcher=NoopSearcher(),
+    )
     req = _base_request()
     req = req.__class__(
         **{
@@ -404,7 +439,12 @@ def test_evaluations_children_slot_missing_all_roots_stop(monkeypatch) -> None:
 
 
 def test_evaluations_children_credits_exhausted_inside_loop() -> None:
-    deps = RunSessionDeps(evaluator=NoopEvaluator(), decomposer=ChildDecomposer(), audit_sink=MemAudit())
+    deps = RunSessionDeps(
+        evaluator=NoopEvaluator(),
+        decomposer=ChildDecomposer(),
+        audit_sink=MemAudit(),
+        searcher=NoopSearcher(),
+    )
     req = _base_request()
     req = req.__class__(
         **{
@@ -421,7 +461,12 @@ def test_evaluations_children_credits_exhausted_inside_loop() -> None:
 
 
 def test_evaluations_children_op_limit_reached_inside_loop() -> None:
-    deps = RunSessionDeps(evaluator=NoopEvaluator(), decomposer=ChildDecomposer(), audit_sink=MemAudit())
+    deps = RunSessionDeps(
+        evaluator=NoopEvaluator(),
+        decomposer=ChildDecomposer(),
+        audit_sink=MemAudit(),
+        searcher=NoopSearcher(),
+    )
     req = _base_request()
     req = req.__class__(
         **{

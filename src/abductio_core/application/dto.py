@@ -15,6 +15,7 @@ class SessionConfig:
     W: float
     lambda_voi: float
     world_mode: str
+    rho_eval_min: float = 0.5
     # Backward-compatible alias for older callers/tests.
     gamma: float = 0.0
 

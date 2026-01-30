@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 from abductio_core import RootSpec, SessionConfig, SessionRequest, replay_session, run_session
 from abductio_core.application.ports import RunSessionDeps
 from abductio_core.domain.audit import AuditEvent
+from tests.support.noop_searcher import NoopSearcher
 
 
 @dataclass
@@ -50,7 +51,13 @@ class ScriptDecomposer:
 class ScriptEvaluator:
     outcomes: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
-    def evaluate(self, node_key: str) -> Dict[str, Any]:
+    def evaluate(
+        self,
+        node_key: str,
+        statement: str = "",
+        context: Dict[str, Any] | None = None,
+        evidence_items: List[Any] | None = None,
+    ) -> Dict[str, Any]:
         return self.outcomes.get(
             node_key,
             {
@@ -71,7 +78,12 @@ class ScriptEvaluator:
 
 def test_replay_matches_final_ledger_and_stop_reason() -> None:
     audit = MemAudit()
-    deps = RunSessionDeps(evaluator=ScriptEvaluator(), decomposer=ScriptDecomposer(), audit_sink=audit)
+    deps = RunSessionDeps(
+        evaluator=ScriptEvaluator(),
+        decomposer=ScriptDecomposer(),
+        audit_sink=audit,
+        searcher=NoopSearcher(),
+    )
 
     req = SessionRequest(
         scope="replay strict",

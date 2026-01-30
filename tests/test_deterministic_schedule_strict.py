@@ -7,6 +7,7 @@ from abductio_core import RootSpec, SessionConfig, SessionRequest, run_session
 from abductio_core.application.canonical import canonical_id_for_statement
 from abductio_core.application.ports import RunSessionDeps
 from abductio_core.domain.audit import AuditEvent
+from tests.support.noop_searcher import NoopSearcher
 
 
 @dataclass
@@ -49,7 +50,13 @@ class ScriptDecomposer:
 
 @dataclass
 class ScriptEvaluator:
-    def evaluate(self, node_key: str) -> Dict[str, Any]:
+    def evaluate(
+        self,
+        node_key: str,
+        statement: str = "",
+        context: Dict[str, Any] | None = None,
+        evidence_items: List[Any] | None = None,
+    ) -> Dict[str, Any]:
         return {
             "p": 0.80,
             "A": 2,
@@ -67,7 +74,12 @@ class ScriptEvaluator:
 
 def _run(roots: List[RootSpec]) -> Dict[str, Any]:
     audit = MemAudit()
-    deps = RunSessionDeps(evaluator=ScriptEvaluator(), decomposer=ScriptDecomposer(), audit_sink=audit)
+    deps = RunSessionDeps(
+        evaluator=ScriptEvaluator(),
+        decomposer=ScriptDecomposer(),
+        audit_sink=audit,
+        searcher=NoopSearcher(),
+    )
     req = SessionRequest(
         scope="determinism strict",
         roots=roots,

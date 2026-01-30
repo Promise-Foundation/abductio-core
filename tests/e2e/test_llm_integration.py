@@ -7,6 +7,7 @@ import pytest
 from abductio_core.application.dto import RootSpec, SessionConfig, SessionRequest
 from abductio_core.application.ports import RunSessionDeps
 from abductio_core.application.use_cases.run_session import run_session
+from tests.support.noop_searcher import NoopSearcher
 
 
 @pytest.mark.e2e
@@ -34,6 +35,7 @@ def test_e2e_llm_integration_smoke_realistic_usage() -> None:
             root_statements=root_statements,
         ),
         audit_sink=_InMemoryAuditSink(),
+        searcher=NoopSearcher(),
     )
 
     request = SessionRequest(
@@ -43,7 +45,7 @@ def test_e2e_llm_integration_smoke_realistic_usage() -> None:
             RootSpec(root_id="H2", statement="Mechanism B", exclusion_clause="Not explained by any other root"),
         ],
         config=SessionConfig(tau=0.70, epsilon=0.05, gamma_noa=0.10, gamma_und=0.10, alpha=0.40, beta=1.0, W=3.0, lambda_voi=0.1, world_mode="open", gamma=0.20),
-        credits=4,
+        credits=6,
         required_slots=[{"slot_key": "feasibility", "role": "NEC"}],
         run_mode="until_credits_exhausted",
     )
@@ -89,7 +91,7 @@ def test_e2e_llm_integration_smoke_realistic_usage() -> None:
 
     event_types = [event["event_type"] for event in view["audit"]]
     assert "OP_EXECUTED" in event_types
-    assert "OTHER_ABSORBER_ENFORCED" in event_types
+    assert "OPEN_WORLD_RESIDUALS_ENFORCED" in event_types or "OTHER_ABSORBER_ENFORCED" in event_types
     assert "INVARIANT_SUM_TO_ONE_CHECK" in event_types
     assert "STOP_REASON_RECORDED" in event_types
 

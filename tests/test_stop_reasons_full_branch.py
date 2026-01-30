@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 from abductio_core import RootSpec, SessionConfig, SessionRequest, run_session
 from abductio_core.application.ports import RunSessionDeps
 from abductio_core.domain.audit import AuditEvent
+from tests.support.noop_searcher import NoopSearcher
 
 
 @dataclass
@@ -30,7 +31,13 @@ class NoChildrenDecomposer:
 class LowConfidenceEvaluator:
     """Produces k=0.15 so FRONTIER_CONFIDENT cannot trigger."""
 
-    def evaluate(self, node_key: str) -> Dict[str, Any]:
+    def evaluate(
+        self,
+        node_key: str,
+        statement: str = "",
+        context: Dict[str, Any] | None = None,
+        evidence_items: List[Any] | None = None,
+    ) -> Dict[str, Any]:
         return {
             "p": 0.9,
             "A": 1,
@@ -51,6 +58,7 @@ def _deps() -> RunSessionDeps:
         evaluator=LowConfidenceEvaluator(),
         decomposer=NoChildrenDecomposer(),
         audit_sink=MemAudit(),
+        searcher=NoopSearcher(),
     )
 
 

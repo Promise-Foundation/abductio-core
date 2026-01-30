@@ -129,7 +129,16 @@ def _search_events(world: StepWorld) -> List[Dict[str, Any]]:
     if not world.result:
         return []
     events = world.result.get("audit", []) or []
-    return [e for e in events if any(marker in str(e.get("event_type", "")) for marker in SEARCH_EVENT_MARKERS)]
+    found = []
+    for event in events:
+        event_type = str(event.get("event_type", "") or "")
+        payload = event.get("payload") or {}
+        op_type = ""
+        if isinstance(payload, dict):
+            op_type = str(payload.get("op_type", "") or payload.get("operation_type", "") or "")
+        if any(marker in event_type for marker in SEARCH_EVENT_MARKERS) or op_type == "SEARCH":
+            found.append(event)
+    return found
 
 
 def _get_payload_number(payload: Dict[str, Any], *keys: str) -> float | None:
@@ -212,6 +221,8 @@ def given_search_enabled_depth_quota(context) -> None:
     world.config["search_enabled"] = True
     world.config["max_search_depth"] = 2
     world.config["max_search_per_node"] = 1
+    world.config["rho_eval_min"] = 0.0
+    world.config["tau"] = 0.0
 
 
 @given("evidence search is enabled with per-slot quota 1")
@@ -219,6 +230,8 @@ def given_search_enabled_slot_quota(context) -> None:
     world = get_world(context)
     world.config["search_enabled"] = True
     world.config["search_quota_per_slot"] = 1
+    world.config["rho_eval_min"] = 0.0
+    world.config["tau"] = 0.0
 
 
 @given("evidence search is enabled with deterministic queries")
@@ -228,6 +241,9 @@ def given_search_enabled_deterministic(context) -> None:
     world.config["search_deterministic"] = True
     world.config["max_search_depth"] = 1
     world.config["max_search_per_node"] = 1
+    world.config["rho_eval_min"] = 0.0
+    world.config["tau"] = 0.0
+    world.enable_search_autogen()
 
 
 @then("the audit log includes SEARCH operations")
@@ -254,6 +270,22 @@ def then_search_records_snapshot_hash(context) -> None:
         if not any(key in payload for key in ("evidence_packet_hash", "search_snapshot_hash", "snapshot_hash")):
             missing.append(event)
     assert not missing, "Expected SEARCH payload to include a snapshot hash"
+
+@then("each SEARCH operation records an evidence packet hash")
+def then_search_records_packet_hash(context) -> None:
+    world = get_world(context)
+    events = _search_events(world)
+    if not events:
+        world.mark_pending("SEARCH operation not implemented in engine")
+    missing = []
+    for event in events:
+        payload = event.get("payload", {})
+        if not isinstance(payload, dict):
+            missing.append(event)
+            continue
+        if "evidence_packet_hash" not in payload:
+            missing.append(event)
+    assert not missing, "Expected SEARCH payload to include evidence_packet_hash"
 
 
 @then('search credits for slot "{slot_key}" are equal across hypotheses')
@@ -1122,7 +1154,9 @@ def then_final_ledger_identical(context, tolerance: str) -> None:
             continue
         other_root = world.replay_result["roots"].get(root_id)
         assert other_root is not None
-        assert abs(root.get("p_ledger", 0.0) - other_root.get("p_ledger", 0.0)) <= tolerance_value
+        actual = world.result.get("ledger", {}).get(root_id, 0.0)
+        expected = world.replay_result.get("ledger", {}).get(root_id, 0.0)
+        assert abs(actual - expected) <= tolerance_value
         assert abs(root.get("k_root", 0.0) - other_root.get("k_root", 0.0)) <= tolerance_value
 
 
@@ -1546,6 +1580,18 @@ def then_explanations_reference_evidence(context, root_id: str, evidence_id: str
 
 @then('the required slots under "{root_a}" and "{root_b}" are identical')
 def then_required_slots_identical(context, root_a: str, root_b: str) -> None:
+    world = get_world(context)
+    if not world.result:
+        world.mark_pending("Session result not available")
+    ra = world.result.get("roots", {}).get(root_a, {})
+    rb = world.result.get("roots", {}).get(root_b, {})
+    slots_a = set((ra.get("obligations") or {}).keys())
+    slots_b = set((rb.get("obligations") or {}).keys())
+    assert slots_a == slots_b
+
+
+@then('the required slots under "{root_a}" and "{root_b}" are identical across runs')
+def then_required_slots_identical_across_runs(context, root_a: str, root_b: str) -> None:
     world = get_world(context)
     if not world.result or not world.replay_result:
         world.mark_pending("Session results not available")

@@ -9,6 +9,7 @@ from typing import Dict, List, Tuple
 
 from abductio_core import RootSpec, SessionConfig, SessionRequest, run_session
 from abductio_core.adapters.openai_llm import OpenAIDecomposerPort, OpenAIEvaluatorPort, OpenAIJsonClient
+from abductio_core.application.dto import EvidenceItem
 from abductio_core.application.ports import RunSessionDeps
 from abductio_core.domain.audit import AuditEvent
 
@@ -90,8 +91,17 @@ def run_case(
         root_statements=root_statements,
     )
 
+    class NoopSearcher:
+        def search(self, query: str, *, limit: int, metadata: Dict[str, Any]) -> List[EvidenceItem]:
+            return []
+
     audit = MemAudit()
-    deps = RunSessionDeps(evaluator=evaluator, decomposer=decomposer, audit_sink=audit)
+    deps = RunSessionDeps(
+        evaluator=evaluator,
+        decomposer=decomposer,
+        audit_sink=audit,
+        searcher=NoopSearcher(),
+    )
 
     request = SessionRequest(
         scope=case_id,

@@ -8,7 +8,13 @@ from typing import Any, Dict
 class DeterministicEvaluator:
     script: Dict[str, Any] = field(default_factory=dict)
 
-    def evaluate(self, node_key: str) -> Dict[str, Any]:
+    def evaluate(
+        self,
+        node_key: str,
+        statement: str = "",
+        context: Dict[str, Any] | None = None,
+        evidence_items: list | None = None,
+    ) -> Dict[str, Any]:
         outcomes = self.script.get("outcomes", {})
         if node_key in outcomes:
             return outcomes[node_key]

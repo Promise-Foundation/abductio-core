@@ -10,6 +10,7 @@ from abductio_core import RootSpec, SessionConfig, SessionRequest, replay_sessio
 from abductio_core.adapters.openai_llm import OpenAIJsonClient, OpenAIDecomposerPort, OpenAIEvaluatorPort
 from abductio_core.application.ports import RunSessionDeps
 from abductio_core.domain.audit import AuditEvent
+from tests.support.noop_searcher import NoopSearcher
 
 
 @dataclass
@@ -39,6 +40,7 @@ def test_e2e_openai_scopes_decomposes_evaluates_and_replays() -> None:
             root_statements=root_statements,
         ),
         audit_sink=InMemoryAudit(),
+        searcher=NoopSearcher(),
     )
 
     req = SessionRequest(

@@ -146,8 +146,12 @@ Ports (implement in your app):
 ## Development
 
 ```bash
+pip install -e ".[dev]"
 pytest
 ```
+
+Environment variables:
+- Copy `.env.example` to `.env` and set `OPENAI_API_KEY` to run E2E tests that hit the OpenAI API.
 
 ## Docs
 

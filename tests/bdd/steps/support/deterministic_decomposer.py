@@ -29,18 +29,24 @@ class DeterministicDecomposer:
                 "feasibility_statement": f"{root_id} is feasible",
                 "availability_statement": f"{root_id} is available",
                 "fit_statement": f"{root_id} fits",
+                "fit_to_key_features_statement": f"{root_id} fits",
                 "defeater_statement": f"{root_id} resists defeaters",
+                "defeater_resistance_statement": f"{root_id} resists defeaters",
             }
 
         if isinstance(scope_roots, list):
             for row in scope_roots:
                 if row.get("root_id") == root_id:
+                    fit_statement = row.get("fit_statement", "")
+                    defeater_statement = row.get("defeater_statement", "")
                     return {
                         "ok": True,
                         "feasibility_statement": row.get("feasibility_statement", ""),
                         "availability_statement": row.get("availability_statement", ""),
-                        "fit_statement": row.get("fit_statement", ""),
-                        "defeater_statement": row.get("defeater_statement", ""),
+                        "fit_statement": fit_statement,
+                        "fit_to_key_features_statement": row.get("fit_to_key_features_statement", fit_statement),
+                        "defeater_statement": defeater_statement,
+                        "defeater_resistance_statement": row.get("defeater_resistance_statement", defeater_statement),
                     }
             return {"ok": False}
 
@@ -51,7 +57,9 @@ class DeterministicDecomposer:
                 "feasibility_statement": f"{root_id} is feasible",
                 "availability_statement": f"{root_id} is available",
                 "fit_statement": f"{root_id} fits",
+                "fit_to_key_features_statement": f"{root_id} fits",
                 "defeater_statement": f"{root_id} resists defeaters",
+                "defeater_resistance_statement": f"{root_id} resists defeaters",
             }
 
         return {"ok": False}

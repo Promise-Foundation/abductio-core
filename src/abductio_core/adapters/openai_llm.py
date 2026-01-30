@@ -8,6 +8,8 @@ import hashlib
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
+from abductio_core.application.dto import EvidenceItem
+
 
 def _first_text(response: Any) -> str:
     if hasattr(response, "output_text") and response.output_text:
@@ -339,11 +341,18 @@ class OpenAIEvaluatorPort:
     root_statements: Optional[Dict[str, str]] = None
     evidence_items: Optional[List[Dict[str, Any]]] = None
 
-    def evaluate(self, node_key: str) -> Dict[str, Any]:
+    def evaluate(
+        self,
+        node_key: str,
+        statement: str = "",
+        context: Dict[str, Any] | None = None,
+        evidence_items: List[Dict[str, Any]] | None = None,
+    ) -> Dict[str, Any]:
         root_id, slot_key, child_id = _parse_node_key(node_key)
         root_statement = ""
         if root_id and self.root_statements:
             root_statement = self.root_statements.get(root_id, "")
+        context = context or {}
         system = (
             "You are an evaluator for ABDUCTIO MVP.\n"
             "Return ONLY a single JSON object matching:\n"
@@ -365,16 +374,38 @@ class OpenAIEvaluatorPort:
             "- Use ONLY facts present in the evidence packet; list any assumptions explicitly.\n"
             "- If no evidence supports the claim, set evidence_ids to [] and evidence_quality to \"none\".\n"
         )
+        if evidence_items is not None:
+            resolved_items: List[Dict[str, Any]] = []
+            for item in evidence_items:
+                if isinstance(item, EvidenceItem):
+                    resolved_items.append(
+                        {
+                            "id": item.id,
+                            "source": item.source,
+                            "text": item.text,
+                            "location": item.location,
+                            "metadata": dict(item.metadata),
+                        }
+                    )
+                elif isinstance(item, dict):
+                    resolved_items.append(item)
+            evidence_payload = resolved_items
+        else:
+            evidence_payload = self.evidence_items or []
+
         user = json.dumps(
             {
                 "task": "evaluate",
                 "node_key": node_key,
+                "node_statement": statement,
                 "root_id": root_id,
                 "root_statement": root_statement,
+                "parent_statement": context.get("parent_statement", ""),
+                "role": context.get("role", ""),
                 "slot_key": slot_key,
                 "child_id": child_id,
                 "scope": self.scope or "",
-                "evidence_items": self.evidence_items or [],
+                "evidence_items": evidence_payload,
             }
         )
         out = self.client.complete_json(system=system, user=user)

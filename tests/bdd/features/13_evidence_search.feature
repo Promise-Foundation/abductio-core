@@ -27,6 +27,7 @@ Feature: Evidence search as a first-class operation
     When I run the engine
     Then the audit log includes SEARCH operations
     And each SEARCH operation records a search snapshot hash
+    And each SEARCH operation records an evidence packet hash
 
   Scenario: Search quotas are symmetric across hypotheses per slot
     Given evidence search is enabled with per-slot quota 1

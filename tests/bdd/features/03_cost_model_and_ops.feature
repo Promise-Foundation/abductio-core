@@ -1,6 +1,6 @@
 # tests/bdd/features/03_cost_model_and_ops.feature
 Feature: Cost model and operation legality
-  Only two operations exist (DECOMPOSE, EVALUATE), each costs exactly 1 credit.
+  Only two core reasoning operations exist (DECOMPOSE, EVALUATE), each costs exactly 1 credit.
   The engine must halt by the specified stopping conditions.
 
   Background:

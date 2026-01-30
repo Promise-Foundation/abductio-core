@@ -137,6 +137,7 @@ def _build_request(payload: Dict[str, object]) -> Tuple[SessionRequest, Dict[str
         W=float(config_payload.get("W", 3.0)),
         lambda_voi=float(config_payload.get("lambda_voi", 0.1)),
         world_mode=str(config_payload.get("world_mode", "open")),
+        rho_eval_min=float(config_payload.get("rho_eval_min", 0.5)),
         gamma=float(config_payload.get("gamma", 0.2)),
     )
     evidence_items_payload = payload.get("evidence_items") if isinstance(payload.get("evidence_items"), list) else []
@@ -193,6 +194,9 @@ def replay_session(audit_trace: Iterable[Dict[str, object]]) -> SessionResult:
     stop_reason: Optional[StopReason] = None
     w_applied: Dict[Tuple[str, str], float] = {}
     named_root_ids = [rid for rid in hypothesis_set.roots if rid not in {H_NOA_ID, H_UND_ID}]
+    log_ledger: Dict[str, float] = {
+        rid: rs._safe_log(float(hypothesis_set.ledger.get(rid, 0.0))) for rid in named_root_ids
+    }
 
     class _NullAuditSink:
         def append(self, _event) -> None:
@@ -202,7 +206,6 @@ def replay_session(audit_trace: Iterable[Dict[str, object]]) -> SessionResult:
         audit_sink = _NullAuditSink()
 
     def apply_ledger_update(root: RootHypothesis) -> None:
-        beta = float(request.config.beta)
         weight_cap = float(request.config.W)
         p_base = float(hypothesis_set.ledger.get(root.root_id, 0.0))
         total_delta = 0.0
@@ -220,13 +223,35 @@ def replay_session(audit_trace: Iterable[Dict[str, object]]) -> SessionResult:
             w_prev = w_applied.get(key, 0.0)
             delta = w_new - w_prev
             total_delta += float(delta)
-            if abs(delta) > 0.0:
-                log_ledger[root.root_id] = log_ledger.get(root.root_id, rs._safe_log(0.0)) + delta
             w_applied[key] = w_new
-        p_prop = p_base * math.exp(beta * total_delta)
+        beta = float(request.config.beta)
         alpha = float(request.config.alpha)
+        log_ledger[root.root_id] = log_ledger.get(root.root_id, rs._safe_log(p_base)) + (beta * total_delta)
+        prop_named = rs._normalize_log_ledger(log_ledger) if log_ledger else {}
+        p_prop = float(prop_named.get(root.root_id, p_base))
         p_damped = (1.0 - alpha) * p_base + alpha * p_prop
-        hypothesis_set.ledger[root.root_id] = p_damped
+
+        if prop_named and len(named_root_ids) > 1:
+            remaining_prop = 1.0 - p_prop
+            remaining_new = 1.0 - p_damped
+            if remaining_prop <= 0.0:
+                for rid in named_root_ids:
+                    if rid != root.root_id:
+                        prop_named[rid] = remaining_new / max(1, len(named_root_ids) - 1)
+            else:
+                scale = remaining_new / remaining_prop
+                for rid in named_root_ids:
+                    if rid != root.root_id:
+                        prop_named[rid] = prop_named.get(rid, 0.0) * scale
+            prop_named[root.root_id] = p_damped
+        elif prop_named:
+            prop_named[root.root_id] = p_damped
+        else:
+            prop_named = {root.root_id: p_damped}
+
+        for rid in named_root_ids:
+            if rid in prop_named:
+                hypothesis_set.ledger[rid] = prop_named[rid]
         if request.config.world_mode == "closed":
             total_named = sum(hypothesis_set.ledger.get(rid, 0.0) for rid in named_root_ids)
             if total_named > 1.0 and total_named > 0.0:
@@ -235,6 +260,8 @@ def replay_session(audit_trace: Iterable[Dict[str, object]]) -> SessionResult:
         else:
             if H_NOA_ID in hypothesis_set.ledger or H_UND_ID in hypothesis_set.ledger:
                 enforce_open_world(hypothesis_set.ledger, named_root_ids)
+        for rid in named_root_ids:
+            log_ledger[rid] = rs._safe_log(float(hypothesis_set.ledger.get(rid, 0.0)))
 
     def evaluate_from_event(root: RootHypothesis, node_key: str, payload: Dict[str, object]) -> None:
         node = nodes.get(node_key)
@@ -400,6 +427,19 @@ def replay_session(audit_trace: Iterable[Dict[str, object]]) -> SessionResult:
                 root = RootHypothesis(root_id, "", "", "")
                 hypothesis_set.roots[root_id] = root
             evaluate_from_event(root, node_key, payload)
+        elif et == "OPEN_WORLD_GAMMA_UPDATED":
+            gamma_noa = payload.get("gamma_noa")
+            gamma_und = payload.get("gamma_und")
+            if isinstance(gamma_noa, (int, float)) and isinstance(gamma_und, (int, float)):
+                remaining = 1.0 - float(gamma_noa) - float(gamma_und)
+                total_named = sum(hypothesis_set.ledger.get(rid, 0.0) for rid in named_root_ids)
+                if total_named > 0.0:
+                    for rid in named_root_ids:
+                        hypothesis_set.ledger[rid] = hypothesis_set.ledger.get(rid, 0.0) * (remaining / total_named)
+                hypothesis_set.ledger[H_NOA_ID] = float(gamma_noa)
+                hypothesis_set.ledger[H_UND_ID] = float(gamma_und)
+                for rid in named_root_ids:
+                    log_ledger[rid] = rs._safe_log(float(hypothesis_set.ledger.get(rid, 0.0)))
         elif et == "ROOT_SCOPED":
             rid = payload.get("root_id")
             if isinstance(rid, str) and rid in hypothesis_set.roots:
