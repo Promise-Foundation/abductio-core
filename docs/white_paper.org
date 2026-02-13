@@ -20,6 +20,11 @@ machinery: evidence updates are symmetric (up or down), aggregation avoids
 decomposition-driven inflation, and scheduling prioritizes uncertainty
 rather than "most likely." The result remains implementation-ready,
 credit-bounded, and fully auditable.
+This revision further makes comparative causal adjudication explicit:
+updates must be grounded in pairwise discriminator evidence, contradiction
+signals must impose auditable penalties, and unresolved discrimination must
+default to principled underdetermination rather than forced single-winner
+selection.
 ABDUCTIO Core is additionally hardened against mismatched or incomplete
 hypothesis libraries through (i) regime/applicability gating that prevents
 out-of-regime hypotheses from dominating, (ii) typed open-world mass
@@ -123,6 +128,9 @@ cause," or umbrella OR-bundles as roots.
 Named hypotheses are intended to be mutually exclusive and collectively
 exhaustive (MECE) for the stated scope; open-world residuals explicitly
 represent mismatch or underdetermination when that intent fails.
+When strict MECE mode is enabled, this intent becomes a hard precondition:
+before any paid operation, the run MUST pass a pairwise MECE certificate
+gate (Section 12.4A).
 In open-world mode, the residuals are typed:
 - \(H_{\text{NOA}}\): none-of-the-above (library mismatch).
 - \(H_{\text{UND}}\): underdetermined (insufficient/contradictory
@@ -197,6 +205,31 @@ comparability:
 NOTE: "Deterministic" refers to the search *schedule and queries*, not to
 LLM or external-source variability. Replay requires capturing and hashing
 the retrieved evidence artifacts.
+** P14. Comparative causal adjudication (normative)
+Root credence updates MUST be contrastive, not merely absolute.
+An EVALUATE operation on hypothesis \(h\) must, by default, produce
+logged comparative evidence against at least one competitor \(g\neq h\)
+using declared pairwise discriminators \(D(h,g)\).
+Generic plausibility statements that do not adjudicate among competitors
+MUST have bounded effect (Section 11.1A).
+** P15. Causal commitment and contradiction accounting
+Each named root SHOULD declare:
+- expected observables \(X_h^{+}\),
+- incompatible/disallowed observables \(X_h^{-}\).
+When evidence with sufficient validity contradicts \(h\) by matching
+\(X_h^{-}\), the update for \(h\) MUST include an explicit negative
+contribution with logged lower-bound penalty (Section 11.2B).
+** P16. Explaining-away across overlapping explanations
+When two hypotheses compete to explain the same discriminator evidence,
+support for one SHOULD reduce support for the other unless explicitly
+marked as jointly compatible. This must be implemented deterministically
+and logged at update time.
+** P17. Principled abstention over forced closure
+If discrimination remains unresolved among leading hypotheses under budget
+or legal-operation limits, ABDUCTIO MUST prefer \(H_{\text{UND}}\)
+(open-world mode) or emit an explicit underdetermination anomaly
+(closed-world mode) rather than outputting a spurious high-confidence
+winner.
 * 4. Data Model
 ** 4.1 Hypothesis roots and nodes
 A hypothesis is represented as a root node with an obligation template and
@@ -316,10 +349,13 @@ c_{\text{decomp}}(k) = c_0 \cdot (1 + \alpha k^2)
 where \(k\) is the number of decompositions already performed on the same
 root/subtree,
 and \(\alpha > 0\). Default \(c_0=1\).
-Depth cap:
-- Maximum decomposition depth \(d_{\max}\) defaults to 2 or 3 unless VOI
-explicitly
- justifies an exception.
+Recursion policy:
+- ABDUCTIO Core permits recursive decomposition without a fixed global
+ depth cap in the core algorithm.
+- Decomposition is gated by paid credits, confidence thresholds, and the
+ minimum evidence-reading share invariant.
+- Implementations MAY set an operational depth cap for safety/performance,
+ but this is optional and MUST be logged.
 Minimum evidence-reading share (hard invariant):
 - Let \(C\) be total credits and \(C_{\text{eval}}\) credits spent on
 EVALUATE.
@@ -561,6 +597,14 @@ root can be accepted as "well-scrutinized."
 ** 9.2 Additional decomposition within slots (optional)
 Each slot node may be decomposed further (2-5 children) when its
 confidence is below threshold and credits remain.
+Normative ordering:
+- Evaluate-before-deepen: if a slot/subnode is unassessed, spend EVALUATE
+ before further decomposition of that node/subtree.
+- Decompose-only-after-assessment: further decomposition is permitted only
+ for assessed nodes whose confidence remains below threshold.
+- No decomposition sink: once root template slots are instantiated, the
+ engine MUST NOT execute slot/subnode DECOMPOSE while any required slot for
+ that root remains unassessed.
 ** 9.3 Coupling for AND nodes (within a slot)
 When decomposing a slot into an AND of NEC children, choose coupling \(c
 \in \{0.20,0.50,0.80,0.95\}\) deterministically from overlap scores
@@ -687,6 +731,39 @@ Normalize across named roots (open-world handling in Section 12):
 \[
 p'(h)=\frac{\tilde p(h)}{\sum_{g\in H}\tilde p(g)}
 \]
+** 11.1A Contrastive update operator (normative default)
+To prevent non-adjudicative drift, updates SHOULD be computed from
+pairwise discriminator evidence.
+Let \(\mathcal{P}=\{\{h,g\}: h,g\in H_{\text{named}}, h\neq g\}\) and let
+\(\mathcal{D}_{h,g}\) be the active discriminator set for pair
+\(\{h,g\}\).
+For each discriminator item \(d\in\mathcal{D}_{h,g}\), compute a signed,
+validity-weighted comparative contribution
+\(q_{h,g,d}\in[-W_d,W_d]\) such that \(q_{h,g,d}=-q_{g,h,d}\).
+Define:
+\[
+\Delta \ell(h)
+=
+\sum_{g\neq h}\omega_{h,g}\!\!\sum_{d\in \mathcal{D}_{h,g}}
+\Delta q_{h,g,d},
+\quad
+\Delta q_{h,g,d}:=q_{h,g,d}-q^{\mathrm{applied}}_{h,g,d}
+\]
+with deterministic weights \(\omega_{h,g}\ge 0\),
+\(\sum_{g\neq h}\omega_{h,g}=1\).
+Then update:
+\[
+\log \tilde p(h)=\log p(h)+\Delta \ell(h),\qquad
+p'=\mathrm{Normalize}(\tilde p).
+\]
+Normative constraints:
+- \(\Delta q\) may change only on EVALUATE.
+- all \(q\), \(\Delta q\), and discriminator IDs must be logged.
+- if no active discriminator evidence is present, any non-contrastive
+  uplift MUST be bounded by \(|\Delta \ell_{\text{noncontrast}}(h)|\le
+  \epsilon_{\text{nc}}\) with \(\epsilon_{\text{nc}}\ll W\), logged.
+This is compatible with Section 11.2 by treating unary slot weights as a
+special case where comparative structure is unavailable.
 ** 11.2 Deterministic mapping from \((p_{h,s}, k_{h,s})\) to \(w_{h,s}\)
 Evaluators return:
 - \(p_{h,s}\in(0,1)\) (slot assessment centered at neutral \(0.5\))
@@ -766,6 +843,20 @@ and use \(w'\) in the Delta-\(w\) rule.
 *Normative constraint:* do not apply multiple independent penalties
 multiplicatively at multiple layers. Compute \(v\) once per evaluated
 slot/claim and apply it once (either through \(k'\) or \(w'\)).
+** 11.2B Causal commitment penalties (normative default)
+Let \(X_h^{-}\) denote incompatible observables for root \(h\).
+If an evaluated evidence item \(e\) is labeled ENTAILS with respect to an
+incompatibility claim in \(X_h^{-}\), and validity is
+\(v(e,h)\ge v_{\min}\), the update for \(h\) MUST include a contradiction
+penalty:
+\[
+\Delta \ell_{\text{contra}}(h;e)\le -\kappa_{\text{contra}}\cdot v(e,h),
+\quad \kappa_{\text{contra}}>0.
+\]
+This penalty MUST be logged separately from supportive contributions and
+MUST be attributable to evidence IDs and quote spans.
+Implementations may choose stronger penalties, but not weaker than the
+configured lower bound when contradiction conditions hold.
 *** Logging requirement
 Each EVALUATE log entry MUST include:
 - \(p_{h,s}, k_{h,s}\),
@@ -773,6 +864,8 @@ Each EVALUATE log entry MUST include:
 - entailment label,
 - evidence IDs and quote spans (offsets),
 - \(w_{\text{old}}, w_{\text{new}}, \Delta w\).
+- for contrastive mode: \(q_{\text{old}}, q_{\text{new}}, \Delta q\),
+  affected pair IDs, and \(\Delta \ell(h)\) contributions.
 ** 11.3 Neutral defaults are zero evidence
 - Unassessed NEC slots contribute no update: \(w=0\) by default.
 - If a displayed slot score is needed, use \(p_{h,s}=0.5\) with low \(k\).
@@ -845,6 +938,30 @@ validation step for overlap signals:
 "NEEDS-EXCLUSION" and force a DECOMPOSE into sharper exclusion clauses
 (credit cost) before continuing evaluation on those roots.
 - Always choose which pair to handle first by canonical_id ordering.
+** 12.4A Strict MECE certificate gate (normative when enabled)
+Let \(H_{\text{named}}\) be the named roots and let:
+- \(O(h_i,h_j)\in[0,2]\): pairwise overlap score for each unordered pair.
+- \(D(h_i,h_j)\): non-empty pairwise discriminator text stating what
+evidence would favor one root over the other.
+- \(\theta_{\text{overlap}}\in[0,2]\): configured maximum allowed overlap.
+
+When strict MECE mode is enabled, implementations MUST validate before any
+paid operation:
+1. *Pair coverage:* for every unordered pair \(\{h_i,h_j\}\subset
+H_{\text{named}}\), both \(O(h_i,h_j)\) and \(D(h_i,h_j)\) are present.
+2. *Bounded overlap:* each \(O(h_i,h_j)\le \theta_{\text{overlap}}\).
+3. *Discriminator non-emptiness:* each \(D(h_i,h_j)\) is non-empty after
+normalization.
+4. *Inferential activation:* during EVALUATE on named roots, each paid
+   update MUST either:
+   - reference at least one active discriminator in \(D(h_i,h_j)\), or
+   - be marked non-discriminative with bounded non-contrastive effect
+     \(\epsilon_{\text{nc}}\) (Section 11.1A).
+
+Failure semantics:
+- If any condition fails, session execution MUST stop with
+\(stop\_reason=\texttt{MECE\_CERTIFICATE\_FAILED}\).
+- The run MUST spend zero credits and log machine-readable issue records.
 * 12A. Regime Inference and Applicability Gating (Domain-Agnostic)
 ** 12A.1 Regime posterior from evidence
 Let \(\mathcal{R}\) be a configured regime taxonomy. The engine computes a
@@ -928,11 +1045,18 @@ not just term frequency.
 Replace priority definition with:
 \[
 \mathrm{priority}(h)=\Big(p(h)(1-p(h)) + \lambda/n\Big)\cdot (1-k(h))\cdot
-s(h)\cdot \phi(h)
+s(h)\cdot \phi(h)\cdot \psi(h)
 \]
 Where:
 - \(s(h)\) is the scope/applicability score from Section 12A.
 - \(\phi(h)\in(0,1]\) is a futility/diversity factor (below).
+- \(\psi(h)\in(0,1]\) is a discriminator deficit factor:
+  \[
+  \psi(h)=\epsilon_D + (1-\epsilon_D)\cdot
+  \frac{U_h}{\max_{g\in H_{\text{named}}}U_g+\delta},
+  \]
+  where \(U_h\) is unresolved discriminator mass involving \(h\),
+  \(\epsilon_D>0\) avoids collapse, and \(\delta\) prevents divide-by-zero.
 Frontier is defined as the priority band within \(\epsilon\) of the leader
 and ordered canonically.
 ** 13.2 Futility rule (stop wasting credits)
@@ -957,19 +1081,53 @@ hypothesis.
 Per cycle, reserve at least one evaluation for:
 - the best-scoped alternative not yet adequately sampled.
 This makes the scheduler robust under initially wrong priors.
+** 13.5A Discriminator-seeking query policy (normative)
+When SEARCH is selected for a named root pair context, query generation
+MUST target unresolved discriminators first (highest \(U_h\) or pairwise
+deficit) before broad evidence expansion.
+This ensures additional credits are spent on adjudicative evidence rather
+than accumulating non-discriminative volume.
 ** 13.5 Tie-breaking (mandatory)
 All ties are broken by canonical ID derived from the statement text
 (hash), never by input ordering.
+** 13.6 Minimum discriminative coverage checkpoint
+At configurable intervals (e.g., each full frontier cycle), compute:
+\[
+\mathrm{coverage}_{\text{disc}}
+=
+\frac{\#\{\text{pairwise discriminators with at least one valid scored item}\}}
+{\#\{\text{required discriminator entries}\}}.
+\]
+If coverage stagnates below threshold while credits are consumed, emit an
+anomaly and increase abstention pressure (\(H_{\text{UND}}\) bias in
+open-world mode).
 * 14. Stopping Conditions
 Stop when any holds:
 A) credits exhausted.
 B) For all hypotheses in the current frontier:
  - root is SCOPED,
- - all template NEC slots have \(k \ge \tau\) (or credit exhaustion
+ - all template NEC slots have effective confidence
+   \(k_{\mathrm{eff}} \ge \tau\), where \(k_{\mathrm{eff}}\) is the
+   recursively propagated slot confidence after applicable policy
+   caps/penalties (or credit exhaustion
 prevents further improvement).
 C) No legal next operation exists (e.g., maximum decomposition depth
 reached and no evaluable nodes remain).
-* 14A. Anomaly Detection and Operator Actions (Normative)
+** 14A Principled abstention trigger (normative)
+Before declaring a single named-root winner, implementations MUST check:
+- top-margin condition:
+  \(p(h_{(1)})-p(h_{(2)}) \ge \delta_{\text{win}}\),
+- discriminator-resolution condition:
+  unresolved-pair mass \(\Upsilon \le \tau_{\Upsilon}\),
+- expected-gain condition:
+  best remaining discriminative VOI \(\ge \nu_{\min}\), or no legal
+  operations remain.
+If conditions fail at stop time:
+- in OPEN_WORLD mode, output SHOULD allocate dominant residual mass to
+  \(H_{\text{UND}}\),
+- in CLOSED_WORLD mode, output MUST emit an underdetermination anomaly and
+  label the run non-decisive.
+* 14B. Anomaly Detection and Operator Actions (Normative)
 ABDUCTIO MUST emit anomaly flags when safety-critical patterns occur.
 Flags are logged artifacts with:
 - trigger condition (numeric),
@@ -996,6 +1154,12 @@ Trigger: two or more hypotheses remember high support and are not
 contradictory under entailment checks.
 Action: "Consider extending hypothesis set or enabling multi-causal
 reporting."
+** A5: Persistent discriminator deficit
+Trigger: discriminator coverage remains below
+\(\theta_{\text{disc\_coverage}}\) for \(\ge N_{\text{stagnant}}\)
+frontier cycles while credits are being spent.
+Action: "Inference is non-adjudicative; prioritize discriminator-targeted
+search or accept underdetermined outcome."
 All thresholds must be configured and logged.
 * 15. Evaluator and Decomposer Interfaces (Implementation Contracts)
 ** 15.1 Evaluator contract (human or agent)
@@ -1009,6 +1173,9 @@ underdetermined)
 - claim_type
 - entailment label(s) for quote\(\to\)claim
 - validity inputs sufficient to compute \(v\) deterministically
+- active discriminator IDs touched (pairwise)
+- comparative directionality for each touched pair
+  (evidence favors \(h\), favors competitor, or non-discriminative)
 - evidence_quality: "direct"|"indirect"|"weak"|"none"
 - reasoning_summary (short, non-chain-of-thought, referencing evidence
 ids)
@@ -1071,7 +1238,15 @@ Decision plug-in (conceptual) inputs and outputs:
 constraints
 - Output: action(s) (e.g., investigate node, accept hypothesis, place bet,
 abstain), with logged rationale
-* 17. Calibration Harness (Optional, Domain-Agnostic)
+* 17. Calibration Harness (Normative for Empirical Probability Claims)
+Calibration is a *reporting layer* over inference outputs, not a
+replacement for contrastive inference.
+Normative boundary:
+- calibration MUST NOT retroactively change in-run ledger transitions,
+  operation legality, or audit arithmetic,
+- calibration MAY transform reported probabilities for evaluation and
+  downstream decision interfaces, provided the transform is versioned and
+  logged.
 ** 17.1 Post-hoc calibration by \(k\)-bucket
 When outcomes resolve, compute calibration diagnostics (e.g., Brier score,
 reliability curves) stratified by \(k\) buckets.
@@ -1084,17 +1259,34 @@ Tune (walk-forward):
 exploration term)
 Objective: reduce systematic miscalibration without requiring
 domain-specific features.
+** 17.3 Monotone calibration map (recommended default)
+Learn a monotone map \(c:[0,1]\rightarrow[0,1]\) on resolved historical
+runs with strict time-split or walk-forward validation:
+\[
+\hat p_{\text{cal}} = c(\hat p_{\text{raw}}).
+\]
+Monotonicity preserves ordering while correcting confidence scale drift.
+The calibrator version, training window, and metrics MUST be logged.
+** 17.4 Required metrics for empirical validation claims
+If claiming empirical validity of probability outputs, reports MUST
+include at minimum:
+- top-1 accuracy and abstention rate,
+- Brier score,
+- log loss,
+- expected calibration error (ECE),
+- underdetermination precision/recall for cases labeled inconclusive by
+  oracle policy.
 * 18. Algorithm (Updated Pseudocode)
 #+begin_src text
 inputs:
  scope text
  roots: List[RootSpec]
  credits B
- tau, epsilon, beta, W, gamma, alpha, lambda_voi
- regime taxonomy R and applicability A_h(r)
- rho_min, rho_max (scope caps)
- world_mode (closed-world or open-world)
- search_policy (queries, sources, max_search_depth, per-slot quotas)
+tau, epsilon, beta, W, gamma, alpha, lambda_voi, epsilon_nc, kappa_contra
+regime taxonomy R and applicability A_h(r)
+rho_min, rho_max (scope caps)
+world_mode (closed-world or open-world)
+search_policy (queries, sources, max_search_depth, per-slot quotas)
 initialize:
  for each root in roots:
  canonical_id[root] = hash(root.statement)
@@ -1105,17 +1297,18 @@ initialize:
  set p_noa = gamma/2, p_und = gamma/2, p_i = (1-gamma)/n
  else:
  set uniform priors: p_i = 1/n
- set all k = 0.15
- set all status = UNSCOPED initially
- initialize w_applied[h,s] = 0 for all slots
- initialize search_counters[h,s,depth] = 0
- initialize evidence_packet_hash = hash(initial_evidence_packet)
+set all k = 0.15
+set all status = UNSCOPED initially
+initialize w_applied[h,s] = 0 for all slots
+initialize q_applied[h,g,d] = 0 for all required discriminator entries
+initialize search_counters[h,s,depth] = 0
+initialize evidence_packet_hash = hash(initial_evidence_packet)
 for cycle = 1.. while credits > 0:
- infer regime posteriors P(r|E) and scope scores s(h)
- for each root, compute priority = (p(1-p) + lambda_voi/n)(1-k)s(h)phi(h)
- leader = argmax priority (tie-break by canonical_id)
- frontier F = {Hi : priority(Hi) >= priority(leader) - epsilon}
- order frontier by canonical_id
+ infer regime posteriors P(r|E), scope scores s(h), and unresolved discriminator deficits U_h
+ for each root, compute priority = (p(1-p) + lambda_voi/n)(1-k)s(h)phi(h)psi(h)
+leader = argmax priority (tie-break by canonical_id)
+frontier F = {Hi : priority(Hi) >= priority(leader) - epsilon}
+order frontier by canonical_id
  for Hi in F:
  if credits == 0: break
  choose operation deterministically:
@@ -1124,26 +1317,37 @@ for cycle = 1.. while credits > 0:
  else:
  pick slot s with lowest k (tie-break by canonical_id)
  if search_needed(s) and search_budget_available(h,s,depth):
- SEARCH(h,s,depth)
+ SEARCH(h,s,depth,target=highest_unresolved_discriminator_pair)
+ elif has_unassessed_target(s):
+ EVALUATE(s)
  elif can_decompose(s) and k(s) < tau:
  DECOMPOSE(s)
  else:
- EVALUATE(s)
+ EVALUATE(s) # reassess decisive assessed target if legal
+ # Guardrail: slot/subnode DECOMPOSE is illegal while any required slot on
+ # Hi remains unassessed.
  spend 1 credit
  update credits_spent on Hi and node
  if SEARCH:
  append evidence items to evidence packet
  recompute evidence_packet_hash
- recompute slot p_s and k_s via aggregation if needed
- clamp p_s to [eta, 1-eta] and compute w_new from p_s and k_s
- delta_w = w_new - w_applied[h,s]
- update log p(h) with delta_w
+ if EVALUATE:
+ compute validity v and claim-type leverage
+ compute contradiction penalties for evidence matching X_h^- with validity >= v_min
+ compute comparative contributions q_new[h,g,d] on active discriminators
+ delta_q[h,g,d] = q_new[h,g,d] - q_applied[h,g,d]
+ delta_ell[h] = sum_g,d omega[h,g] * delta_q[h,g,d]
+ bound any non-contrastive uplift by epsilon_nc
+ update log p(h) for all named roots using delta_ell, then normalize
+ write q_applied <- q_new
+ if contradiction condition met, enforce penalty floor -kappa_contra * v
  normalize ledger over named roots + open-world residuals (log-sum-exp)
  if open-world: enforce typed residual floors for H_NOA/H_UND and apply
 scope caps
  if alpha > 0: blend p_new with p_prev via damping
- log clamps, clips, w_old, w_new, delta_w, evidence_packet_hash, and
+ log clamps, clips, q_old, q_new, delta_q, delta_ell, contradiction penalties, evidence_packet_hash, and
 every arithmetic step and invariant check
+before final winner declaration, run principled abstention trigger
 stop when stopping conditions met
 output full audit trace
 #+end_src
@@ -1426,6 +1630,9 @@ You MAY conclude:
 1. Relative ranking: if \(p_{\text{ledger}}(h) > p_{\text{ledger}}(g)\),
 ABDUCTIO currently favors \(h\) over \(g\) under its logged evidence
 weights.
+1a. Tie handling: if multiple roots share the maximum
+\(p_{\text{ledger}}\) (within declared numeric tolerance), report an
+*ambiguous top set* rather than a unique winner.
 2. Auditability: every ledger shift is attributable to specific evaluated
 nodes with cited evidence (or explicitly marked “no-evidence” conservative
 updates).
@@ -1458,6 +1665,49 @@ An implementation SHOULD display, alongside every
 - the list of evaluated slots contributing nonzero \(w\),
 - a warning banner if any required slot is UNSCOPED or has rubric A=0,
 - a “claims policy” tooltip summarizing D.6 in plain language.
+** D.9 Simplified Single-Claim Interface (Extension, Not a New Engine)
+ABDUCTIO MAY expose a simplified interface for non-expert users where the
+input is a single claim \(C\) and the output is a plain-language opinion.
+This is a projection of the same core machinery, not an alternate
+reasoning system.
+
+Normative mapping:
+- Build a normal session with named roots:
+  - \(H_{\text{YES}}\): "\(C\)"
+  - \(H_{\text{NO}}\): "Not-\(C\)"
+- Keep standard open-world residual handling (\(H_{\text{NOA}},
+  H_{\text{UND}}\)) in open-world mode.
+- Apply the same required-slot template, decomposition/evaluation/search
+  operations, credit accounting, and audit requirements as any other run.
+- This mode is a *truth-value partition* over one proposition, not a
+  mechanism-library mode. For multi-mechanism causal diagnosis, use the
+  full root-set workflow from the main body (including P1 stand-alone
+  mechanism roots).
+
+Recommended default profile (`simple_v1`):
+- required slots: {availability, fit_to_key_features,
+  defeater_resistance} as NEC;
+- run mode: until_stops;
+- open-world mode enabled;
+- \(\alpha=1.0\) to reduce order-induced damping artifacts in two-root
+  (YES/NO) sessions while preserving the same logged Delta-\(w\) update
+  equations.
+
+Opinion projection (UI-level):
+- YES: \(H_{\text{YES}}\) is top among \(\{H_{\text{YES}},
+  H_{\text{NO}}, H_{\text{UND}}\}\) beyond tie tolerance.
+- NO: \(H_{\text{NO}}\) is top beyond tie tolerance.
+- UNDERDETERMINED: tie within tolerance among top competitors or
+  \(H_{\text{UND}}\) top.
+
+Interpretation contract:
+- "Credence" shown in the simplified UI is the projected ledger mass for
+  the selected opinion root.
+- "Confidence" shown in the simplified UI is \(k\)-based robustness
+  (for UNDERDETERMINED, use a conservative function such as
+  \(\min(k(H_{\text{YES}}), k(H_{\text{NO}}))\)).
+- This mode MUST NOT claim stronger semantics than D.6; it is a usability
+  layer over the same audit-traceable process.
 This appendix is the definitive interpretation contract for the meanings
 of \(p_{\text{ledger}}, p(\cdot), k\) in ABDUCTIO Core.
 * Appendix E: Worked Example (Closed-World Mode)
@@ -1974,7 +2224,7 @@ Using only keyed state \((R,N,w)\) for hypothesis \(k\):
 - if UNSCOPED or missing required slots: DECOMPOSE(root)
 - else pick required slot \(s\) with minimum \(k\)-confidence (tie-break
 by canonical slot id)
- - if decomposable and \(k<\tau\): DECOMPOSE(slot)
+ - if decomposable and \(k_{\mathrm{eff}}<\tau\): DECOMPOSE(slot)
  - else: EVALUATE(slot)
 4) *Apply operation.*
 - DECOMPOSE: update \(R,N\) only (structure). Enforce: \(q,\gamma,w\)

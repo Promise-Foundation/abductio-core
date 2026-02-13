@@ -311,6 +311,7 @@ def replay_session(audit_trace: Iterable[Dict[str, object]]) -> SessionResult:
             rubric["A"] = 0
         if rubric:
             node.k, guardrail = rs._derive_k_from_rubric(rubric)
+            node.guardrail_applied = bool(guardrail)
             if not has_refs and node.k > 0.55:
                 node.k = 0.55
             quality_caps = {"weak": 0.35, "indirect": 0.55, "none": 0.35}
@@ -321,32 +322,11 @@ def replay_session(audit_trace: Iterable[Dict[str, object]]) -> SessionResult:
             assumptions = outcome.get("assumptions")
             if isinstance(assumptions, list) and assumptions and node.k > 0.55:
                 node.k = 0.55
+        else:
+            node.guardrail_applied = False
 
-        for parent in nodes.values():
-            if parent.decomp_type == "AND" and node_key in parent.children:
-                aggregated, _details = rs._aggregate_soft_and(parent, nodes)
-                parent.p = rs._clamp_probability(float(aggregated))
-                parent.assessed = True
-            if parent.decomp_type == "OR" and node_key in parent.children:
-                children = [nodes[k] for k in parent.children if k in nodes and nodes[k].assessed]
-                if not children:
-                    parent.p = 0.5
-                else:
-                    parent.p = max(child.p for child in children)
-                parent.assessed = True
-
-        slot_nodes = []
-        for slot_key in required_slot_keys:
-            if required_slot_roles.get(slot_key, "NEC") != "NEC":
-                continue
-            node_key_for_slot = root.obligations.get(slot_key)
-            if not node_key_for_slot:
-                continue
-            slot_node = nodes.get(node_key_for_slot)
-            if slot_node:
-                slot_nodes.append(slot_node)
-        if slot_nodes:
-            root.k_root = min(n.k for n in slot_nodes)
+        rs._propagate_parent_updates(node_key, nodes)
+        rs._recompute_root_confidence(root, required_slot_keys, required_slot_roles, nodes)
 
         apply_ledger_update(root)
 
@@ -416,7 +396,16 @@ def replay_session(audit_trace: Iterable[Dict[str, object]]) -> SessionResult:
                             "overlap_with_siblings": child.get("overlap_with_siblings", []),
                         }
                     )
-            rs._apply_node_decomposition(_NullDeps(), node_key, decomp, nodes)
+            decomposed = rs._apply_node_decomposition(_NullDeps(), node_key, decomp, nodes)
+            if decomposed:
+                parent_node = nodes.get(node_key)
+                if parent_node and parent_node.decomp_type in {"AND", "OR"}:
+                    parent_node.k, _ = rs._propagate_parent_k(parent_node, nodes)
+                rs._propagate_parent_updates(node_key, nodes)
+                root_id = node_key.split(":", 1)[0]
+                root = hypothesis_set.roots.get(root_id)
+                if root:
+                    rs._recompute_root_confidence(root, required_slot_keys, required_slot_roles, nodes)
         elif et == "NODE_EVALUATED":
             node_key = payload.get("node_key")
             if not isinstance(node_key, str):

@@ -83,7 +83,7 @@ class _FakeOpenAIClass:
     def __init__(self, client: _FakeOpenAI):
         self._client = client
 
-    def __call__(self, api_key, timeout):
+    def __call__(self, api_key, timeout, **kwargs):
         return self._client
 
 
@@ -153,3 +153,27 @@ def test_complete_json_retries_after_invalid_json(monkeypatch) -> None:
     out = client.complete_json(system="s", user="u")
     assert out["ok"] is True
     assert "_provenance" in out
+
+
+def test_complete_json_accepts_fenced_json(monkeypatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+    _install_fake_openai(monkeypatch, _FakeOpenAI(responses_text="```json\n{\"ok\": true}\n```"))
+    client = m.OpenAIJsonClient(model="gpt-4.1-mini", max_retries=1, retry_backoff_s=0.0, retry_jitter_s=0.0)
+    out = client.complete_json(system="s", user="u")
+    assert out["ok"] is True
+    assert "_provenance" in out
+
+
+def test_complete_json_error_includes_nested_exception_chain(monkeypatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+
+    err = RuntimeError("outer")
+    err.__cause__ = ValueError("inner")
+    _install_fake_openai(monkeypatch, _FakeOpenAI(responses_exc=err, chat_exc=err))
+
+    client = m.OpenAIJsonClient(model="gpt-4.1-mini", max_retries=1, retry_backoff_s=0.0, retry_jitter_s=0.0)
+    with pytest.raises(RuntimeError) as excinfo:
+        client.complete_json(system="s", user="u")
+    message = str(excinfo.value)
+    assert "RuntimeError: outer" in message
+    assert "ValueError: inner" in message

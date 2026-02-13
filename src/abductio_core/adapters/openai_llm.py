@@ -5,6 +5,8 @@ import json
 import os
 import time
 import hashlib
+import random
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -39,14 +41,88 @@ def _hash_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _extract_json_object(text: str) -> Dict[str, Any]:
+    candidate = str(text or "").strip()
+    if not candidate:
+        raise json.JSONDecodeError("empty response", candidate, 0)
+
+    try:
+        payload = json.loads(candidate)
+        if isinstance(payload, dict):
+            return payload
+    except json.JSONDecodeError:
+        pass
+
+    fenced = candidate
+    if fenced.startswith("```"):
+        fenced = re.sub(r"^```(?:json)?\s*", "", fenced, flags=re.IGNORECASE)
+        fenced = re.sub(r"\s*```$", "", fenced)
+        try:
+            payload = json.loads(fenced)
+            if isinstance(payload, dict):
+                return payload
+        except json.JSONDecodeError:
+            pass
+
+    start = candidate.find("{")
+    end = candidate.rfind("}")
+    if start >= 0 and end > start:
+        snippet = candidate[start : end + 1]
+        payload = json.loads(snippet)
+        if isinstance(payload, dict):
+            return payload
+
+    payload = json.loads(candidate)
+    if isinstance(payload, dict):
+        return payload
+    raise json.JSONDecodeError("response JSON is not an object", candidate, 0)
+
+
+def _exception_chain(exc: Exception | None) -> str:
+    if exc is None:
+        return "unknown error"
+    parts: List[str] = []
+    seen: set[int] = set()
+    cursor: Exception | None = exc
+    while cursor is not None and id(cursor) not in seen:
+        seen.add(id(cursor))
+        parts.append(f"{type(cursor).__name__}: {cursor}")
+        nxt = getattr(cursor, "__cause__", None) or getattr(cursor, "__context__", None)
+        cursor = nxt if isinstance(nxt, Exception) else None
+    return " <- ".join(parts)
+
+
+def _is_non_retryable_error(exc: Exception | None) -> bool:
+    if exc is None:
+        return False
+    names = {type(exc).__name__}
+    nested = getattr(exc, "__cause__", None) or getattr(exc, "__context__", None)
+    if isinstance(nested, Exception):
+        names.add(type(nested).__name__)
+    return bool(
+        names
+        & {
+            "AuthenticationError",
+            "PermissionDeniedError",
+            "BadRequestError",
+            "NotFoundError",
+            "UnprocessableEntityError",
+        }
+    )
+
+
 @dataclass
 class OpenAIJsonClient:
     api_key: Optional[str] = None
     model: str = "gpt-4.1-mini"
     temperature: float = 0.0
     timeout_s: float = 60.0
-    max_retries: int = 3
-    retry_backoff_s: float = 0.8
+    max_retries: int = 6
+    retry_backoff_s: float = 1.0
+    retry_backoff_max_s: float = 15.0
+    retry_jitter_s: float = 0.25
+    fallback_models: Tuple[str, ...] = ()
+    base_url: Optional[str] = None
 
     def __post_init__(self) -> None:
         key = self.api_key or os.getenv("OPENAI_API_KEY")
@@ -59,69 +135,112 @@ class OpenAIJsonClient:
         openai_cls = getattr(openai_mod, "OpenAI", None)
         if openai_cls is None:
             raise RuntimeError("openai package is required")
-        self._client = openai_cls(api_key=key, timeout=self.timeout_s)
+        base_url = self.base_url or os.getenv("OPENAI_BASE_URL") or os.getenv("OPENAI_API_BASE")
+        kwargs: Dict[str, Any] = {"api_key": key, "timeout": self.timeout_s}
+        if base_url:
+            kwargs["base_url"] = base_url
+        self._client = openai_cls(**kwargs)
+
+    def _sleep_for_retry(self, attempt: int) -> None:
+        delay = float(self.retry_backoff_s) * (2**attempt)
+        if self.retry_backoff_max_s > 0:
+            delay = min(delay, float(self.retry_backoff_max_s))
+        if self.retry_jitter_s > 0:
+            delay += random.uniform(0.0, float(self.retry_jitter_s))
+        if delay > 0:
+            time.sleep(delay)
+
+    def _model_candidates(self) -> List[str]:
+        models: List[str] = []
+        raw_fallbacks: List[str] = []
+        if isinstance(self.fallback_models, str):
+            raw_fallbacks = [part.strip() for part in self.fallback_models.split(",")]
+        else:
+            raw_fallbacks = [str(part).strip() for part in self.fallback_models]
+        for candidate in [str(self.model).strip(), *raw_fallbacks]:
+            if candidate and candidate not in models:
+                models.append(candidate)
+        return models or ["gpt-4.1-mini"]
+
+    def _request_text(self, *, model: str, system: str, user: str) -> Tuple[str, Optional[Exception]]:
+        last_exc: Optional[Exception] = None
+        text = ""
+        try:
+            response = self._client.responses.create(
+                model=model,
+                temperature=self.temperature,
+                response_format={"type": "json_object"},
+                input=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            )
+            text = _first_text(response).strip()
+        except Exception as exc:
+            last_exc = exc
+
+        if text:
+            return text, last_exc
+
+        try:
+            response = self._client.chat.completions.create(
+                model=model,
+                temperature=self.temperature,
+                response_format={"type": "json_object"},
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            )
+            text = _chat_text(response).strip()
+        except Exception as exc:
+            last_exc = exc
+        return text, last_exc
 
     def complete_json(self, *, system: str, user: str) -> Dict[str, Any]:
         last_exc: Optional[Exception] = None
-        for attempt in range(self.max_retries):
-            text = ""
-            try:
-                response = self._client.responses.create(
-                    model=self.model,
-                    temperature=self.temperature,
-                    response_format={"type": "json_object"},
-                    input=[
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
-                )
-                text = _first_text(response).strip()
-            except Exception as exc:
-                last_exc = exc
+        model_candidates = self._model_candidates()
+        total_attempts = max(1, int(self.max_retries))
+        for model_idx, model_name in enumerate(model_candidates):
+            for attempt in range(total_attempts):
+                text, request_exc = self._request_text(model=model_name, system=system, user=user)
+                if text:
+                    try:
+                        payload = _extract_json_object(text)
+                        payload.setdefault(
+                            "_provenance",
+                            {
+                                "provider": "openai",
+                                "model": model_name,
+                                "temperature": self.temperature,
+                                "timeout_s": self.timeout_s,
+                                "response_format": "json_object",
+                                "system_hash": _hash_text(system),
+                                "user_hash": _hash_text(user),
+                                "response_hash": _hash_text(text),
+                                "attempt": attempt + 1,
+                                "fallback_model_used": model_idx > 0,
+                            },
+                        )
+                        return payload
+                    except Exception as exc:
+                        last_exc = exc if isinstance(exc, Exception) else RuntimeError(str(exc))
+                else:
+                    last_exc = request_exc or RuntimeError("empty response text from OpenAI APIs")
 
-            if not text:
-                try:
-                    response = self._client.chat.completions.create(
-                        model=self.model,
-                        temperature=self.temperature,
-                        response_format={"type": "json_object"},
-                        messages=[
-                            {"role": "system", "content": system},
-                            {"role": "user", "content": user},
-                        ],
-                    )
-                    text = _chat_text(response).strip()
-                except Exception as exc:
-                    last_exc = exc
-                    text = ""
+                should_retry = attempt < (total_attempts - 1)
+                if should_retry and not _is_non_retryable_error(last_exc):
+                    self._sleep_for_retry(attempt)
+                    continue
+                break
 
-            if not text:
-                time.sleep(self.retry_backoff_s * (attempt + 1))
-                continue
+            if model_idx < len(model_candidates) - 1:
+                self._sleep_for_retry(0)
 
-            try:
-                payload = json.loads(text)
-                if isinstance(payload, dict):
-                    payload.setdefault(
-                        "_provenance",
-                        {
-                            "provider": "openai",
-                            "model": self.model,
-                            "temperature": self.temperature,
-                            "timeout_s": self.timeout_s,
-                            "response_format": "json_object",
-                            "system_hash": _hash_text(system),
-                            "user_hash": _hash_text(user),
-                            "response_hash": _hash_text(text),
-                        },
-                    )
-                return payload
-            except json.JSONDecodeError as exc:
-                last_exc = exc
-                time.sleep(self.retry_backoff_s * (attempt + 1))
-                continue
-
-        raise RuntimeError(f"LLM did not return valid JSON after retries: {last_exc}") from last_exc
+        detail = _exception_chain(last_exc)
+        raise RuntimeError(
+            f"LLM did not return valid JSON after retries across models {model_candidates}: {detail}"
+        ) from last_exc
 
 
 def _validate_evaluation(outcome: Dict[str, Any]) -> None:
@@ -134,6 +253,9 @@ def _validate_evaluation(outcome: Dict[str, Any]) -> None:
             "C",
             "D",
             "evidence_ids",
+            "discriminator_ids",
+            "discriminator_payloads",
+            "entailment",
             "reasoning_summary",
             "defeaters",
             "uncertainty_source",
@@ -163,6 +285,36 @@ def _validate_evaluation(outcome: Dict[str, Any]) -> None:
     evidence_ids = outcome.get("evidence_ids")
     if not isinstance(evidence_ids, list) or not all(isinstance(item, str) and item for item in evidence_ids):
         raise RuntimeError("LLM evaluation evidence_ids must be a non-empty list of strings (or [] when none)")
+    discriminator_ids = outcome.get("discriminator_ids")
+    if not isinstance(discriminator_ids, list) or not all(
+        isinstance(item, str) and item.strip() for item in discriminator_ids
+    ):
+        raise RuntimeError("LLM evaluation discriminator_ids must be a list of non-empty strings (or [])")
+    discriminator_payloads = outcome.get("discriminator_payloads")
+    if not isinstance(discriminator_payloads, list):
+        raise RuntimeError("LLM evaluation discriminator_payloads must be a list")
+    for payload in discriminator_payloads:
+        if not isinstance(payload, dict):
+            raise RuntimeError("LLM evaluation discriminator_payload must be an object")
+        discriminator_id = payload.get("id")
+        pair = payload.get("pair")
+        direction = payload.get("direction")
+        typed_evidence_ids = payload.get("evidence_ids")
+        if not isinstance(discriminator_id, str) or not discriminator_id.strip():
+            raise RuntimeError("LLM evaluation discriminator_payload.id must be a non-empty string")
+        if not isinstance(pair, str) or not pair.strip():
+            raise RuntimeError("LLM evaluation discriminator_payload.pair must be a non-empty string")
+        if not isinstance(direction, str) or not direction.strip():
+            raise RuntimeError("LLM evaluation discriminator_payload.direction must be a non-empty string")
+        if not isinstance(typed_evidence_ids, list) or not all(
+            isinstance(item, str) and item.strip() for item in typed_evidence_ids
+        ):
+            raise RuntimeError("LLM evaluation discriminator_payload.evidence_ids must be a list of non-empty strings")
+        if discriminator_id not in discriminator_ids:
+            raise RuntimeError("LLM evaluation discriminator_payload.id must appear in discriminator_ids")
+    entailment = str(outcome.get("entailment", "")).strip().upper()
+    if entailment not in {"SUPPORTS", "CONTRADICTS", "NEUTRAL", "UNKNOWN"}:
+        raise RuntimeError("LLM evaluation entailment must be one of {SUPPORTS,CONTRADICTS,NEUTRAL,UNKNOWN}")
     evidence_quality = outcome.get("evidence_quality")
     if evidence_quality not in {"direct", "indirect", "weak", "none"}:
         raise RuntimeError("LLM evaluation evidence_quality must be one of {direct,indirect,weak,none}")
@@ -363,6 +515,17 @@ class OpenAIEvaluatorPort:
             "  \"C\": int 0..2,\n"
             "  \"D\": int 0..2,\n"
             "  \"evidence_ids\": [\"EV-1\", \"EV-2\"],\n"
+            "  \"discriminator_ids\": [\"disc:H1|H2\"],\n"
+            "  \"discriminator_payloads\": [\n"
+            "    {\n"
+            "      \"id\": \"disc:H1|H2\",\n"
+            "      \"pair\": \"H1|H2\",\n"
+            "      \"direction\": \"FAVORS_LEFT\"|\"FAVORS_RIGHT\"|\"SUPPORTS\"|\"CONTRADICTS\"|\"NEUTRAL\",\n"
+            "      \"evidence_ids\": [\"EV-1\"]\n"
+            "    }\n"
+            "  ],\n"
+            "  \"entailment\": \"SUPPORTS\"|\"CONTRADICTS\"|\"NEUTRAL\"|\"UNKNOWN\",\n"
+            "  \"non_discriminative\": boolean,\n"
             "  \"quotes\": [{\"evidence_id\":\"EV-1\",\"exact_quote\":\"...\",\"location\":{}}],\n"
             "  \"evidence_quality\": \"direct\"|\"indirect\"|\"weak\"|\"none\",\n"
             "  \"reasoning_summary\": \"short justification referencing evidence ids\",\n"
@@ -373,6 +536,9 @@ class OpenAIEvaluatorPort:
             "Rules:\n"
             "- Use ONLY facts present in the evidence packet; list any assumptions explicitly.\n"
             "- If no evidence supports the claim, set evidence_ids to [] and evidence_quality to \"none\".\n"
+            "- Use contrastive.candidate_discriminator_ids only; if none apply, return discriminator_ids=[] and discriminator_payloads=[].\n"
+            "- If discriminator_ids is non-empty, include matching discriminator_payloads and cite supporting evidence_ids.\n"
+            "- Use entailment=NEUTRAL when evidence does not discriminate among active alternatives.\n"
         )
         if evidence_items is not None:
             resolved_items: List[Dict[str, Any]] = []
@@ -405,6 +571,7 @@ class OpenAIEvaluatorPort:
                 "slot_key": slot_key,
                 "child_id": child_id,
                 "scope": self.scope or "",
+                "contrastive": context.get("contrastive", {}),
                 "evidence_items": evidence_payload,
             }
         )

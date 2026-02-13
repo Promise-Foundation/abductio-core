@@ -1,0 +1,3899 @@
+[
+  {
+    "event_type": "SESSION_INITIALIZED",
+    "payload": {
+      "config": {
+        "W": 3.0,
+        "alpha": 0.4,
+        "beta": 1.0,
+        "epsilon": 0.05,
+        "gamma": 0.2,
+        "gamma_noa": 0.1,
+        "gamma_und": 0.1,
+        "lambda_voi": 0.1,
+        "rho_eval_min": 0.5,
+        "tau": 0.7,
+        "world_mode": "open"
+      },
+      "evidence_items": [
+        {
+          "id": "H1",
+          "location": null,
+          "metadata": {},
+          "source": "history",
+          "text": "A tug driving instructor (tug instructor) and trainee tug driver (trainee driver) were seated beside each other in the tug. The flight crew were in communication with the headset operator via the aircraft\u2019s interphone."
+        },
+        {
+          "id": "H2",
+          "location": null,
+          "metadata": {},
+          "source": "history",
+          "text": "The trainee driver decided to stop the pushback and asked the tug instructor to take over."
+        },
+        {
+          "id": "H3",
+          "location": null,
+          "metadata": {},
+          "source": "history",
+          "text": "After swapping seats the instructor recommenced the pushback, correcting the aircraft back onto the taxiway centreline. He continued to reassure and advise the trainee while performing the pushback, looking at her while doing so. The headset operator continued walking on the right side of the tug, abeam its cabin. The wingman was on the left just ahead of the tug."
+        },
+        {
+          "id": "H4",
+          "location": null,
+          "metadata": {},
+          "source": "history",
+          "text": "The aircraft\u2019s nosewheel reached the \u2018Tug release point\u2019 (TRP) ground markings. However, it continued moving beyond the TRP with its engine at idle and hit the blast barrier at the end of the cul-de-sac."
+        },
+        {
+          "id": "H5",
+          "location": null,
+          "metadata": {},
+          "source": "history",
+          "text": "The tug instructor pulled the aircraft forward off the fence then stopped the tug."
+        }
+      ],
+      "evidence_packet_hash": "d1634c042910c0044614e6f77f88590e64e77525e272a8f45674c82d95ff3879",
+      "framing": null,
+      "initial_ledger": {},
+      "ledger": {
+        "H_NOA": 0.1,
+        "H_UND": 0.1,
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION": 0.2,
+        "R2_COMMUNICATION_BREAKDOWN": 0.2,
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": 0.2,
+        "R4_MECHANICAL_CONTROL_FAILURE": 0.2
+      },
+      "required_slots": [
+        {
+          "role": "NEC",
+          "slot_key": "availability"
+        },
+        {
+          "role": "NEC",
+          "slot_key": "fit_to_key_features"
+        },
+        {
+          "role": "NEC",
+          "slot_key": "defeater_resistance"
+        }
+      ],
+      "roots": [
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+        "R2_COMMUNICATION_BREAKDOWN",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "H_NOA",
+        "H_UND"
+      ],
+      "roots_spec": [
+        {
+          "canonical_id": "c6d227ce120fd88aab44d5a410d92a6f298f0646ce6b0e2cf8c73b43c1d4f097",
+          "exclusion_clause": "Not explained by any other root",
+          "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+          "statement": "Procedural deviation in pushback execution"
+        },
+        {
+          "canonical_id": "5d61d1752609048f908ddee0b546541b1fdb6e2495011392e2eef3b1e64a016d",
+          "exclusion_clause": "Not explained by any other root",
+          "root_id": "R2_COMMUNICATION_BREAKDOWN",
+          "statement": "Communication/coordination breakdown among crew"
+        },
+        {
+          "canonical_id": "80041c50405b2d422e9f0f1c0bc104062cbcb782f1d4bf09dc3a19463381844e",
+          "exclusion_clause": "Not explained by any other root",
+          "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+          "statement": "Environmental/marking deficiency"
+        },
+        {
+          "canonical_id": "ab11ad18c5a0d329a5e53e7a3682985ecde71f70be861989f0bea3dea37a1a69",
+          "exclusion_clause": "Not explained by any other root",
+          "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+          "statement": "Mechanical/control failure"
+        },
+        {
+          "canonical_id": "7af580976d463ec209f8b784d25a4f6ad1a1d7f20706bd396463ccf7b0c455e0",
+          "exclusion_clause": "Not any named hypothesis",
+          "root_id": "H_NOA",
+          "statement": "None of the above"
+        },
+        {
+          "canonical_id": "739ba201292f5632ea1d53673c9a3c0e6ce284f3c6bd3df0389656ff5c8fd458",
+          "exclusion_clause": "Insufficient evidence to discriminate",
+          "root_id": "H_UND",
+          "statement": "Underdetermined"
+        }
+      ],
+      "slot_initial_p": {},
+      "slot_k_min": {}
+    }
+  },
+  {
+    "event_type": "OPEN_WORLD_RESIDUALS_ENFORCED",
+    "payload": {
+      "branch": "S<=1",
+      "gamma_noa": 0.1,
+      "gamma_und": 0.1,
+      "sum_named": 0.8
+    }
+  },
+  {
+    "event_type": "INVARIANT_SUM_TO_ONE_CHECK",
+    "payload": {
+      "total": 1.0
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R2_COMMUNICATION_BREAKDOWN",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+      ],
+      "leader_id": "R2_COMMUNICATION_BREAKDOWN"
+    }
+  },
+  {
+    "event_type": "TIE_BREAKER_APPLIED",
+    "payload": {
+      "ordered_frontier": [
+        "R2_COMMUNICATION_BREAKDOWN",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+      ]
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "target_id": "R2_COMMUNICATION_BREAKDOWN",
+      "voi": 0.23931471805599452
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "voi": 0.23931471805599452
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "target_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "voi": 0.23931471805599452
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "target_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "voi": 0.23931471805599452
+    }
+  },
+  {
+    "event_type": "ROOT_DECOMPOSED",
+    "payload": {
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "0dde62a4deb310432bca5ba5d482a36476218bf13581bdacdd7c55f62dee4ba9",
+        "system_hash": "857d2f15f2c3ca030ae301fbeff52f742553e003798039fccde97fad62518fcf",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "cdd11680f08e9b89f68ced2d82781c95905eef3fe454a3afbd4dc0e146c5631b"
+      },
+      "ok": true,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "slot_statements": {
+        "availability": "The communication/coordination breakdown among crew occurred during the early phase of the historical timeline for Boeing 737-8AS 9H-QAA on 12-25.",
+        "defeater_resistance": "The communication/coordination breakdown among crew is resistant to defeaters based on the available evidence from the Boeing 737-8AS 9H-QAA incident on 12-25 in the early historical timeline, with no contradictory information undermining this root cause.",
+        "fit_to_key_features": "The communication/coordination breakdown among crew aligns with key features observed in the Boeing 737-8AS 9H-QAA incident on 12-25 during the early historical timeline, including crew interactions and coordination challenges."
+      }
+    }
+  },
+  {
+    "event_type": "ROOT_SCOPED",
+    "payload": {
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "slots": [
+        "availability",
+        "fit_to_key_features",
+        "defeater_resistance"
+      ]
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 19,
+      "credits_before": 20,
+      "op_type": "DECOMPOSE",
+      "target_id": "R2_COMMUNICATION_BREAKDOWN"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R2_COMMUNICATION_BREAKDOWN",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+      ],
+      "leader_id": "R2_COMMUNICATION_BREAKDOWN"
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "target_id": "R2_COMMUNICATION_BREAKDOWN:availability",
+      "voi": 0.23931471805599452
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "voi": 0.23931471805599452
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "target_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "voi": 0.23931471805599452
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "target_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "voi": 0.23931471805599452
+    }
+  },
+  {
+    "event_type": "K_GUARDRAIL_APPLIED",
+    "payload": {
+      "k": 0.15,
+      "node_key": "R2_COMMUNICATION_BREAKDOWN:availability"
+    }
+  },
+  {
+    "event_type": "NODE_EVALUATED",
+    "payload": {
+      "derived": {
+        "conservative_delta_applied": false,
+        "guardrail_applied": true,
+        "has_evidence": true,
+        "k_caps": [],
+        "missing_evidence_ids": [],
+        "quote_mismatches": [],
+        "quotes_valid": true,
+        "validity": 1.0
+      },
+      "evidence_packet_hash": "d1634c042910c0044614e6f77f88590e64e77525e272a8f45674c82d95ff3879",
+      "k": 0.15,
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "a2bebc817dd35d04294a49b8bb4938ee0ccccd8a4e48ee45d8f987d94a48a24a",
+        "system_hash": "1ef388679b5d1b62bd5a307b4c2403f66b3d259ffb0be19a571731537e3db879",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "91a9d0d7b19a0126aef9155495b99fcd3f6a583ca1a07f19fd28b2d17d579308"
+      },
+      "node": {
+        "coupling": null,
+        "decomp_type": null,
+        "role": "NEC",
+        "statement": "The communication/coordination breakdown among crew occurred during the early phase of the historical timeline for Boeing 737-8AS 9H-QAA on 12-25."
+      },
+      "node_key": "R2_COMMUNICATION_BREAKDOWN:availability",
+      "outcome": {
+        "A": 0,
+        "B": 1,
+        "C": 0,
+        "D": 0,
+        "assumptions": [
+          "Communication between tug crew and flight crew is representative of overall crew communication",
+          "The early phase of the timeline corresponds to the events described in the evidence"
+        ],
+        "defeaters": [
+          "Direct evidence of communication breakdown among flight crew during early phase",
+          "Clear indication that communication was effective and no breakdown occurred"
+        ],
+        "evidence_ids": [
+          "H1",
+          "H2",
+          "H3",
+          "H4",
+          "H5"
+        ],
+        "evidence_quality": "indirect",
+        "p": 0.2,
+        "quotes": [
+          {
+            "evidence_id": "H1",
+            "exact_quote": "The flight crew were in communication with the headset operator via the aircraft\u2019s interphone.",
+            "location": null
+          },
+          {
+            "evidence_id": "H2",
+            "exact_quote": "The trainee driver decided to stop the pushback and asked the tug instructor to take over.",
+            "location": null
+          },
+          {
+            "evidence_id": "H3",
+            "exact_quote": "After swapping seats the instructor recommenced the pushback, correcting the aircraft back onto the taxiway centreline. He continued to reassure and advise the trainee while performing the pushback, looking at her while doing so.",
+            "location": null
+          },
+          {
+            "evidence_id": "H4",
+            "exact_quote": "The aircraft\u2019s nosewheel reached the \u2018Tug release point\u2019 (TRP) ground markings. However, it continued moving beyond the TRP with its engine at idle and hit the blast barrier at the end of the cul-de-sac.",
+            "location": null
+          },
+          {
+            "evidence_id": "H5",
+            "exact_quote": "The tug instructor pulled the aircraft forward off the fence then stopped the tug.",
+            "location": null
+          }
+        ],
+        "reasoning_summary": "The evidence shows communication between flight crew and headset operator and coordination between tug instructor and trainee during pushback, but no direct indication of a communication/coordination breakdown among the flight crew during the early phase of the timeline (H1-H5). The incident with the aircraft moving beyond the TRP suggests a possible coordination issue but does not explicitly confirm a communication breakdown among the crew.",
+        "uncertainty_source": "absence of explicit statements about communication breakdown among crew in early timeline"
+      },
+      "p_after": 0.2,
+      "p_before": 0.5
+    }
+  },
+  {
+    "event_type": "P_PROP_COMPUTED",
+    "payload": {
+      "log_ledger": {
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION": -1.6094379124341003,
+        "R2_COMMUNICATION_BREAKDOWN": -2.525728644308255,
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": -1.6094379124341003,
+        "R4_MECHANICAL_CONTROL_FAILURE": -1.6094379124341003
+      },
+      "p_base": 0.2,
+      "p_prop": 0.11764705882352941,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "total_delta_w": -0.916290731874155
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "-W",
+      "clipped": false,
+      "delta_w": -0.916290731874155,
+      "k_slot": 0.15,
+      "m": 0.4,
+      "p_base": 0.2,
+      "p_damped": 0.16705882352941176,
+      "p_prop": 0.11764705882352941,
+      "p_slot": 0.2,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "slot_key": "availability",
+      "w_new": -0.916290731874155,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 0.4,
+      "p_base": 0.2,
+      "p_damped": 0.16705882352941176,
+      "p_prop": 0.11764705882352941,
+      "p_slot": 0.5,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "slot_key": "fit_to_key_features",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 0.4,
+      "p_base": 0.2,
+      "p_damped": 0.16705882352941176,
+      "p_prop": 0.11764705882352941,
+      "p_slot": 0.5,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "slot_key": "defeater_resistance",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "OPEN_WORLD_GAMMA_UPDATED",
+    "payload": {
+      "M": 0.075,
+      "U": 0.0,
+      "gamma_noa": 0.11875000000000001,
+      "gamma_und": 0.1
+    }
+  },
+  {
+    "event_type": "INVARIANT_SUM_TO_ONE_CHECK",
+    "payload": {
+      "total": 1.0
+    }
+  },
+  {
+    "event_type": "DAMPING_APPLIED",
+    "payload": {
+      "alpha": 0.4,
+      "p_before": 0.2,
+      "p_damped": 0.13051470588235295,
+      "p_new": 0.16705882352941176,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN"
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 18,
+      "credits_before": 19,
+      "op_type": "EVALUATE",
+      "target_id": "R2_COMMUNICATION_BREAKDOWN:availability"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+      ],
+      "leader_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY"
+    }
+  },
+  {
+    "event_type": "TIE_BREAKER_APPLIED",
+    "payload": {
+      "ordered_frontier": [
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+      ]
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "voi": 0.25368971805599455
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "target_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "voi": 0.25368971805599455
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "target_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "voi": 0.25368971805599455
+    }
+  },
+  {
+    "event_type": "ROOT_DECOMPOSED",
+    "payload": {
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "13092a3da67c46250c66c005010f52221c5701eb9e3b174d028ae5bacf5e24f5",
+        "system_hash": "857d2f15f2c3ca030ae301fbeff52f742553e003798039fccde97fad62518fcf",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "183a72c60506d8c2a0180646b31960a95d15d145696d2948659067580f4fd839"
+      },
+      "ok": true,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "slot_statements": {
+        "availability": "The environmental or marking deficiency is present and observable in the Boeing 737-8AS with registration 9H-QAA during the historical time frame hist_t1_early on 12-25.",
+        "defeater_resistance": "The assessment of the environmental or marking deficiency in the Boeing 737-8AS 9H-QAA during hist_t1_early is robust and resistant to potential defeaters or contradictory evidence.",
+        "fit_to_key_features": "The identified environmental or marking deficiency aligns with the key features and characteristics expected for such deficiencies in the Boeing 737-8AS 9H-QAA during the specified historical period hist_t1_early."
+      }
+    }
+  },
+  {
+    "event_type": "ROOT_SCOPED",
+    "payload": {
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "slots": [
+        "availability",
+        "fit_to_key_features",
+        "defeater_resistance"
+      ]
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 17,
+      "credits_before": 18,
+      "op_type": "DECOMPOSE",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+      ],
+      "leader_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY"
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:availability",
+      "voi": 0.25368971805599455
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "target_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "voi": 0.25368971805599455
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "target_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "voi": 0.25368971805599455
+    }
+  },
+  {
+    "event_type": "K_GUARDRAIL_APPLIED",
+    "payload": {
+      "k": 0.35,
+      "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:availability"
+    }
+  },
+  {
+    "event_type": "NODE_EVALUATED",
+    "payload": {
+      "derived": {
+        "conservative_delta_applied": false,
+        "guardrail_applied": true,
+        "has_evidence": true,
+        "k_caps": [],
+        "missing_evidence_ids": [],
+        "quote_mismatches": [],
+        "quotes_valid": true,
+        "validity": 1.0
+      },
+      "evidence_packet_hash": "d1634c042910c0044614e6f77f88590e64e77525e272a8f45674c82d95ff3879",
+      "k": 0.35,
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "cbc4f8c85cfde18c5042fa099ee01fa5480d7b3ab4bead8d21893a7cdb6bc121",
+        "system_hash": "1ef388679b5d1b62bd5a307b4c2403f66b3d259ffb0be19a571731537e3db879",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "83b8efe9ea7cdd65ce4ee3ed8eca1bed07edd1631e9ad4bb0b16a4858638971d"
+      },
+      "node": {
+        "coupling": null,
+        "decomp_type": null,
+        "role": "NEC",
+        "statement": "The environmental or marking deficiency is present and observable in the Boeing 737-8AS with registration 9H-QAA during the historical time frame hist_t1_early on 12-25."
+      },
+      "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:availability",
+      "outcome": {
+        "A": 2,
+        "B": 0,
+        "C": 0,
+        "D": 0,
+        "assumptions": [
+          "The TRP ground markings mentioned are considered part of the environmental or marking deficiency context"
+        ],
+        "defeaters": [
+          "If evidence showed the TRP markings were not visible or absent at the time",
+          "If the aircraft or tug crew did not observe or rely on the markings during pushback"
+        ],
+        "evidence_ids": [
+          "H4"
+        ],
+        "evidence_quality": "indirect",
+        "p": 0.8,
+        "quotes": [
+          {
+            "evidence_id": "H4",
+            "exact_quote": "The aircraft\u2019s nosewheel reached the \u2018Tug release point\u2019 (TRP) ground markings. However, it continued moving beyond the TRP with its engine at idle and hit the blast barrier at the end of the cul-de-sac.",
+            "location": {}
+          }
+        ],
+        "reasoning_summary": "The presence of the 'Tug release point' ground markings (H4) indicates environmental or marking features were present and observable on the Boeing 737-8AS 9H-QAA during the historical timeframe. The incident of the aircraft moving beyond the TRP and hitting the blast barrier suggests the markings were relevant and visible, supporting the claim.",
+        "uncertainty_source": "No explicit statement confirming the condition or visibility of the markings; inference is based on the description of the event."
+      },
+      "p_after": 0.8,
+      "p_before": 0.5
+    }
+  },
+  {
+    "event_type": "P_PROP_COMPUTED",
+    "payload": {
+      "log_ledger": {
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION": -1.5282646223902778,
+        "R2_COMMUNICATION_BREAKDOWN": -2.0362693698146273,
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": -1.0582609931445421,
+        "R4_MECHANICAL_CONTROL_FAILURE": -1.5282646223902778
+      },
+      "p_base": 0.21691176470588236,
+      "p_prop": 0.38079870915691816,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "total_delta_w": 0.47000362924573563
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "+W",
+      "clipped": false,
+      "delta_w": 0.47000362924573563,
+      "k_slot": 0.35,
+      "m": 1.6,
+      "p_base": 0.21691176470588236,
+      "p_damped": 0.28246654248629666,
+      "p_prop": 0.38079870915691816,
+      "p_slot": 0.8,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "slot_key": "availability",
+      "w_new": 0.47000362924573563,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 1.6,
+      "p_base": 0.21691176470588236,
+      "p_damped": 0.28246654248629666,
+      "p_prop": 0.38079870915691816,
+      "p_slot": 0.5,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "slot_key": "fit_to_key_features",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 1.6,
+      "p_base": 0.21691176470588236,
+      "p_damped": 0.28246654248629666,
+      "p_prop": 0.38079870915691816,
+      "p_slot": 0.5,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "slot_key": "defeater_resistance",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "OPEN_WORLD_GAMMA_UPDATED",
+    "payload": {
+      "M": 0.07333333333333332,
+      "U": 0.0,
+      "gamma_noa": 0.11833333333333333,
+      "gamma_und": 0.1
+    }
+  },
+  {
+    "event_type": "INVARIANT_SUM_TO_ONE_CHECK",
+    "payload": {
+      "total": 1.0
+    }
+  },
+  {
+    "event_type": "DAMPING_APPLIED",
+    "payload": {
+      "alpha": 0.4,
+      "p_before": 0.21691176470588236,
+      "p_damped": 0.2207946807101219,
+      "p_new": 0.28246654248629666,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY"
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 16,
+      "credits_before": 17,
+      "op_type": "EVALUATE",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:availability"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY"
+      ],
+      "leader_id": "R4_MECHANICAL_CONTROL_FAILURE"
+    }
+  },
+  {
+    "event_type": "TIE_BREAKER_APPLIED",
+    "payload": {
+      "ordered_frontier": [
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY"
+      ]
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "target_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "voi": 0.25255725939619467
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "target_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "voi": 0.25255725939619467
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features",
+      "voi": 0.25699019665959816
+    }
+  },
+  {
+    "event_type": "CONSERVATIVE_DELTA_ENFORCED",
+    "payload": {
+      "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features",
+      "p_after": 0.45,
+      "p_before": 0.5
+    }
+  },
+  {
+    "event_type": "K_GUARDRAIL_APPLIED",
+    "payload": {
+      "k": 0.15,
+      "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features"
+    }
+  },
+  {
+    "event_type": "NODE_EVALUATED",
+    "payload": {
+      "derived": {
+        "conservative_delta_applied": true,
+        "guardrail_applied": true,
+        "has_evidence": false,
+        "k_caps": [],
+        "missing_evidence_ids": [],
+        "quote_mismatches": [],
+        "quotes_valid": true,
+        "validity": 0.0
+      },
+      "evidence_packet_hash": "d1634c042910c0044614e6f77f88590e64e77525e272a8f45674c82d95ff3879",
+      "k": 0.15,
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "47dfb6c8aabe1033faed2d60ef945c5088aa27a5e067b93ed804bcd1503de9a4",
+        "system_hash": "1ef388679b5d1b62bd5a307b4c2403f66b3d259ffb0be19a571731537e3db879",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "dcba1f7c8c99915aae1b590fac436c71ea06e487baae5918073a53f7a3bf9b6f"
+      },
+      "node": {
+        "coupling": null,
+        "decomp_type": null,
+        "role": "NEC",
+        "statement": "The identified environmental or marking deficiency aligns with the key features and characteristics expected for such deficiencies in the Boeing 737-8AS 9H-QAA during the specified historical period hist_t1_early."
+      },
+      "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features",
+      "outcome": {
+        "A": 0,
+        "B": 0,
+        "C": 0,
+        "D": 0,
+        "assumptions": [],
+        "defeaters": [
+          "Evidence showing specific environmental or marking deficiencies and their characteristics for the aircraft and period",
+          "Documentation of expected key features for such deficiencies in the Boeing 737-8AS 9H-QAA during hist_t1_early"
+        ],
+        "evidence_ids": [],
+        "evidence_quality": "none",
+        "p": 0,
+        "quotes": [],
+        "reasoning_summary": "No evidence describes or identifies any environmental or marking deficiency or its alignment with expected key features for the Boeing 737-8AS 9H-QAA during the specified period.",
+        "uncertainty_source": "missing evidence"
+      },
+      "p_after": 0.45,
+      "p_before": 0.5
+    }
+  },
+  {
+    "event_type": "P_PROP_COMPUTED",
+    "payload": {
+      "log_ledger": {
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION": -1.5344257116458169,
+        "R2_COMMUNICATION_BREAKDOWN": -2.0424304590701663,
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": -1.6158825715139824,
+        "R4_MECHANICAL_CONTROL_FAILURE": -1.5344257116458169
+      },
+      "p_base": 0.2207946807101219,
+      "p_prop": 0.2616094807896971,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "total_delta_w": -0.10536051565782628
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "+W",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.35,
+      "m": 0.9,
+      "p_base": 0.2207946807101219,
+      "p_damped": 0.23712060074195196,
+      "p_prop": 0.2616094807896971,
+      "p_slot": 0.8,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "slot_key": "availability",
+      "w_new": 0.47000362924573563,
+      "w_prev": 0.47000362924573563
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "-W",
+      "clipped": false,
+      "delta_w": -0.10536051565782628,
+      "k_slot": 0.15,
+      "m": 0.9,
+      "p_base": 0.2207946807101219,
+      "p_damped": 0.23712060074195196,
+      "p_prop": 0.2616094807896971,
+      "p_slot": 0.45,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "slot_key": "fit_to_key_features",
+      "w_new": -0.10536051565782628,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 0.9,
+      "p_base": 0.2207946807101219,
+      "p_damped": 0.23712060074195196,
+      "p_prop": 0.2616094807896971,
+      "p_slot": 0.5,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "slot_key": "defeater_resistance",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "OPEN_WORLD_GAMMA_UPDATED",
+    "payload": {
+      "M": 0.075,
+      "U": 0.3333333333333333,
+      "gamma_noa": 0.11875000000000001,
+      "gamma_und": 0.18333333333333335
+    }
+  },
+  {
+    "event_type": "INVARIANT_SUM_TO_ONE_CHECK",
+    "payload": {
+      "total": 1.0
+    }
+  },
+  {
+    "event_type": "DAMPING_APPLIED",
+    "payload": {
+      "alpha": 0.4,
+      "p_before": 0.2207946807101219,
+      "p_damped": 0.1654904192678206,
+      "p_new": 0.23712060074195196,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY"
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 15,
+      "credits_before": 16,
+      "op_type": "EVALUATE",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+      ],
+      "leader_id": "R4_MECHANICAL_CONTROL_FAILURE"
+    }
+  },
+  {
+    "event_type": "TIE_BREAKER_APPLIED",
+    "payload": {
+      "ordered_frontier": [
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+      ]
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "target_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "voi": 0.243263749372295
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "target_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "voi": 0.243263749372295
+    }
+  },
+  {
+    "event_type": "ROOT_DECOMPOSED",
+    "payload": {
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "8a37fc5e9f69afbb7dff8f4b30a0857b56abc096f819ea42224208a40f8986e4",
+        "system_hash": "857d2f15f2c3ca030ae301fbeff52f742553e003798039fccde97fad62518fcf",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "732e82f42c62120bbe758842e28ba8f81619f0de7dc5d8a8880d6a2c185ffaef"
+      },
+      "ok": true,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "slot_statements": {
+        "availability": "Mechanical/control failure occurred in the Boeing 737-8AS 9H-QAA on 12-25 during hist_t1_early.",
+        "defeater_resistance": "The mechanical/control failure in the Boeing 737-8AS 9H-QAA on 12-25 during hist_t1_early is resistant to common defeaters.",
+        "fit_to_key_features": "The mechanical/control failure aligns with key features observed in the Boeing 737-8AS 9H-QAA incident on 12-25 during hist_t1_early."
+      }
+    }
+  },
+  {
+    "event_type": "ROOT_SCOPED",
+    "payload": {
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "slots": [
+        "availability",
+        "fit_to_key_features",
+        "defeater_resistance"
+      ]
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 14,
+      "credits_before": 15,
+      "op_type": "DECOMPOSE",
+      "target_id": "R4_MECHANICAL_CONTROL_FAILURE"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+      ],
+      "leader_id": "R4_MECHANICAL_CONTROL_FAILURE"
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "target_id": "R4_MECHANICAL_CONTROL_FAILURE:availability",
+      "voi": 0.243263749372295
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "target_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "voi": 0.243263749372295
+    }
+  },
+  {
+    "event_type": "CONSERVATIVE_DELTA_ENFORCED",
+    "payload": {
+      "node_key": "R4_MECHANICAL_CONTROL_FAILURE:availability",
+      "p_after": 0.45,
+      "p_before": 0.5
+    }
+  },
+  {
+    "event_type": "K_GUARDRAIL_APPLIED",
+    "payload": {
+      "k": 0.15,
+      "node_key": "R4_MECHANICAL_CONTROL_FAILURE:availability"
+    }
+  },
+  {
+    "event_type": "NODE_EVALUATED",
+    "payload": {
+      "derived": {
+        "conservative_delta_applied": true,
+        "guardrail_applied": true,
+        "has_evidence": false,
+        "k_caps": [],
+        "missing_evidence_ids": [],
+        "quote_mismatches": [],
+        "quotes_valid": true,
+        "validity": 0.0
+      },
+      "evidence_packet_hash": "d1634c042910c0044614e6f77f88590e64e77525e272a8f45674c82d95ff3879",
+      "k": 0.15,
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "b671554c336a423693da19bb6ba1bd2c001e0293fec7536c07e57923386e1a90",
+        "system_hash": "1ef388679b5d1b62bd5a307b4c2403f66b3d259ffb0be19a571731537e3db879",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "3e2f3cf09f02ef64fe3763c9c95de13ec776f6bec35af262428808da58e25f3a"
+      },
+      "node": {
+        "coupling": null,
+        "decomp_type": null,
+        "role": "NEC",
+        "statement": "Mechanical/control failure occurred in the Boeing 737-8AS 9H-QAA on 12-25 during hist_t1_early."
+      },
+      "node_key": "R4_MECHANICAL_CONTROL_FAILURE:availability",
+      "outcome": {
+        "A": 0,
+        "B": 0,
+        "C": 0,
+        "D": 0,
+        "assumptions": [],
+        "defeaters": [
+          "Evidence showing mechanical or control system malfunction on the aircraft during the event",
+          "Reports or data indicating failure in aircraft controls or systems"
+        ],
+        "evidence_ids": [],
+        "evidence_quality": "none",
+        "p": 0,
+        "quotes": [],
+        "reasoning_summary": "No evidence indicates a mechanical or control failure of the Boeing 737-8AS 9H-QAA during the event; the history describes tug driver actions and aircraft movement but no mechanical faults.",
+        "uncertainty_source": "missing evidence"
+      },
+      "p_after": 0.45,
+      "p_before": 0.5
+    }
+  },
+  {
+    "event_type": "P_PROP_COMPUTED",
+    "payload": {
+      "log_ledger": {
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION": -1.58647401664983,
+        "R2_COMMUNICATION_BREAKDOWN": -2.094478764074179,
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": -1.7988419754611076,
+        "R4_MECHANICAL_CONTROL_FAILURE": -1.6918345323076562
+      },
+      "p_base": 0.20464591919564765,
+      "p_prop": 0.27187358950054025,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "total_delta_w": -0.10536051565782628
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "-W",
+      "clipped": false,
+      "delta_w": -0.10536051565782628,
+      "k_slot": 0.15,
+      "m": 0.9,
+      "p_base": 0.20464591919564765,
+      "p_damped": 0.2315369873176047,
+      "p_prop": 0.27187358950054025,
+      "p_slot": 0.45,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "slot_key": "availability",
+      "w_new": -0.10536051565782628,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 0.9,
+      "p_base": 0.20464591919564765,
+      "p_damped": 0.2315369873176047,
+      "p_prop": 0.27187358950054025,
+      "p_slot": 0.5,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "slot_key": "fit_to_key_features",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 0.9,
+      "p_base": 0.20464591919564765,
+      "p_damped": 0.2315369873176047,
+      "p_prop": 0.27187358950054025,
+      "p_slot": 0.5,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "slot_key": "defeater_resistance",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "OPEN_WORLD_GAMMA_UPDATED",
+    "payload": {
+      "M": 0.075,
+      "U": 0.5,
+      "gamma_noa": 0.11875000000000001,
+      "gamma_und": 0.225
+    }
+  },
+  {
+    "event_type": "INVARIANT_SUM_TO_ONE_CHECK",
+    "payload": {
+      "total": 1.0
+    }
+  },
+  {
+    "event_type": "DAMPING_APPLIED",
+    "payload": {
+      "alpha": 0.4,
+      "p_before": 0.20464591919564765,
+      "p_damped": 0.15194614792717812,
+      "p_new": 0.2315369873176047,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE"
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 13,
+      "credits_before": 14,
+      "op_type": "EVALUATE",
+      "target_id": "R4_MECHANICAL_CONTROL_FAILURE:availability"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+      ],
+      "leader_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "target_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "voi": 0.247154508894798
+    }
+  },
+  {
+    "event_type": "ROOT_DECOMPOSED",
+    "payload": {
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "5271c56f58047ad42ac315098948325ce650d212671a8c0c4bce94eeeaddd41c",
+        "system_hash": "857d2f15f2c3ca030ae301fbeff52f742553e003798039fccde97fad62518fcf",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "c60b49cd33c76aed2f69bc095d13c83dffa2c42180ea720ef1098feb19922e45"
+      },
+      "ok": true,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "slot_statements": {
+        "availability": "The procedural deviation in pushback execution was observed and recorded during the early historical timeframe of the Boeing 737-8AS with tail number 9H-QAA on December 25.",
+        "defeater_resistance": "The procedural deviation in pushback execution is resistant to defeaters, as the evidence from the Boeing 737-8AS 9H-QAA on December 25 during the early historical timeframe strongly supports the occurrence and significance of the deviation.",
+        "fit_to_key_features": "The procedural deviation in pushback execution aligns with key features identified for the Boeing 737-8AS 9H-QAA during the specified early historical timeframe, including deviations from standard pushback protocols."
+      }
+    }
+  },
+  {
+    "event_type": "ROOT_SCOPED",
+    "payload": {
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "slots": [
+        "availability",
+        "fit_to_key_features",
+        "defeater_resistance"
+      ]
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 12,
+      "credits_before": 13,
+      "op_type": "DECOMPOSE",
+      "target_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+      ],
+      "leader_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "target_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION:availability",
+      "voi": 0.247154508894798
+    }
+  },
+  {
+    "event_type": "NODE_EVALUATED",
+    "payload": {
+      "derived": {
+        "conservative_delta_applied": false,
+        "guardrail_applied": false,
+        "has_evidence": true,
+        "k_caps": [
+          {
+            "cap": 0.55,
+            "reason": "assumptions_present"
+          }
+        ],
+        "missing_evidence_ids": [],
+        "quote_mismatches": [],
+        "quotes_valid": true,
+        "validity": 1.0
+      },
+      "evidence_packet_hash": "d1634c042910c0044614e6f77f88590e64e77525e272a8f45674c82d95ff3879",
+      "k": 0.55,
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "865eb7cefc239cc2a3e0b509354f7f1147d976c5f4d613b3556b5b90fda0f904",
+        "system_hash": "1ef388679b5d1b62bd5a307b4c2403f66b3d259ffb0be19a571731537e3db879",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "4112309d21b12fbc8451cb5205689bc9f2f55583ebf64c1e20f8b308c7c4f2d1"
+      },
+      "node": {
+        "coupling": null,
+        "decomp_type": null,
+        "role": "NEC",
+        "statement": "The procedural deviation in pushback execution was observed and recorded during the early historical timeframe of the Boeing 737-8AS with tail number 9H-QAA on December 25."
+      },
+      "node_key": "R1_PUSHBACK_PROCEDURAL_DEVIATION:availability",
+      "outcome": {
+        "A": 2,
+        "B": 2,
+        "C": 2,
+        "D": 2,
+        "assumptions": [
+          "The historical evidence refers to the specified aircraft and date as per the scope"
+        ],
+        "defeaters": [
+          "If evidence showed the event occurred on a different date or aircraft tail number",
+          "If no procedural deviation was recorded or observed during the pushback"
+        ],
+        "evidence_ids": [
+          "H1",
+          "H2",
+          "H3",
+          "H4",
+          "H5"
+        ],
+        "evidence_quality": "direct",
+        "p": 1,
+        "quotes": [
+          {
+            "evidence_id": "H1",
+            "exact_quote": "A tug driving instructor (tug instructor) and trainee tug driver (trainee driver) were seated beside each other in the tug.",
+            "location": {}
+          },
+          {
+            "evidence_id": "H2",
+            "exact_quote": "The trainee driver decided to stop the pushback and asked the tug instructor to take over.",
+            "location": {}
+          },
+          {
+            "evidence_id": "H3",
+            "exact_quote": "After swapping seats the instructor recommenced the pushback, correcting the aircraft back onto the taxiway centreline.",
+            "location": {}
+          },
+          {
+            "evidence_id": "H4",
+            "exact_quote": "The aircraft\u2019s nosewheel reached the \u2018Tug release point\u2019 (TRP) ground markings. However, it continued moving beyond the TRP with its engine at idle and hit the blast barrier at the end of the cul-de-sac.",
+            "location": {}
+          },
+          {
+            "evidence_id": "H5",
+            "exact_quote": "The tug instructor pulled the aircraft forward off the fence then stopped the tug.",
+            "location": {}
+          }
+        ],
+        "reasoning_summary": "The historical evidence (H1-H5) directly describes the pushback event involving the Boeing 737-8AS with tail number 9H-QAA on December 25, including the procedural deviation where the aircraft moved beyond the Tug release point and hit the blast barrier.",
+        "uncertainty_source": "none"
+      },
+      "p_after": 1.0,
+      "p_before": 0.5
+    }
+  },
+  {
+    "event_type": "P_PROP_COMPUTED",
+    "payload": {
+      "log_ledger": {
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION": -0.8712070753897557,
+        "R2_COMMUNICATION_BREAKDOWN": -2.0723580033735503,
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": -1.7767212147604785,
+        "R4_MECHANICAL_CONTROL_FAILURE": -1.8842291108641491
+      },
+      "p_base": 0.2092232833397688,
+      "p_prop": 0.48348846648659105,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "total_delta_w": 0.6931461805594453
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "+W",
+      "clipped": false,
+      "delta_w": 0.6931461805594453,
+      "k_slot": 0.55,
+      "m": 1.999998,
+      "p_base": 0.2092232833397688,
+      "p_damped": 0.3189293565984977,
+      "p_prop": 0.48348846648659105,
+      "p_slot": 1.0,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "slot_key": "availability",
+      "w_new": 0.6931461805594453,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 1.999998,
+      "p_base": 0.2092232833397688,
+      "p_damped": 0.3189293565984977,
+      "p_prop": 0.48348846648659105,
+      "p_slot": 0.5,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "slot_key": "fit_to_key_features",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 1.999998,
+      "p_base": 0.2092232833397688,
+      "p_damped": 0.3189293565984977,
+      "p_prop": 0.48348846648659105,
+      "p_slot": 0.5,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "slot_key": "defeater_resistance",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "OPEN_WORLD_GAMMA_UPDATED",
+    "payload": {
+      "M": 0.049999999999999996,
+      "U": 0.4,
+      "gamma_noa": 0.1125,
+      "gamma_und": 0.2
+    }
+  },
+  {
+    "event_type": "INVARIANT_SUM_TO_ONE_CHECK",
+    "payload": {
+      "total": 1.0
+    }
+  },
+  {
+    "event_type": "DAMPING_APPLIED",
+    "payload": {
+      "alpha": 0.4,
+      "p_before": 0.2092232833397688,
+      "p_damped": 0.21926393266146715,
+      "p_new": 0.3189293565984977,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 11,
+      "credits_before": 12,
+      "op_type": "EVALUATE",
+      "target_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION:availability"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+        "R2_COMMUNICATION_BREAKDOWN"
+      ],
+      "leader_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+    }
+  },
+  {
+    "event_type": "TIE_BREAKER_APPLIED",
+    "payload": {
+      "ordered_frontier": [
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+        "R2_COMMUNICATION_BREAKDOWN"
+      ]
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "target_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION:fit_to_key_features",
+      "voi": 0.2556890608182416
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.45,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "target_id": "R4_MECHANICAL_CONTROL_FAILURE:availability",
+      "voi": 0.20409587791861739
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.45,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features",
+      "voi": 0.21945033758665455
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.2,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "target_id": "R2_COMMUNICATION_BREAKDOWN:availability",
+      "voi": 0.16212244682901744
+    }
+  },
+  {
+    "event_type": "NODE_EVALUATED",
+    "payload": {
+      "derived": {
+        "conservative_delta_applied": false,
+        "guardrail_applied": false,
+        "has_evidence": true,
+        "k_caps": [
+          {
+            "cap": 0.55,
+            "reason": "assumptions_present"
+          }
+        ],
+        "missing_evidence_ids": [],
+        "quote_mismatches": [],
+        "quotes_valid": true,
+        "validity": 1.0
+      },
+      "evidence_packet_hash": "d1634c042910c0044614e6f77f88590e64e77525e272a8f45674c82d95ff3879",
+      "k": 0.55,
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "a2b83110b7036618416bca670e6547bbd134517dac15debe712f934c19fa1700",
+        "system_hash": "1ef388679b5d1b62bd5a307b4c2403f66b3d259ffb0be19a571731537e3db879",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "6f550dd5212d1efb71f58b20fd09b014a69b3a1428aa3ff69d66db210d79e3fd"
+      },
+      "node": {
+        "coupling": null,
+        "decomp_type": null,
+        "role": "NEC",
+        "statement": "The procedural deviation in pushback execution aligns with key features identified for the Boeing 737-8AS 9H-QAA during the specified early historical timeframe, including deviations from standard pushback protocols."
+      },
+      "node_key": "R1_PUSHBACK_PROCEDURAL_DEVIATION:fit_to_key_features",
+      "outcome": {
+        "A": 2,
+        "B": 1,
+        "C": 2,
+        "D": 1,
+        "assumptions": [
+          "Continuing beyond the TRP and hitting the blast barrier is a deviation from standard pushback protocols",
+          "Instructor taking over from trainee during pushback is a procedural deviation"
+        ],
+        "defeaters": [
+          "If evidence showed that continuing beyond the TRP was standard procedure for this aircraft or timeframe",
+          "If the pushback protocol allowed for the instructor to take over in this manner without it being a deviation"
+        ],
+        "evidence_ids": [
+          "H2",
+          "H4"
+        ],
+        "evidence_quality": "direct",
+        "p": 0.8,
+        "quotes": [
+          {
+            "evidence_id": "H2",
+            "exact_quote": "The trainee driver decided to stop the pushback and asked the tug instructor to take over.",
+            "location": null
+          },
+          {
+            "evidence_id": "H4",
+            "exact_quote": "The aircraft\u2019s nosewheel reached the \u2018Tug release point\u2019 (TRP) ground markings. However, it continued moving beyond the TRP with its engine at idle and hit the blast barrier at the end of the cul-de-sac.",
+            "location": null
+          }
+        ],
+        "reasoning_summary": "Evidence H2 and H4 directly describe deviations from standard pushback protocols, such as the trainee stopping and instructor taking over, and the aircraft moving beyond the designated release point and hitting a barrier, which align with key features of procedural deviation for the Boeing 737-8AS 9H-QAA in the early timeframe.",
+        "uncertainty_source": "lack of explicit standard pushback protocol details for the Boeing 737-8AS 9H-QAA in the early historical timeframe"
+      },
+      "p_after": 0.8,
+      "p_before": 0.5
+    }
+  },
+  {
+    "event_type": "P_PROP_COMPUTED",
+    "payload": {
+      "log_ledger": {
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION": -1.0474754735865168,
+        "R2_COMMUNICATION_BREAKDOWN": -2.0260037788838825,
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": -1.7303669902708108,
+        "R4_MECHANICAL_CONTROL_FAILURE": -1.8378748863744814
+      },
+      "p_base": 0.21926393266146715,
+      "p_prop": 0.42832392606433234,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "total_delta_w": 0.47000362924573563
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "+W",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.55,
+      "m": 1.6,
+      "p_base": 0.21926393266146715,
+      "p_damped": 0.3028879300226132,
+      "p_prop": 0.42832392606433234,
+      "p_slot": 1.0,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "slot_key": "availability",
+      "w_new": 0.6931461805594453,
+      "w_prev": 0.6931461805594453
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "+W",
+      "clipped": false,
+      "delta_w": 0.47000362924573563,
+      "k_slot": 0.55,
+      "m": 1.6,
+      "p_base": 0.21926393266146715,
+      "p_damped": 0.3028879300226132,
+      "p_prop": 0.42832392606433234,
+      "p_slot": 0.8,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "slot_key": "fit_to_key_features",
+      "w_new": 0.47000362924573563,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 1.6,
+      "p_base": 0.21926393266146715,
+      "p_damped": 0.3028879300226132,
+      "p_prop": 0.42832392606433234,
+      "p_slot": 0.5,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "slot_key": "defeater_resistance",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "OPEN_WORLD_GAMMA_UPDATED",
+    "payload": {
+      "M": 0.06166666666666667,
+      "U": 0.3333333333333333,
+      "gamma_noa": 0.11541666666666667,
+      "gamma_und": 0.18333333333333335
+    }
+  },
+  {
+    "event_type": "INVARIANT_SUM_TO_ONE_CHECK",
+    "payload": {
+      "total": 1.0
+    }
+  },
+  {
+    "event_type": "DAMPING_APPLIED",
+    "payload": {
+      "alpha": 0.4,
+      "p_before": 0.21926393266146715,
+      "p_damped": 0.2124001609283575,
+      "p_new": 0.3028879300226132,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 10,
+      "credits_before": 11,
+      "op_type": "EVALUATE",
+      "target_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION:fit_to_key_features"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+        "R2_COMMUNICATION_BREAKDOWN"
+      ],
+      "leader_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "target_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION:defeater_resistance",
+      "voi": 0.2498548548450984
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.45,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "target_id": "R4_MECHANICAL_CONTROL_FAILURE:availability",
+      "voi": 0.21005157503583305
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.45,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features",
+      "voi": 0.2260820042601695
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.2,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "target_id": "R2_COMMUNICATION_BREAKDOWN:availability",
+      "voi": 0.16705678901142995
+    }
+  },
+  {
+    "event_type": "NODE_EVALUATED",
+    "payload": {
+      "derived": {
+        "conservative_delta_applied": false,
+        "guardrail_applied": false,
+        "has_evidence": true,
+        "k_caps": [
+          {
+            "cap": 0.55,
+            "reason": "assumptions_present"
+          }
+        ],
+        "missing_evidence_ids": [],
+        "quote_mismatches": [],
+        "quotes_valid": true,
+        "validity": 1.0
+      },
+      "evidence_packet_hash": "d1634c042910c0044614e6f77f88590e64e77525e272a8f45674c82d95ff3879",
+      "k": 0.55,
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "f17b0a2a9e23b3ec5b12e43f9410430d56d20ee1076d40a4919dd68842e52b16",
+        "system_hash": "1ef388679b5d1b62bd5a307b4c2403f66b3d259ffb0be19a571731537e3db879",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "fe06d8e590ce9daebaae4063732811fa69a6274d0fb5f6b715d94466c2c502be"
+      },
+      "node": {
+        "coupling": null,
+        "decomp_type": null,
+        "role": "NEC",
+        "statement": "The procedural deviation in pushback execution is resistant to defeaters, as the evidence from the Boeing 737-8AS 9H-QAA on December 25 during the early historical timeframe strongly supports the occurrence and significance of the deviation."
+      },
+      "node_key": "R1_PUSHBACK_PROCEDURAL_DEVIATION:defeater_resistance",
+      "outcome": {
+        "A": 2,
+        "B": 2,
+        "C": 1,
+        "D": 1,
+        "assumptions": [
+          "The described events represent a procedural deviation",
+          "The significance is inferred from the aircraft hitting the blast barrier"
+        ],
+        "defeaters": [
+          "If evidence showed the deviation was minor or corrected without incident",
+          "If alternative explanations for the aircraft movement beyond TRP were provided"
+        ],
+        "evidence_ids": [
+          "H1",
+          "H2",
+          "H3",
+          "H4",
+          "H5"
+        ],
+        "evidence_quality": "direct",
+        "p": 0.9,
+        "quotes": [
+          {
+            "evidence_id": "H2",
+            "exact_quote": "The trainee driver decided to stop the pushback and asked the tug instructor to take over.",
+            "location": {}
+          },
+          {
+            "evidence_id": "H3",
+            "exact_quote": "After swapping seats the instructor recommenced the pushback, correcting the aircraft back onto the taxiway centreline. He continued to reassure and advise the trainee while performing the pushback, looking at her while doing so.",
+            "location": {}
+          },
+          {
+            "evidence_id": "H4",
+            "exact_quote": "The aircraft\u2019s nosewheel reached the \u2018Tug release point\u2019 (TRP) ground markings. However, it continued moving beyond the TRP with its engine at idle and hit the blast barrier at the end of the cul-de-sac.",
+            "location": {}
+          }
+        ],
+        "reasoning_summary": "The historical evidence (H2, H3, H4) directly documents the procedural deviation during pushback, including the trainee stopping and the instructor taking over, and the aircraft moving beyond the TRP and hitting the blast barrier, supporting the occurrence and significance of the deviation.",
+        "uncertainty_source": "lack of detailed procedural standards or explicit statements on resistance to defeaters"
+      },
+      "p_after": 0.9,
+      "p_before": 0.5
+    }
+  },
+  {
+    "event_type": "P_PROP_COMPUTED",
+    "payload": {
+      "log_ledger": {
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION": -0.9614965670460547,
+        "R2_COMMUNICATION_BREAKDOWN": -1.98292100026207,
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": -1.6872842116489986,
+        "R4_MECHANICAL_CONTROL_FAILURE": -1.794792107752669
+      },
+      "p_base": 0.2124001609283575,
+      "p_prop": 0.4388583550526765,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "total_delta_w": 0.5877866649021191
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "+W",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.55,
+      "m": 1.8,
+      "p_base": 0.2124001609283575,
+      "p_damped": 0.3029834385780851,
+      "p_prop": 0.4388583550526765,
+      "p_slot": 1.0,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "slot_key": "availability",
+      "w_new": 0.6931461805594453,
+      "w_prev": 0.6931461805594453
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "+W",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.55,
+      "m": 1.8,
+      "p_base": 0.2124001609283575,
+      "p_damped": 0.3029834385780851,
+      "p_prop": 0.4388583550526765,
+      "p_slot": 0.8,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "slot_key": "fit_to_key_features",
+      "w_new": 0.47000362924573563,
+      "w_prev": 0.47000362924573563
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "+W",
+      "clipped": false,
+      "delta_w": 0.5877866649021191,
+      "k_slot": 0.55,
+      "m": 1.8,
+      "p_base": 0.2124001609283575,
+      "p_damped": 0.3029834385780851,
+      "p_prop": 0.4388583550526765,
+      "p_slot": 0.9,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "slot_key": "defeater_resistance",
+      "w_new": 0.5877866649021191,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "OPEN_WORLD_GAMMA_UPDATED",
+    "payload": {
+      "M": 0.05499999999999999,
+      "U": 0.2857142857142857,
+      "gamma_noa": 0.11375,
+      "gamma_und": 0.17142857142857143
+    }
+  },
+  {
+    "event_type": "INVARIANT_SUM_TO_ONE_CHECK",
+    "payload": {
+      "total": 1.0
+    }
+  },
+  {
+    "event_type": "DAMPING_APPLIED",
+    "payload": {
+      "alpha": 0.4,
+      "p_before": 0.2124001609283575,
+      "p_damped": 0.2165790543978704,
+      "p_new": 0.3029834385780851,
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION"
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 9,
+      "credits_before": 10,
+      "op_type": "EVALUATE",
+      "target_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION:defeater_resistance"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+        "R2_COMMUNICATION_BREAKDOWN"
+      ],
+      "leader_id": "R4_MECHANICAL_CONTROL_FAILURE"
+    }
+  },
+  {
+    "event_type": "TIE_BREAKER_APPLIED",
+    "payload": {
+      "ordered_frontier": [
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+        "R2_COMMUNICATION_BREAKDOWN"
+      ]
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.45,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "target_id": "R4_MECHANICAL_CONTROL_FAILURE:availability",
+      "voi": 0.212765250871293
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.45,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features",
+      "voi": 0.22910368136136433
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.2,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "target_id": "R2_COMMUNICATION_BREAKDOWN:availability",
+      "voi": 0.16930509091140358
+    }
+  },
+  {
+    "event_type": "NODE_REFINED_REQUIREMENTS",
+    "payload": {
+      "children": [
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:34511103160f2c2eece185d945ab49352d4b301c8c642c819426b5013a0fe417",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:b171608d20ecc24eaea29c9bc56a39c33504d1e07b8309b31a4f73887ec28531",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:cc16e407fb8cc2dadd3f2593ef8259a3c4e2455c0b615fb60437eb30efab758c"
+      ],
+      "children_spec": [
+        {
+          "canonical_child_id": "34511103160f2c2eece185d945ab49352d4b301c8c642c819426b5013a0fe417",
+          "child_id": "c1",
+          "falsifiable": true,
+          "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:34511103160f2c2eece185d945ab49352d4b301c8c642c819426b5013a0fe417",
+          "overlap_with_siblings": [],
+          "role": "NEC",
+          "statement": "The environmental conditions at the time match known patterns of environmental deficiencies",
+          "test_procedure": "Compare recorded environmental data (weather, visibility, lighting) with established criteria for environmental deficiencies"
+        },
+        {
+          "canonical_child_id": "b171608d20ecc24eaea29c9bc56a39c33504d1e07b8309b31a4f73887ec28531",
+          "child_id": "c2",
+          "falsifiable": true,
+          "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:b171608d20ecc24eaea29c9bc56a39c33504d1e07b8309b31a4f73887ec28531",
+          "overlap_with_siblings": [],
+          "role": "NEC",
+          "statement": "Markings and signage at the location were inconsistent with regulatory standards",
+          "test_procedure": "Inspect and compare physical markings and signage against regulatory and design standards"
+        },
+        {
+          "canonical_child_id": "cc16e407fb8cc2dadd3f2593ef8259a3c4e2455c0b615fb60437eb30efab758c",
+          "child_id": "c3",
+          "falsifiable": true,
+          "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:cc16e407fb8cc2dadd3f2593ef8259a3c4e2455c0b615fb60437eb30efab758c",
+          "overlap_with_siblings": [],
+          "role": "EVID",
+          "statement": "There is documented evidence of environmental or marking deficiencies contributing to the event",
+          "test_procedure": "Review investigation reports and witness statements for references to environmental or marking deficiencies"
+        }
+      ],
+      "coupling": 0.8,
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "d5bbd620e2c3541ef5b413f7c238b7cde2305bd12e9f275604be9889e2dd5f0b",
+        "system_hash": "f9a249caffbe357125cb93cd667474067e53e2e21f6e0324a95248f8217b7cdc",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "2528a48507614a50fb2b2c908a0a775afe3ae1c7fd1de4eef7e56d6fdb4722a4"
+      },
+      "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features",
+      "type": "AND"
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 8,
+      "credits_before": 9,
+      "op_type": "DECOMPOSE",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+        "R2_COMMUNICATION_BREAKDOWN"
+      ],
+      "leader_id": "R4_MECHANICAL_CONTROL_FAILURE"
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.45,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "target_id": "R4_MECHANICAL_CONTROL_FAILURE:availability",
+      "voi": 0.212765250871293
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:34511103160f2c2eece185d945ab49352d4b301c8c642c819426b5013a0fe417",
+      "voi": 0.22960451804600002
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.2,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "target_id": "R2_COMMUNICATION_BREAKDOWN:availability",
+      "voi": 0.16930509091140358
+    }
+  },
+  {
+    "event_type": "CONSERVATIVE_DELTA_ENFORCED",
+    "payload": {
+      "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:34511103160f2c2eece185d945ab49352d4b301c8c642c819426b5013a0fe417",
+      "p_after": 0.45,
+      "p_before": 0.5
+    }
+  },
+  {
+    "event_type": "K_GUARDRAIL_APPLIED",
+    "payload": {
+      "k": 0.15,
+      "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:34511103160f2c2eece185d945ab49352d4b301c8c642c819426b5013a0fe417"
+    }
+  },
+  {
+    "event_type": "NODE_EVALUATED",
+    "payload": {
+      "derived": {
+        "conservative_delta_applied": true,
+        "guardrail_applied": true,
+        "has_evidence": false,
+        "k_caps": [],
+        "missing_evidence_ids": [],
+        "quote_mismatches": [],
+        "quotes_valid": true,
+        "validity": 0.0
+      },
+      "evidence_packet_hash": "d1634c042910c0044614e6f77f88590e64e77525e272a8f45674c82d95ff3879",
+      "k": 0.15,
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "31767ba441b4d8dc017026ca83168e9a1acb0333f5697fe6963c920d6e18d53e",
+        "system_hash": "1ef388679b5d1b62bd5a307b4c2403f66b3d259ffb0be19a571731537e3db879",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "54a5ab35b0c8ecaaba321128a225f2ab5fa8a1597dc01f28aadd8fc8b5e02346"
+      },
+      "node": {
+        "coupling": null,
+        "decomp_type": null,
+        "role": "NEC",
+        "statement": "The environmental conditions at the time match known patterns of environmental deficiencies"
+      },
+      "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:34511103160f2c2eece185d945ab49352d4b301c8c642c819426b5013a0fe417",
+      "outcome": {
+        "A": 0,
+        "B": 0,
+        "C": 0,
+        "D": 0,
+        "assumptions": [],
+        "defeaters": [
+          "Evidence showing environmental conditions at the time",
+          "Evidence describing known patterns of environmental deficiencies relevant to the incident"
+        ],
+        "evidence_ids": [],
+        "evidence_quality": "none",
+        "p": 0,
+        "quotes": [],
+        "reasoning_summary": "No evidence in the provided history items describes environmental conditions or matches known patterns of environmental deficiencies.",
+        "uncertainty_source": "missing evidence"
+      },
+      "p_after": 0.45,
+      "p_before": 0.5
+    }
+  },
+  {
+    "event_type": "SOFT_AND_COMPUTED",
+    "payload": {
+      "c": 0.8,
+      "m": 0.45,
+      "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features",
+      "p_min": 0.45,
+      "p_prod": 0.45
+    }
+  },
+  {
+    "event_type": "P_PROP_COMPUTED",
+    "payload": {
+      "log_ledger": {
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION": -1.5297996508553817,
+        "R2_COMMUNICATION_BREAKDOWN": -1.963889711261249,
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": -1.6682529226481777,
+        "R4_MECHANICAL_CONTROL_FAILURE": -1.775760818751848
+      },
+      "p_base": 0.1885762352823594,
+      "p_prop": 0.2638088727407476,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "total_delta_w": 0.0
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "+W",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.35,
+      "m": 1.0,
+      "p_base": 0.1885762352823594,
+      "p_damped": 0.2186692902657147,
+      "p_prop": 0.2638088727407476,
+      "p_slot": 0.8,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "slot_key": "availability",
+      "w_new": 0.47000362924573563,
+      "w_prev": 0.47000362924573563
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "-W",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 1.0,
+      "p_base": 0.1885762352823594,
+      "p_damped": 0.2186692902657147,
+      "p_prop": 0.2638088727407476,
+      "p_slot": 0.45,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "slot_key": "fit_to_key_features",
+      "w_new": -0.10536051565782628,
+      "w_prev": -0.10536051565782628
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 1.0,
+      "p_base": 0.1885762352823594,
+      "p_damped": 0.2186692902657147,
+      "p_prop": 0.2638088727407476,
+      "p_slot": 0.5,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "slot_key": "defeater_resistance",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "OPEN_WORLD_GAMMA_UPDATED",
+    "payload": {
+      "M": 0.05499999999999999,
+      "U": 0.2857142857142857,
+      "gamma_noa": 0.11375,
+      "gamma_und": 0.17142857142857143
+    }
+  },
+  {
+    "event_type": "INVARIANT_SUM_TO_ONE_CHECK",
+    "payload": {
+      "total": 0.9999999999999999
+    }
+  },
+  {
+    "event_type": "DAMPING_APPLIED",
+    "payload": {
+      "alpha": 0.4,
+      "p_before": 0.1885762352823594,
+      "p_damped": 0.15630949445243852,
+      "p_new": 0.2186692902657147,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY"
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 7,
+      "credits_before": 8,
+      "op_type": "EVALUATE",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:34511103160f2c2eece185d945ab49352d4b301c8c642c819426b5013a0fe417"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R2_COMMUNICATION_BREAKDOWN",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY"
+      ],
+      "leader_id": "R4_MECHANICAL_CONTROL_FAILURE"
+    }
+  },
+  {
+    "event_type": "TIE_BREAKER_APPLIED",
+    "payload": {
+      "ordered_frontier": [
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R2_COMMUNICATION_BREAKDOWN",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY"
+      ]
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.45,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "target_id": "R4_MECHANICAL_CONTROL_FAILURE:availability",
+      "voi": 0.22159163368865603
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.2,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "target_id": "R2_COMMUNICATION_BREAKDOWN:availability",
+      "voi": 0.17661781890892747
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:b171608d20ecc24eaea29c9bc56a39c33504d1e07b8309b31a4f73887ec28531",
+      "voi": 0.20217778834056727
+    }
+  },
+  {
+    "event_type": "NODE_REFINED_REQUIREMENTS",
+    "payload": {
+      "children": [
+        "R4_MECHANICAL_CONTROL_FAILURE:availability:4e48393722de2350482abb616587da515e270123c0e4b95ed7c5279d7257d86f",
+        "R4_MECHANICAL_CONTROL_FAILURE:availability:5aa50a70b291a89232e7267f5472527f0a0ddf0211f875fe5ebb5ca56a94b34e",
+        "R4_MECHANICAL_CONTROL_FAILURE:availability:671b45b2f330f63a707146dc451e6922d8f4a3b889d6682b2f591eb5e1c34c7f",
+        "R4_MECHANICAL_CONTROL_FAILURE:availability:b727e82179424aab91fa6c2162b1d8773aae4a49e0a45b8ddbe7694b04e7b670"
+      ],
+      "children_spec": [
+        {
+          "canonical_child_id": "671b45b2f330f63a707146dc451e6922d8f4a3b889d6682b2f591eb5e1c34c7f",
+          "child_id": "c1",
+          "falsifiable": true,
+          "node_key": "R4_MECHANICAL_CONTROL_FAILURE:availability:671b45b2f330f63a707146dc451e6922d8f4a3b889d6682b2f591eb5e1c34c7f",
+          "overlap_with_siblings": [],
+          "role": "NEC",
+          "statement": "The mechanical control system components are physically present and installed in the aircraft",
+          "test_procedure": "Inspect the aircraft to verify the presence and installation of all mechanical control system components"
+        },
+        {
+          "canonical_child_id": "5aa50a70b291a89232e7267f5472527f0a0ddf0211f875fe5ebb5ca56a94b34e",
+          "child_id": "c2",
+          "falsifiable": true,
+          "node_key": "R4_MECHANICAL_CONTROL_FAILURE:availability:5aa50a70b291a89232e7267f5472527f0a0ddf0211f875fe5ebb5ca56a94b34e",
+          "overlap_with_siblings": [],
+          "role": "NEC",
+          "statement": "The mechanical control system components are not obstructed or damaged preventing their operation",
+          "test_procedure": "Perform a physical examination and functional test to detect any obstructions or damage in the mechanical control components"
+        },
+        {
+          "canonical_child_id": "4e48393722de2350482abb616587da515e270123c0e4b95ed7c5279d7257d86f",
+          "child_id": "c3",
+          "falsifiable": true,
+          "node_key": "R4_MECHANICAL_CONTROL_FAILURE:availability:4e48393722de2350482abb616587da515e270123c0e4b95ed7c5279d7257d86f",
+          "overlap_with_siblings": [],
+          "role": "NEC",
+          "statement": "The mechanical control system components are connected and linked correctly to allow control input transmission",
+          "test_procedure": "Verify the mechanical linkages and connections through inspection and functional testing"
+        },
+        {
+          "canonical_child_id": "b727e82179424aab91fa6c2162b1d8773aae4a49e0a45b8ddbe7694b04e7b670",
+          "child_id": "c4",
+          "falsifiable": true,
+          "node_key": "R4_MECHANICAL_CONTROL_FAILURE:availability:b727e82179424aab91fa6c2162b1d8773aae4a49e0a45b8ddbe7694b04e7b670",
+          "overlap_with_siblings": [],
+          "role": "NEC",
+          "statement": "The mechanical control system components are free from failures such as wear, corrosion, or fatigue that impair availability",
+          "test_procedure": "Conduct maintenance records review and physical inspection to identify wear, corrosion, or fatigue issues"
+        }
+      ],
+      "coupling": 0.8,
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "8045c322361053aae0aeeb324656aeccfd1ca86061d6831637dc4ac87c64f4f3",
+        "system_hash": "f9a249caffbe357125cb93cd667474067e53e2e21f6e0324a95248f8217b7cdc",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "df4961f83966b8bbf15607296c64c0c78df69c10f6831763b48ca4ced498e4fa"
+      },
+      "node_key": "R4_MECHANICAL_CONTROL_FAILURE:availability",
+      "type": "AND"
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 6,
+      "credits_before": 7,
+      "op_type": "DECOMPOSE",
+      "target_id": "R4_MECHANICAL_CONTROL_FAILURE:availability"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R4_MECHANICAL_CONTROL_FAILURE",
+        "R2_COMMUNICATION_BREAKDOWN",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY"
+      ],
+      "leader_id": "R4_MECHANICAL_CONTROL_FAILURE"
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "target_id": "R4_MECHANICAL_CONTROL_FAILURE:availability:4e48393722de2350482abb616587da515e270123c0e4b95ed7c5279d7257d86f",
+      "voi": 0.22209247037329172
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.2,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "target_id": "R2_COMMUNICATION_BREAKDOWN:availability",
+      "voi": 0.17661781890892747
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:b171608d20ecc24eaea29c9bc56a39c33504d1e07b8309b31a4f73887ec28531",
+      "voi": 0.20217778834056727
+    }
+  },
+  {
+    "event_type": "K_GUARDRAIL_APPLIED",
+    "payload": {
+      "k": 0.15,
+      "node_key": "R4_MECHANICAL_CONTROL_FAILURE:availability:4e48393722de2350482abb616587da515e270123c0e4b95ed7c5279d7257d86f"
+    }
+  },
+  {
+    "event_type": "NODE_EVALUATED",
+    "payload": {
+      "derived": {
+        "conservative_delta_applied": false,
+        "guardrail_applied": true,
+        "has_evidence": true,
+        "k_caps": [],
+        "missing_evidence_ids": [],
+        "quote_mismatches": [],
+        "quotes_valid": true,
+        "validity": 1.0
+      },
+      "evidence_packet_hash": "d1634c042910c0044614e6f77f88590e64e77525e272a8f45674c82d95ff3879",
+      "k": 0.15,
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "5cc6668f68111770bdff15f206d1206f4a524f7b90cf8e752f088f2288167e0a",
+        "system_hash": "1ef388679b5d1b62bd5a307b4c2403f66b3d259ffb0be19a571731537e3db879",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "6e27a1cc3258fbc16414e109caa1c0ee586abb411e426d7d866094966a1f45aa"
+      },
+      "node": {
+        "coupling": null,
+        "decomp_type": null,
+        "role": "NEC",
+        "statement": "The mechanical control system components are connected and linked correctly to allow control input transmission"
+      },
+      "node_key": "R4_MECHANICAL_CONTROL_FAILURE:availability:4e48393722de2350482abb616587da515e270123c0e4b95ed7c5279d7257d86f",
+      "outcome": {
+        "A": 0,
+        "B": 0,
+        "C": 0,
+        "D": 0,
+        "assumptions": [
+          "The aircraft movement beyond the TRP with engine at idle may indicate a mechanical control issue but could also be due to other factors such as tug operation or human error."
+        ],
+        "defeaters": [
+          "Direct evidence showing mechanical control system components were disconnected or linked incorrectly",
+          "Evidence of mechanical control system failure causing the incident"
+        ],
+        "evidence_ids": [
+          "H4"
+        ],
+        "evidence_quality": "indirect",
+        "p": 0.1,
+        "quotes": [
+          {
+            "evidence_id": "H4",
+            "exact_quote": "The aircraft\u2019s nosewheel reached the \u2018Tug release point\u2019 (TRP) ground markings. However, it continued moving beyond the TRP with its engine at idle and hit the blast barrier at the end of the cul-de-sac.",
+            "location": null
+          }
+        ],
+        "reasoning_summary": "The aircraft moved beyond the tug release point and hit a barrier despite the engine being at idle, suggesting possible control issues, but no direct evidence confirms mechanical control system components were connected and linked correctly (H4).",
+        "uncertainty_source": "No direct evidence about the mechanical control system connections; only indirect inference from the aircraft movement beyond the TRP."
+      },
+      "p_after": 0.1,
+      "p_before": 0.5
+    }
+  },
+  {
+    "event_type": "SOFT_AND_COMPUTED",
+    "payload": {
+      "c": 0.8,
+      "m": 0.1,
+      "node_key": "R4_MECHANICAL_CONTROL_FAILURE:availability",
+      "p_min": 0.1,
+      "p_prod": 0.1
+    }
+  },
+  {
+    "event_type": "P_PROP_COMPUTED",
+    "payload": {
+      "log_ledger": {
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION": -1.4702909154738755,
+        "R2_COMMUNICATION_BREAKDOWN": -1.904380975879743,
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": -1.8559172983424241,
+        "R4_MECHANICAL_CONTROL_FAILURE": -3.2203294801466162
+      },
+      "p_base": 0.1797385321379967,
+      "p_prop": 0.069461172029656,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "total_delta_w": -1.504077396776274
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "-W",
+      "clipped": false,
+      "delta_w": -1.504077396776274,
+      "k_slot": 0.15,
+      "m": 0.22222222222222224,
+      "p_base": 0.1797385321379967,
+      "p_damped": 0.1356275880946604,
+      "p_prop": 0.069461172029656,
+      "p_slot": 0.1,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "slot_key": "availability",
+      "w_new": -1.6094379124341003,
+      "w_prev": -0.10536051565782628
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 0.22222222222222224,
+      "p_base": 0.1797385321379967,
+      "p_damped": 0.1356275880946604,
+      "p_prop": 0.069461172029656,
+      "p_slot": 0.5,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "slot_key": "fit_to_key_features",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 0.22222222222222224,
+      "p_base": 0.1797385321379967,
+      "p_damped": 0.1356275880946604,
+      "p_prop": 0.069461172029656,
+      "p_slot": 0.5,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "slot_key": "defeater_resistance",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "OPEN_WORLD_GAMMA_UPDATED",
+    "payload": {
+      "M": 0.05499999999999999,
+      "U": 0.2857142857142857,
+      "gamma_noa": 0.11375,
+      "gamma_und": 0.17142857142857143
+    }
+  },
+  {
+    "event_type": "INVARIANT_SUM_TO_ONE_CHECK",
+    "payload": {
+      "total": 1.0
+    }
+  },
+  {
+    "event_type": "DAMPING_APPLIED",
+    "payload": {
+      "alpha": 0.4,
+      "p_before": 0.1797385321379967,
+      "p_damped": 0.09694950627552244,
+      "p_new": 0.1356275880946604,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE"
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 5,
+      "credits_before": 6,
+      "op_type": "EVALUATE",
+      "target_id": "R4_MECHANICAL_CONTROL_FAILURE:availability:4e48393722de2350482abb616587da515e270123c0e4b95ed7c5279d7257d86f"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R2_COMMUNICATION_BREAKDOWN",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY"
+      ],
+      "leader_id": "R2_COMMUNICATION_BREAKDOWN"
+    }
+  },
+  {
+    "event_type": "TIE_BREAKER_APPLIED",
+    "payload": {
+      "ordered_frontier": [
+        "R2_COMMUNICATION_BREAKDOWN",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY"
+      ]
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.2,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "target_id": "R2_COMMUNICATION_BREAKDOWN:availability",
+      "voi": 0.1962021381403569
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:b171608d20ecc24eaea29c9bc56a39c33504d1e07b8309b31a4f73887ec28531",
+      "voi": 0.2227346109100692
+    }
+  },
+  {
+    "event_type": "CONSERVATIVE_DELTA_ENFORCED",
+    "payload": {
+      "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:b171608d20ecc24eaea29c9bc56a39c33504d1e07b8309b31a4f73887ec28531",
+      "p_after": 0.45,
+      "p_before": 0.5
+    }
+  },
+  {
+    "event_type": "K_GUARDRAIL_APPLIED",
+    "payload": {
+      "k": 0.15,
+      "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:b171608d20ecc24eaea29c9bc56a39c33504d1e07b8309b31a4f73887ec28531"
+    }
+  },
+  {
+    "event_type": "NODE_EVALUATED",
+    "payload": {
+      "derived": {
+        "conservative_delta_applied": true,
+        "guardrail_applied": true,
+        "has_evidence": false,
+        "k_caps": [],
+        "missing_evidence_ids": [],
+        "quote_mismatches": [],
+        "quotes_valid": true,
+        "validity": 0.0
+      },
+      "evidence_packet_hash": "d1634c042910c0044614e6f77f88590e64e77525e272a8f45674c82d95ff3879",
+      "k": 0.15,
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "ed101aa369f76812eb37935bff3841f3cde249d59d61489977762ac84b8c620b",
+        "system_hash": "1ef388679b5d1b62bd5a307b4c2403f66b3d259ffb0be19a571731537e3db879",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "caa017872340aab60d50ebe5ed1a3b62aad9cc7fa61eec4b96d77b0c7aef185a"
+      },
+      "node": {
+        "coupling": null,
+        "decomp_type": null,
+        "role": "NEC",
+        "statement": "Markings and signage at the location were inconsistent with regulatory standards"
+      },
+      "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:b171608d20ecc24eaea29c9bc56a39c33504d1e07b8309b31a4f73887ec28531",
+      "outcome": {
+        "A": 0,
+        "B": 0,
+        "C": 0,
+        "D": 0,
+        "assumptions": [],
+        "defeaters": [
+          "Evidence showing markings and signage were consistent with regulatory standards",
+          "Direct statements or reports about regulatory compliance of markings and signage"
+        ],
+        "evidence_ids": [],
+        "evidence_quality": "none",
+        "p": 0,
+        "quotes": [],
+        "reasoning_summary": "No evidence in the provided history items (H1-H5) mentions markings or signage being inconsistent with regulatory standards.",
+        "uncertainty_source": "missing evidence"
+      },
+      "p_after": 0.45,
+      "p_before": 0.5
+    }
+  },
+  {
+    "event_type": "SOFT_AND_COMPUTED",
+    "payload": {
+      "c": 0.8,
+      "m": 0.4005,
+      "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features",
+      "p_min": 0.45,
+      "p_prod": 0.2025
+    }
+  },
+  {
+    "event_type": "P_PROP_COMPUTED",
+    "payload": {
+      "log_ledger": {
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION": -1.3264314064679428,
+        "R2_COMMUNICATION_BREAKDOWN": -1.76052146687381,
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": -1.828591605592443,
+        "R4_MECHANICAL_CONTROL_FAILURE": -2.3335649898745463
+      },
+      "p_base": 0.180493991593029,
+      "p_prop": 0.2311471362395719,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "total_delta_w": -0.1165338162559515
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "+W",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.35,
+      "m": 0.89,
+      "p_base": 0.180493991593029,
+      "p_damped": 0.20075524945164616,
+      "p_prop": 0.2311471362395719,
+      "p_slot": 0.8,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "slot_key": "availability",
+      "w_new": 0.47000362924573563,
+      "w_prev": 0.47000362924573563
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "-W",
+      "clipped": false,
+      "delta_w": -0.1165338162559515,
+      "k_slot": 0.15,
+      "m": 0.89,
+      "p_base": 0.180493991593029,
+      "p_damped": 0.20075524945164616,
+      "p_prop": 0.2311471362395719,
+      "p_slot": 0.4005,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "slot_key": "fit_to_key_features",
+      "w_new": -0.22189433191377778,
+      "w_prev": -0.10536051565782628
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 0.89,
+      "p_base": 0.180493991593029,
+      "p_damped": 0.20075524945164616,
+      "p_prop": 0.2311471362395719,
+      "p_slot": 0.5,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "slot_key": "defeater_resistance",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "OPEN_WORLD_GAMMA_UPDATED",
+    "payload": {
+      "M": 0.05499999999999999,
+      "U": 0.2857142857142857,
+      "gamma_noa": 0.11375,
+      "gamma_und": 0.17142857142857143
+    }
+  },
+  {
+    "event_type": "INVARIANT_SUM_TO_ONE_CHECK",
+    "payload": {
+      "total": 0.9999999999999999
+    }
+  },
+  {
+    "event_type": "DAMPING_APPLIED",
+    "payload": {
+      "alpha": 0.4,
+      "p_before": 0.180493991593029,
+      "p_damped": 0.14350415420623922,
+      "p_new": 0.20075524945164616,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY"
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 4,
+      "credits_before": 5,
+      "op_type": "EVALUATE",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:b171608d20ecc24eaea29c9bc56a39c33504d1e07b8309b31a4f73887ec28531"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R2_COMMUNICATION_BREAKDOWN"
+      ],
+      "leader_id": "R2_COMMUNICATION_BREAKDOWN"
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.2,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "target_id": "R2_COMMUNICATION_BREAKDOWN:availability",
+      "voi": 0.2063204745444587
+    }
+  },
+  {
+    "event_type": "NODE_REFINED_REQUIREMENTS",
+    "payload": {
+      "children": [
+        "R2_COMMUNICATION_BREAKDOWN:availability:07823e3c7ffbad9c7539cd0745bf0681b4b1f334a6d281246990980647adc7a6",
+        "R2_COMMUNICATION_BREAKDOWN:availability:92f2738dd69b895d9159698b4c4c2a4da755637c93eabd94bb074d73e51bb213",
+        "R2_COMMUNICATION_BREAKDOWN:availability:e950ac7cbdbc4eb317f8f5de6936af2650982a5a52a5e0f5b9133f7899fd879e"
+      ],
+      "children_spec": [
+        {
+          "canonical_child_id": "07823e3c7ffbad9c7539cd0745bf0681b4b1f334a6d281246990980647adc7a6",
+          "child_id": "c1",
+          "falsifiable": true,
+          "node_key": "R2_COMMUNICATION_BREAKDOWN:availability:07823e3c7ffbad9c7539cd0745bf0681b4b1f334a6d281246990980647adc7a6",
+          "overlap_with_siblings": [],
+          "role": "NEC",
+          "statement": "Crew members were physically present and reachable during the operation",
+          "test_procedure": "Check crew attendance logs, communication device records, and physical presence reports to confirm availability"
+        },
+        {
+          "canonical_child_id": "92f2738dd69b895d9159698b4c4c2a4da755637c93eabd94bb074d73e51bb213",
+          "child_id": "c2",
+          "falsifiable": true,
+          "node_key": "R2_COMMUNICATION_BREAKDOWN:availability:92f2738dd69b895d9159698b4c4c2a4da755637c93eabd94bb074d73e51bb213",
+          "overlap_with_siblings": [],
+          "role": "NEC",
+          "statement": "Communication devices and channels were operational and accessible to all crew members",
+          "test_procedure": "Review maintenance logs and communication system status reports to verify device functionality and accessibility"
+        },
+        {
+          "canonical_child_id": "e950ac7cbdbc4eb317f8f5de6936af2650982a5a52a5e0f5b9133f7899fd879e",
+          "child_id": "c3",
+          "falsifiable": true,
+          "node_key": "R2_COMMUNICATION_BREAKDOWN:availability:e950ac7cbdbc4eb317f8f5de6936af2650982a5a52a5e0f5b9133f7899fd879e",
+          "overlap_with_siblings": [],
+          "role": "NEC",
+          "statement": "Crew members were not engaged in conflicting tasks that prevented timely communication",
+          "test_procedure": "Analyze task logs and crew activity reports to determine if any conflicting duties impeded communication availability"
+        }
+      ],
+      "coupling": 0.8,
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "9b23790c45cda99055b86f87aedb47bf8ea2889dd6f68facf9afbf7f8a6b6ff5",
+        "system_hash": "f9a249caffbe357125cb93cd667474067e53e2e21f6e0324a95248f8217b7cdc",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "e94e1dc1092d242be79ef3dd9251c9a7e80891ba64fcd7763086368bd99eac11"
+      },
+      "node_key": "R2_COMMUNICATION_BREAKDOWN:availability",
+      "type": "AND"
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 3,
+      "credits_before": 4,
+      "op_type": "DECOMPOSE",
+      "target_id": "R2_COMMUNICATION_BREAKDOWN:availability"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R2_COMMUNICATION_BREAKDOWN",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY"
+      ],
+      "leader_id": "R2_COMMUNICATION_BREAKDOWN"
+    }
+  },
+  {
+    "event_type": "TIE_BREAKER_APPLIED",
+    "payload": {
+      "ordered_frontier": [
+        "R2_COMMUNICATION_BREAKDOWN",
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY"
+      ]
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "target_id": "R2_COMMUNICATION_BREAKDOWN:availability:07823e3c7ffbad9c7539cd0745bf0681b4b1f334a6d281246990980647adc7a6",
+      "voi": 0.22559495024663445
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:cc16e407fb8cc2dadd3f2593ef8259a3c4e2455c0b615fb60437eb30efab758c",
+      "voi": 0.19129324913129786
+    }
+  },
+  {
+    "event_type": "NODE_EVALUATED",
+    "payload": {
+      "derived": {
+        "conservative_delta_applied": false,
+        "guardrail_applied": false,
+        "has_evidence": true,
+        "k_caps": [],
+        "missing_evidence_ids": [],
+        "quote_mismatches": [],
+        "quotes_valid": true,
+        "validity": 1.0
+      },
+      "evidence_packet_hash": "d1634c042910c0044614e6f77f88590e64e77525e272a8f45674c82d95ff3879",
+      "k": 0.9,
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "c7170317583023b9f7a1125f9a1eb448e7bfea6bf14f4e06d9649f0710f4fbed",
+        "system_hash": "1ef388679b5d1b62bd5a307b4c2403f66b3d259ffb0be19a571731537e3db879",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "98638b44c71bd7511ebbe507b83cbee9a6988abc9ade6261f22509754f7339fa"
+      },
+      "node": {
+        "coupling": null,
+        "decomp_type": null,
+        "role": "NEC",
+        "statement": "Crew members were physically present and reachable during the operation"
+      },
+      "node_key": "R2_COMMUNICATION_BREAKDOWN:availability:07823e3c7ffbad9c7539cd0745bf0681b4b1f334a6d281246990980647adc7a6",
+      "outcome": {
+        "A": 2,
+        "B": 2,
+        "C": 2,
+        "D": 2,
+        "assumptions": [],
+        "defeaters": [
+          "If evidence showed any crew member was absent or unreachable during the operation."
+        ],
+        "evidence_ids": [
+          "H1",
+          "H2",
+          "H3",
+          "H5"
+        ],
+        "evidence_quality": "direct",
+        "p": 1,
+        "quotes": [
+          {
+            "evidence_id": "H1",
+            "exact_quote": "A tug driving instructor (tug instructor) and trainee tug driver (trainee driver) were seated beside each other in the tug. The flight crew were in communication with the headset operator via the aircraft\u2019s interphone.",
+            "location": null
+          },
+          {
+            "evidence_id": "H2",
+            "exact_quote": "The trainee driver decided to stop the pushback and asked the tug instructor to take over.",
+            "location": null
+          },
+          {
+            "evidence_id": "H3",
+            "exact_quote": "After swapping seats the instructor recommenced the pushback, correcting the aircraft back onto the taxiway centreline. He continued to reassure and advise the trainee while performing the pushback, looking at her while doing so. The headset operator continued walking on the right side of the tug, abeam its cabin. The wingman was on the left just ahead of the tug.",
+            "location": null
+          },
+          {
+            "evidence_id": "H5",
+            "exact_quote": "The tug instructor pulled the aircraft forward off the fence then stopped the tug.",
+            "location": null
+          }
+        ],
+        "reasoning_summary": "The evidence directly states that crew members (tug instructor, trainee driver, headset operator, wingman) were physically present and reachable during the operation (H1, H2, H3, H5).",
+        "uncertainty_source": "none"
+      },
+      "p_after": 1.0,
+      "p_before": 0.5
+    }
+  },
+  {
+    "event_type": "SOFT_AND_COMPUTED",
+    "payload": {
+      "c": 0.8,
+      "m": 1.0,
+      "node_key": "R2_COMMUNICATION_BREAKDOWN:availability",
+      "p_min": 1.0,
+      "p_prod": 1.0
+    }
+  },
+  {
+    "event_type": "P_PROP_COMPUTED",
+    "payload": {
+      "log_ledger": {
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION": -1.2594955331578943,
+        "R2_COMMUNICATION_BREAKDOWN": -0.08414868113016127,
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": -1.9413912950290817,
+        "R4_MECHANICAL_CONTROL_FAILURE": -2.2666291165644976
+      },
+      "p_base": 0.1838590966948705,
+      "p_prop": 0.6338839461334543,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "total_delta_w": 1.6094369124336003
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "+W",
+      "clipped": false,
+      "delta_w": 1.6094369124336003,
+      "k_slot": 0.15,
+      "m": 4.999994999999999,
+      "p_base": 0.1838590966948705,
+      "p_damped": 0.363869036470304,
+      "p_prop": 0.6338839461334543,
+      "p_slot": 1.0,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "slot_key": "availability",
+      "w_new": 0.6931461805594453,
+      "w_prev": -0.916290731874155
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 4.999994999999999,
+      "p_base": 0.1838590966948705,
+      "p_damped": 0.363869036470304,
+      "p_prop": 0.6338839461334543,
+      "p_slot": 0.5,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "slot_key": "fit_to_key_features",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 4.999994999999999,
+      "p_base": 0.1838590966948705,
+      "p_damped": 0.363869036470304,
+      "p_prop": 0.6338839461334543,
+      "p_slot": 0.5,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "slot_key": "defeater_resistance",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "OPEN_WORLD_GAMMA_UPDATED",
+    "payload": {
+      "M": 0.049999999999999996,
+      "U": 0.2857142857142857,
+      "gamma_noa": 0.1125,
+      "gamma_und": 0.17142857142857143
+    }
+  },
+  {
+    "event_type": "INVARIANT_SUM_TO_ONE_CHECK",
+    "payload": {
+      "total": 0.9999999999999999
+    }
+  },
+  {
+    "event_type": "DAMPING_APPLIED",
+    "payload": {
+      "alpha": 0.4,
+      "p_before": 0.1838590966948705,
+      "p_damped": 0.2605562207581998,
+      "p_new": 0.363869036470304,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN"
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 2,
+      "credits_before": 3,
+      "op_type": "EVALUATE",
+      "target_id": "R2_COMMUNICATION_BREAKDOWN:availability:07823e3c7ffbad9c7539cd0745bf0681b4b1f334a6d281246990980647adc7a6"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R2_COMMUNICATION_BREAKDOWN"
+      ],
+      "leader_id": "R2_COMMUNICATION_BREAKDOWN"
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "target_id": "R2_COMMUNICATION_BREAKDOWN:availability:92f2738dd69b895d9159698b4c4c2a4da755637c93eabd94bb074d73e51bb213",
+      "voi": 0.29078750570046435
+    }
+  },
+  {
+    "event_type": "K_GUARDRAIL_APPLIED",
+    "payload": {
+      "k": 0.15,
+      "node_key": "R2_COMMUNICATION_BREAKDOWN:availability:92f2738dd69b895d9159698b4c4c2a4da755637c93eabd94bb074d73e51bb213"
+    }
+  },
+  {
+    "event_type": "NODE_EVALUATED",
+    "payload": {
+      "derived": {
+        "conservative_delta_applied": false,
+        "guardrail_applied": true,
+        "has_evidence": true,
+        "k_caps": [],
+        "missing_evidence_ids": [],
+        "quote_mismatches": [],
+        "quotes_valid": true,
+        "validity": 1.0
+      },
+      "evidence_packet_hash": "d1634c042910c0044614e6f77f88590e64e77525e272a8f45674c82d95ff3879",
+      "k": 0.15,
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "6840464bc79dfd3c573d82930beb532a0f40d60dd0c6f102c2afa509936165e5",
+        "system_hash": "1ef388679b5d1b62bd5a307b4c2403f66b3d259ffb0be19a571731537e3db879",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "b4073d079a60dd44fd7d827852ad8a9c43eea7c5ee5de4b2ad2b84a08b20ff7e"
+      },
+      "node": {
+        "coupling": null,
+        "decomp_type": null,
+        "role": "NEC",
+        "statement": "Communication devices and channels were operational and accessible to all crew members"
+      },
+      "node_key": "R2_COMMUNICATION_BREAKDOWN:availability:92f2738dd69b895d9159698b4c4c2a4da755637c93eabd94bb074d73e51bb213",
+      "outcome": {
+        "A": 0,
+        "B": 1,
+        "C": 0,
+        "D": 0,
+        "assumptions": [],
+        "defeaters": [
+          "Evidence showing any communication device failure or inaccessibility to some crew members",
+          "Reports of crew members unable to use communication channels"
+        ],
+        "evidence_ids": [
+          "H1",
+          "H3"
+        ],
+        "evidence_quality": "indirect",
+        "p": 0.2,
+        "quotes": [
+          {
+            "evidence_id": "H1",
+            "exact_quote": "The flight crew were in communication with the headset operator via the aircraft\u2019s interphone.",
+            "location": {}
+          },
+          {
+            "evidence_id": "H3",
+            "exact_quote": "The headset operator continued walking on the right side of the tug, abeam its cabin. The wingman was on the left just ahead of the tug.",
+            "location": {}
+          }
+        ],
+        "reasoning_summary": "Evidence H1 and H3 indicate that communication devices (interphone) were in use and headset operator was present and mobile, suggesting operational and accessible communication channels, but no explicit confirmation that all crew members had full access or that devices were fully operational for all.",
+        "uncertainty_source": "No explicit statement confirming all crew members had operational and accessible communication devices; only partial indications from headset operator and flight crew communication."
+      },
+      "p_after": 0.2,
+      "p_before": 0.5
+    }
+  },
+  {
+    "event_type": "SOFT_AND_COMPUTED",
+    "payload": {
+      "c": 0.8,
+      "m": 0.2,
+      "node_key": "R2_COMMUNICATION_BREAKDOWN:availability",
+      "p_min": 0.2,
+      "p_prod": 0.2
+    }
+  },
+  {
+    "event_type": "P_PROP_COMPUTED",
+    "payload": {
+      "log_ledger": {
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION": -1.4127575105791101,
+        "R2_COMMUNICATION_BREAKDOWN": -2.954373534858291,
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": -2.0946532724502975,
+        "R4_MECHANICAL_CONTROL_FAILURE": -2.4198910939857132
+      },
+      "p_base": 0.2605562207581998,
+      "p_prop": 0.10265676800657632,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "total_delta_w": -1.6094369124336003
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "-W",
+      "clipped": false,
+      "delta_w": -1.6094369124336003,
+      "k_slot": 0.15,
+      "m": 0.20000020000020002,
+      "p_base": 0.2605562207581998,
+      "p_damped": 0.19739643965755038,
+      "p_prop": 0.10265676800657632,
+      "p_slot": 0.2,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "slot_key": "availability",
+      "w_new": -0.916290731874155,
+      "w_prev": 0.6931461805594453
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 0.20000020000020002,
+      "p_base": 0.2605562207581998,
+      "p_damped": 0.19739643965755038,
+      "p_prop": 0.10265676800657632,
+      "p_slot": 0.5,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "slot_key": "fit_to_key_features",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 0.20000020000020002,
+      "p_base": 0.2605562207581998,
+      "p_damped": 0.19739643965755038,
+      "p_prop": 0.10265676800657632,
+      "p_slot": 0.5,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "slot_key": "defeater_resistance",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "OPEN_WORLD_GAMMA_UPDATED",
+    "payload": {
+      "M": 0.05499999999999999,
+      "U": 0.2857142857142857,
+      "gamma_noa": 0.11375,
+      "gamma_und": 0.17142857142857143
+    }
+  },
+  {
+    "event_type": "INVARIANT_SUM_TO_ONE_CHECK",
+    "payload": {
+      "total": 1.0
+    }
+  },
+  {
+    "event_type": "DAMPING_APPLIED",
+    "payload": {
+      "alpha": 0.4,
+      "p_before": 0.2605562207581998,
+      "p_damped": 0.14110320499092394,
+      "p_new": 0.19739643965755038,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN"
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 1,
+      "credits_before": 2,
+      "op_type": "EVALUATE",
+      "target_id": "R2_COMMUNICATION_BREAKDOWN:availability:92f2738dd69b895d9159698b4c4c2a4da755637c93eabd94bb074d73e51bb213"
+    }
+  },
+  {
+    "event_type": "FRONTIER_DEFINED",
+    "payload": {
+      "frontier": [
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+        "R2_COMMUNICATION_BREAKDOWN",
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+        "R4_MECHANICAL_CONTROL_FAILURE"
+      ],
+      "leader_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY"
+    }
+  },
+  {
+    "event_type": "TIE_BREAKER_APPLIED",
+    "payload": {
+      "ordered_frontier": [
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+        "R2_COMMUNICATION_BREAKDOWN",
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+        "R4_MECHANICAL_CONTROL_FAILURE"
+      ]
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:cc16e407fb8cc2dadd3f2593ef8259a3c4e2455c0b615fb60437eb30efab758c",
+      "voi": 0.2011156047896172
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "target_id": "R2_COMMUNICATION_BREAKDOWN:availability:e950ac7cbdbc4eb317f8f5de6936af2650982a5a52a5e0f5b9133f7899fd879e",
+      "voi": 0.18925244229827987
+    }
+  },
+  {
+    "event_type": "VOI_SCORED",
+    "payload": {
+      "k_node": 0.15,
+      "lambda_voi": 0.1,
+      "p_node": 0.5,
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "target_id": "R4_MECHANICAL_CONTROL_FAILURE:availability:5aa50a70b291a89232e7267f5472527f0a0ddf0211f875fe5ebb5ca56a94b34e",
+      "voi": 0.16452181896377044
+    }
+  },
+  {
+    "event_type": "CONSERVATIVE_DELTA_ENFORCED",
+    "payload": {
+      "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:cc16e407fb8cc2dadd3f2593ef8259a3c4e2455c0b615fb60437eb30efab758c",
+      "p_after": 0.45,
+      "p_before": 0.5
+    }
+  },
+  {
+    "event_type": "K_GUARDRAIL_APPLIED",
+    "payload": {
+      "k": 0.15,
+      "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:cc16e407fb8cc2dadd3f2593ef8259a3c4e2455c0b615fb60437eb30efab758c"
+    }
+  },
+  {
+    "event_type": "NODE_EVALUATED",
+    "payload": {
+      "derived": {
+        "conservative_delta_applied": true,
+        "guardrail_applied": true,
+        "has_evidence": false,
+        "k_caps": [],
+        "missing_evidence_ids": [],
+        "quote_mismatches": [],
+        "quotes_valid": true,
+        "validity": 0.0
+      },
+      "evidence_packet_hash": "d1634c042910c0044614e6f77f88590e64e77525e272a8f45674c82d95ff3879",
+      "k": 0.15,
+      "llm": {
+        "model": "gpt-4.1-mini",
+        "provider": "openai",
+        "response_format": "json_object",
+        "response_hash": "29a142ea8d07d2747c0775bb03c04a4f67b722db516d670574a7b0ece5f224a5",
+        "system_hash": "1ef388679b5d1b62bd5a307b4c2403f66b3d259ffb0be19a571731537e3db879",
+        "temperature": 0.0,
+        "timeout_s": 60.0,
+        "user_hash": "456edbee3a84bde8019816d39baef3be193ddfd3b9ed4895b0770c46abe5b488"
+      },
+      "node": {
+        "coupling": null,
+        "decomp_type": null,
+        "role": "EVID",
+        "statement": "There is documented evidence of environmental or marking deficiencies contributing to the event"
+      },
+      "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:cc16e407fb8cc2dadd3f2593ef8259a3c4e2455c0b615fb60437eb30efab758c",
+      "outcome": {
+        "A": 0,
+        "B": 0,
+        "C": 0,
+        "D": 0,
+        "assumptions": [],
+        "defeaters": [
+          "If evidence showed that the 'Tug release point' markings were unclear, missing, or misleading, or if environmental conditions impaired visibility or contributed to the event."
+        ],
+        "evidence_ids": [],
+        "evidence_quality": "none",
+        "p": 0,
+        "quotes": [],
+        "reasoning_summary": "No evidence in the provided history items documents any environmental or marking deficiencies contributing to the event (H1-H5). The text mentions the 'Tug release point' ground markings but does not indicate any deficiency or problem with these markings.",
+        "uncertainty_source": "missing evidence"
+      },
+      "p_after": 0.45,
+      "p_before": 0.5
+    }
+  },
+  {
+    "event_type": "SOFT_AND_COMPUTED",
+    "payload": {
+      "c": 0.8,
+      "m": 0.37822500000000003,
+      "node_key": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features",
+      "p_min": 0.45,
+      "p_prod": 0.09112500000000001
+    }
+  },
+  {
+    "event_type": "P_PROP_COMPUTED",
+    "payload": {
+      "log_ledger": {
+        "R1_PUSHBACK_PROCEDURAL_DEVIATION": -1.1820482376946937,
+        "R2_COMMUNICATION_BREAKDOWN": -1.9582637060586991,
+        "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": -1.9211685094433963,
+        "R4_MECHANICAL_CONTROL_FAILURE": -2.1891818211012968
+      },
+      "p_base": 0.15505986674543845,
+      "p_prop": 0.20735812497821854,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "total_delta_w": -0.057224509877515206
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "+W",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.35,
+      "m": 0.9443820224719102,
+      "p_base": 0.15505986674543845,
+      "p_damped": 0.1759791700385505,
+      "p_prop": 0.20735812497821854,
+      "p_slot": 0.8,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "slot_key": "availability",
+      "w_new": 0.47000362924573563,
+      "w_prev": 0.47000362924573563
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "-W",
+      "clipped": false,
+      "delta_w": -0.057224509877515206,
+      "k_slot": 0.15,
+      "m": 0.9443820224719102,
+      "p_base": 0.15505986674543845,
+      "p_damped": 0.1759791700385505,
+      "p_prop": 0.20735812497821854,
+      "p_slot": 0.37822500000000003,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "slot_key": "fit_to_key_features",
+      "w_new": -0.279118841791293,
+      "w_prev": -0.22189433191377778
+    }
+  },
+  {
+    "event_type": "DELTA_W_APPLIED",
+    "payload": {
+      "W": 3.0,
+      "alpha": 0.4,
+      "beta": 1.0,
+      "clip_direction": "0",
+      "clipped": false,
+      "delta_w": 0.0,
+      "k_slot": 0.15,
+      "m": 0.9443820224719102,
+      "p_base": 0.15505986674543845,
+      "p_damped": 0.1759791700385505,
+      "p_prop": 0.20735812497821854,
+      "p_slot": 0.5,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "slot_key": "defeater_resistance",
+      "w_new": 0.0,
+      "w_prev": 0.0
+    }
+  },
+  {
+    "event_type": "OPEN_WORLD_GAMMA_UPDATED",
+    "payload": {
+      "M": 0.05499999999999999,
+      "U": 0.2857142857142857,
+      "gamma_noa": 0.11375,
+      "gamma_und": 0.17142857142857143
+    }
+  },
+  {
+    "event_type": "INVARIANT_SUM_TO_ONE_CHECK",
+    "payload": {
+      "total": 1.0
+    }
+  },
+  {
+    "event_type": "DAMPING_APPLIED",
+    "payload": {
+      "alpha": 0.4,
+      "p_before": 0.15505986674543845,
+      "p_damped": 0.125793681725771,
+      "p_new": 0.1759791700385505,
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY"
+    }
+  },
+  {
+    "event_type": "OP_EXECUTED",
+    "payload": {
+      "credits_after": 0,
+      "credits_before": 1,
+      "op_type": "EVALUATE",
+      "target_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY:fit_to_key_features:cc16e407fb8cc2dadd3f2593ef8259a3c4e2455c0b615fb60437eb30efab758c"
+    }
+  },
+  {
+    "event_type": "STOP_REASON_RECORDED",
+    "payload": {
+      "stop_reason": "CREDITS_EXHAUSTED"
+    }
+  }
+]

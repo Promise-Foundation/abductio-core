@@ -16,6 +16,7 @@ class Node:
     children: List[str] = field(default_factory=list)
     decomp_type: Optional[str] = None
     coupling: Optional[float] = None
+    guardrail_applied: bool = False
 
 
 @dataclass

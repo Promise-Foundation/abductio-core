@@ -52,3 +52,29 @@ Feature: Deterministic scheduling, frontier selection, and tie-breaking
     When I run the engine for exactly 2 operations
     Then the operation order follows canonical_id order of statements, not the provided ids
     And the audit log shows deterministic tie-breaking
+
+  Scenario: Evaluate-before-deepen is enforced after root scoping
+    Given a hypothesis set with named roots:
+      | id | statement       | exclusion_clause                |
+      | H1 | Alpha mechanism | Not explained by any other root |
+    And a deterministic decomposer that will scope root "H1"
+    And a deterministic decomposer that will decompose slot "H1:availability" as AND with coupling 0.80 into:
+      | child_id | statement      | role |
+      | c1       | Avail signal 1 | NEC  |
+      | c2       | Avail signal 2 | NEC  |
+    And a deterministic decomposer that will decompose slot "H1:fit_to_key_features" as AND with coupling 0.80 into:
+      | child_id | statement    | role |
+      | c1       | Fit signal 1 | NEC  |
+      | c2       | Fit signal 2 | NEC  |
+    And a deterministic evaluator with the following outcomes:
+      | node_key                 | p    | A | B | C | D | evidence_ids |
+      | H1:availability          | 0.60 | 2 | 1 | 1 | 1 | ref1         |
+      | H1:fit_to_key_features   | 0.60 | 2 | 1 | 1 | 1 | ref2         |
+      | H1:defeater_resistance   | 0.60 | 2 | 1 | 1 | 1 | ref3         |
+    And credits 4
+    When I run the engine for exactly 4 operations
+    Then operation 1 is "DECOMPOSE" targeting "H1"
+    And operation 2 is "EVALUATE" targeting "H1:availability"
+    And operation 3 is "EVALUATE" targeting "H1:fit_to_key_features"
+    And operation 4 is "EVALUATE" targeting "H1:defeater_resistance"
+    And no slot-level decomposition occurs before all required slots of "H1" are first evaluated

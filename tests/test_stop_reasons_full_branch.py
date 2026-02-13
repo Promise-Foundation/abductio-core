@@ -104,3 +104,42 @@ def test_stop_reason_no_legal_op_after_decomp_and_eval() -> None:
     )
     res = run_session(req, _deps()).to_dict_view()
     assert res["stop_reason"] == "NO_LEGAL_OP"
+
+
+def test_stop_reason_mece_certificate_failed_before_spending_credits() -> None:
+    req = SessionRequest(
+        scope="mece cert fail",
+        roots=[
+            RootSpec("H1", "Mechanism A", "x"),
+            RootSpec("H2", "Mechanism B", "x"),
+        ],
+        config=SessionConfig(
+            tau=0.70,
+            epsilon=0.05,
+            gamma_noa=0.10,
+            gamma_und=0.10,
+            alpha=0.40,
+            beta=1.0,
+            W=3.0,
+            lambda_voi=0.1,
+            world_mode="open",
+            gamma=0.20,
+        ),
+        credits=10,
+        required_slots=[{"slot_key": "feasibility", "role": "NEC"}],
+        run_mode="until_stops",
+        strict_mece=True,
+        max_pair_overlap=0.0,
+        mece_certificate={
+            "pairwise_overlaps": {"H1|H2": 2.0},
+            "pairwise_discriminators": {"H1|H2": "Differentiator exists"},
+        },
+        evidence_items=[{"id": "EV-1", "source": "test", "text": "Evidence item 1."}],
+    )
+    res = run_session(req, _deps()).to_dict_view()
+    assert res["stop_reason"] == "MECE_CERTIFICATE_FAILED"
+    assert res["total_credits_spent"] == 0
+    assert res["operation_log"] == []
+    checks = [event for event in res["audit"] if event.get("event_type") == "MECE_CERTIFICATE_CHECKED"]
+    assert checks
+    assert checks[-1]["payload"].get("status") == "FAILED"

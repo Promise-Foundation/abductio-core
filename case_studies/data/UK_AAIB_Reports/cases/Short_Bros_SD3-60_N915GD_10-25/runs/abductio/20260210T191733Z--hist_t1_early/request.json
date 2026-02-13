@@ -1,0 +1,125 @@
+{
+  "config": {
+    "W": 3.0,
+    "alpha": 0.4,
+    "beta": 1.0,
+    "epsilon": 0.05,
+    "gamma": 0.2,
+    "gamma_noa": 0.1,
+    "gamma_und": 0.1,
+    "lambda_voi": 0.1,
+    "rho_eval_min": 0.5,
+    "tau": 0.7,
+    "world_mode": "open"
+  },
+  "credits": 20,
+  "evidence_items": [
+    {
+      "id": "H1",
+      "source": "history",
+      "text": "During an airfield inspection at TUPJ, which began at 1900 hrs Z on 6 November, it was found that a frangible light at the western edge of the Rwy 07 undershoot was missing. Tyre marks were also discovered on the extreme end of the runway. Based on the nature of the marks, their orientation and location, as well as the track between them, it was determined they were made by an aircraft rather than a ground vehicle. The airfield boundary fence in the Rwy 07 undershoot had also sustained damage. The barbed wire support arm on one fence pole was missing and the wire had been severed in that location."
+    },
+    {
+      "id": "H2",
+      "source": "history",
+      "text": "Safety reporting With damage to airfield infrastructure having been found, the airfield duty manager submitted a Mandatory Occurrence Report (MOR) to Air Safety Support International (ASSI) on 9 November 2024. In the MOR, the event type was recorded as \u2018 Incident.\u2019 Following a review of the report, ASSI reclassified the event as a Serious Incident and notified the AAIB on 6 January 2025."
+    },
+    {
+      "id": "H3",
+      "source": "history",
+      "text": "Unaware that the aircraft had struck any obstacles on the approach, the flight crew did not submit a safety report about the landing but provided the following brief statement on 8 November 2024 in response to the TUPJ airfield authorities\u2019 enquiries."
+    },
+    {
+      "id": "H4",
+      "source": "history",
+      "text": "\u2018On November 6 the weather was marginal with rain on all quadrants, upon approaching runway 7 on short final started to experience wind gusts and probably a downdraft [sic], seemed close to a low-level wind shear. Applied power to arrest the descent. I landed slightly short of the numbers. I was totally unaware that I struck [anything].\u2019 Although they were requested from the commander, further details of the occurrence, which could have provided greater insight into the content and context of their 8 November statement, were not provided to the AAIB."
+    },
+    {
+      "id": "S1",
+      "source": "synopsis",
+      "text": "On arrival at Terrance B Lettsome International Airport (TUPJ) in the British Virgin Islands, N915GD was likely affected by nearby thunderstorm activity, reportedly experiencing a downdraught on short finals. Despite the commander applying more power to \u201carrest the descent\u201d, the aircraft initially touched down on the lip of Runway (Rwy 07), approximately 150 m short of the threshold. It then bounced and touched down again close to the threshold."
+    },
+    {
+      "id": "S2",
+      "source": "synopsis",
+      "text": "The airfield operations team later found a frangible runway light had been damaged by the aircraft when it undershot the runway."
+    },
+    {
+      "id": "S3",
+      "source": "synopsis",
+      "text": "While he knew the aircraft initially touched down in the undershoot, the commander was unaware that it had struck the light and did not file an occurrence report. The aircraft returned to its home base approximately one hour later."
+    }
+  ],
+  "force_scope_fail_root": null,
+  "framing": null,
+  "initial_ledger": null,
+  "max_pair_overlap": 1.0,
+  "max_search_depth": null,
+  "max_search_per_node": null,
+  "mece_certificate": {
+    "max_pair_overlap": 1.0,
+    "pairwise_discriminators": {
+      "R1_PUSHBACK_PROCEDURAL_DEVIATION|R2_COMMUNICATION_BREAKDOWN": "Stop-point and continuation behavior under aligned crew model distinguishes procedural deviation from coordination failure.",
+      "R1_PUSHBACK_PROCEDURAL_DEVIATION|R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": "Marker adequacy and visibility evidence separates procedural non-compliance from environmental deficiency.",
+      "R1_PUSHBACK_PROCEDURAL_DEVIATION|R4_MECHANICAL_CONTROL_FAILURE": "Equipment fault traces or bench checks separate control malfunction from operator procedural deviation.",
+      "R2_COMMUNICATION_BREAKDOWN|R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": "Challenge/alert behavior and shared-model mismatches discriminate crew coordination failures from deficient markings.",
+      "R2_COMMUNICATION_BREAKDOWN|R4_MECHANICAL_CONTROL_FAILURE": "Communication failures without corroborated hardware faults separate coordination breakdown from mechanical failure.",
+      "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY|R4_MECHANICAL_CONTROL_FAILURE": "Physical marking/location evidence versus verified fault codes or repeat malfunctions distinguishes environmental deficiency from control failure."
+    },
+    "pairwise_overlaps": {
+      "R1_PUSHBACK_PROCEDURAL_DEVIATION|R2_COMMUNICATION_BREAKDOWN": 1,
+      "R1_PUSHBACK_PROCEDURAL_DEVIATION|R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": 1,
+      "R1_PUSHBACK_PROCEDURAL_DEVIATION|R4_MECHANICAL_CONTROL_FAILURE": 0,
+      "R2_COMMUNICATION_BREAKDOWN|R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": 1,
+      "R2_COMMUNICATION_BREAKDOWN|R4_MECHANICAL_CONTROL_FAILURE": 1,
+      "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY|R4_MECHANICAL_CONTROL_FAILURE": 1
+    }
+  },
+  "pre_scoped_roots": null,
+  "required_slots": [
+    {
+      "role": "NEC",
+      "slot_key": "availability"
+    },
+    {
+      "role": "NEC",
+      "slot_key": "fit_to_key_features"
+    },
+    {
+      "role": "NEC",
+      "slot_key": "defeater_resistance"
+    }
+  ],
+  "roots": [
+    {
+      "exclusion_clause": "Not explained by any other root",
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "statement": "Procedural deviation in pushback execution"
+    },
+    {
+      "exclusion_clause": "Not explained by any other root",
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "statement": "Communication/coordination breakdown among crew"
+    },
+    {
+      "exclusion_clause": "Not explained by any other root",
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "statement": "Environmental/marking deficiency"
+    },
+    {
+      "exclusion_clause": "Not explained by any other root",
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "statement": "Mechanical/control failure"
+    }
+  ],
+  "run_count": null,
+  "run_mode": null,
+  "run_target": null,
+  "scope": "Short_Bros_SD3-60_N915GD_10-25:hist_t1_early",
+  "search_deterministic": null,
+  "search_enabled": null,
+  "search_quota_per_slot": null,
+  "slot_initial_p": null,
+  "slot_k_min": null,
+  "strict_mece": true
+}

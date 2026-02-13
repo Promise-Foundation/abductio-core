@@ -22,7 +22,9 @@ These studies are not claims of ground truth. They are evidence that ABDUCTIO be
 - MECE root sets are required. Hypotheses are mutually exclusive and collectively exhaustive for the scoped question.
 - Fairness is mandatory. Same scope, evidence, roots, and budget across methods.
 
-Canonical rules live in `case_studies/abductio_v2_validation_framework.md`.
+Canonical validation strategy and rules:
+- `case_studies/unified_empirical_strategy.md`
+- `case_studies/abductio_v2_validation_framework.md`
 
 ## 3) How to create a new case study
 
@@ -33,28 +35,30 @@ These steps use the AAIB tooling in this repo. Replace `<case_id>` and filenames
 - Define the unit of analysis (problem-level preferred).
 - Define evidence freeze time T.
 
-### 3.2 Add the case to the inbox and registry
+### 3.2 Add the case to the registry (public-web download workflow)
 
-1) Place the PDF in the inbox:
+1) Add or update the case row in `case_studies/data/UK_AAIB_Reports/index.csv` with:
+- `case_id`
+- `source_url` (for AAIB, usually `https://www.gov.uk/aaib-reports`)
+- `source_doc_id` (for example `AAIB-30304`)
+- `doc_title`
+- `pdf_filename` (target local filename)
 
-```
-cp /path/to/AAIB_report.pdf case_studies/data/UK_AAIB_Reports/inbox/
-```
-
-2) Add a row to the inbox metadata file:
-
-```
-cat >> case_studies/data/UK_AAIB_Reports/inbox/inbox.csv <<'CSV'
-pdf_filename,case_id,source_url,retrieved_date_utc,doc_title,bulletin_issue,source_doc_id
-AAIB_report.pdf,Example_Case_01,https://www.gov.uk/aaib-reports,2026-01-08,"Example Title",01/2026,AAIB-12345
-CSV
-```
-
-3) Ingest the inbox (updates `index.csv`):
+2) Download the source PDF programmatically from public web sources:
 
 ```
-python -m case_studies.tools.aaib_bench.aaib_bench ingest
+python -m case_studies.tools.aaib_bench.aaib_bench download --case <case_id>
 ```
+
+3) Optional bulk mode:
+
+```
+python -m case_studies.tools.aaib_bench.aaib_bench download --selected
+```
+
+4) Manual fallback (if the resolver fails for a specific case):
+- Place PDF in `case_studies/data/UK_AAIB_Reports/`
+- Keep `pdf_filename` in `index.csv` aligned with the local file
 
 ### 3.3 Prepare extracted sections (required by the build tool)
 
@@ -105,6 +109,16 @@ Validate the case artifacts:
 ```
 python -m case_studies.tools.aaib_bench.aaib_bench validate --case <case_id>
 ```
+
+End-to-end pipeline (download + build + validate, plus optional run):
+
+```
+python -m case_studies.tools.aaib_bench.aaib_bench pipeline --case <case_id>
+python -m case_studies.tools.aaib_bench.aaib_bench pipeline --selected --run
+```
+
+Pipeline writes a JSON and CSV report to:
+`case_studies/data/UK_AAIB_Reports/results/pipeline/`
 
 ### 3.8 Generate run artifacts
 - Run ABDUCTIO and baselines under identical scope and budget.
@@ -163,14 +177,16 @@ python -m case_studies.tools.aaib_bench.aaib_bench validate --case <case_id>
 - If ABDUCTIO diverges from the oracle, confirm D0-D4 classification.
 - Ensure justified dissent criteria are documented with evidence refs.
 
-## 5) Verified commands (run in this repo)
+## 5) Example commands (run in this repo)
 
-The following commands have been run and verified against this repo:
+The following commands are the standard workflow commands for this repo:
 
 ```
 python -m case_studies.tools.aaib_bench.aaib_bench --help
+python -m case_studies.tools.aaib_bench.aaib_bench download --case Boeing_737-8AS_9H-QAA_12-25
 python -m case_studies.tools.aaib_bench.aaib_bench build --case Boeing_737-8AS_9H-QAA_12-25
 python -m case_studies.tools.aaib_bench.aaib_bench validate --case Boeing_737-8AS_9H-QAA_12-25
+python -m case_studies.tools.aaib_bench.aaib_bench pipeline --case Boeing_737-8AS_9H-QAA_12-25
 rg -n "cause|caused|resulted from|therefore|led to" case_studies/data/UK_AAIB_Reports/cases/Boeing_737-8AS_9H-QAA_12-25/evidence_packet.md
 ```
 

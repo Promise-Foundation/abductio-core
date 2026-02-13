@@ -35,13 +35,12 @@ Feature: No-free-probability semantics
     Given a hypothesis set with named roots:
       | id   | statement     | exclusion_clause                |
       | H1   | Mechanism A   | Not explained by any other root |
-    And a deterministic decomposer that will scope root "H1"
-    And a deterministic decomposer that will decompose slot "H1:fit_to_key_features" as AND with coupling 0.80 into:
+    And a scoped root "H1" with slot "fit_to_key_features" decomposed as AND coupling 0.80 into NEC children:
       | child_id | statement                 | role |
       | c1       | Fits timing               | NEC  |
       | c2       | Fits witness consistency  | NEC  |
       | c3       | Fits physical traces      | NEC  |
-    And credits 2
-    When I run the engine for exactly 2 operations
+    And credits 0
+    When I run the engine for exactly 0 operations
     Then slot "H1:fit_to_key_features" has aggregated p = 0.5
     And no ledger probability changed due to unassessed NEC children

@@ -64,3 +64,7 @@ class SessionRequest:
     max_search_per_node: Optional[int] = None
     search_quota_per_slot: Optional[int] = None
     search_deterministic: Optional[bool] = None
+    mece_certificate: Optional[Dict[str, Any]] = None
+    strict_mece: Optional[bool] = None
+    max_pair_overlap: Optional[float] = None
+    policy: Optional[Dict[str, Any]] = None

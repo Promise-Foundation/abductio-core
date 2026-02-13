@@ -48,6 +48,8 @@ Abductio computes an auditable output $(p(h),k(h))_{h\in H}$, optionally augment
 5. *Open-world honesty:* mismatch and underdetermination are represented explicitly and preserved against “best-of-bad-set” overconfidence.
 6. *Deterministic, symmetric evidence acquisition:* evidence retrieval cannot adapt to interim hypothesis scores in a way that enables p-hacking.
 7. *Recursion:* any obligation node may spawn a local Abductio instance; recursion must preserve the above invariants.
+8. *Strict MECE certification (optional mode):* if enabled, pairwise overlap and pairwise discriminator completeness must be validated before any paid operation; failures must halt with an auditable stop reason.
+9. *Comparative causal adjudication:* named-root credence updates must be contrastive over competitors using declared discriminators; non-discriminative plausibility updates are bounded and cannot dominate selection.
 
 * 2. Mathematical Preliminaries
 ** 2.1 Notation
@@ -58,7 +60,10 @@ Abductio computes an auditable output $(p(h),k(h))_{h\in H}$, optionally augment
 - $k$: confidence score in $[0,1]$.
 - $v$: validity scalar in $[0,1]$.
 - $w$: signed bounded weight in $[-W,W]$.
+- $q$: signed bounded *comparative* contribution on a discriminator item.
 - $\eta$: logit clamp parameter, $\eta\in(0,\tfrac12)$.
+- $D(h,g)$: declared pairwise discriminator set for unordered pair $\{h,g\}$.
+- $X_h^+,X_h^-$: expected and incompatible observables for hypothesis $h$.
 
 ** 2.2 Evidence objects
 \begin{definition}[Evidence object]
@@ -184,7 +189,7 @@ This section gives the publishable “machine semantics” of Abductio.
 \begin{definition}[Session state]
 A session state is a tuple
 \[
-\Sigma = (S,\ H,\ \R,\ E,\ \theta,\ B,\ \Pi,\ \Gamma,\ \Omega,\ L)
+\Sigma = (S,\ H,\ \R,\ E,\ \theta,\ B,\ \Pi,\ \Gamma_w,\ \Gamma_D,\ \Omega,\ L)
 \]
 where:
 - $S$ is the scope text,
@@ -194,7 +199,9 @@ where:
 - $\theta$ are configuration constants (including $\beta,W,\eta$ and thresholds),
 - $B$ is remaining credits,
 - $\Pi$ is the ledger distribution $p$ over roots (and residuals if enabled),
-- $\Gamma$ is applied-weight memory $w_{\mathrm{applied}}[h,s]$,
+- $\Gamma_w$ is unary applied-weight memory $w_{\mathrm{applied}}[h,s]$,
+- $\Gamma_D$ is comparative applied-weight memory
+  $q^{\mathrm{applied}}_{h,g,d}$,
 - $\Omega$ is structural state (decomposition trees, recursion instances, search counters),
 - $L$ is the audit log.
 \end{definition}
@@ -212,7 +219,7 @@ Otherwise:
 
 *Normative:* determinism includes tie-breaking (always by canonical keys), fixed reduction order, and deterministic numeric handling.
 
-* 7. Ledger Update Rule (Symmetric Log-Space with Delta-w Memory)
+* 7. Ledger Update Rule (Symmetric Log-Space with Memory)
 ** 7.1 Weight map
 \begin{definition}[Weight mapping]
 Given $(p_{h,s},k'_{h,s})$ define
@@ -238,6 +245,81 @@ Then set $\Gamma(h,s)\leftarrow w_{h,s}$ and $p\leftarrow p'$.
 \end{definition}
 
 DECOMPOSE and SEARCH must not modify $p$ or $\Gamma$.
+
+** 7.3 Contrastive discriminator update (normative default)
+Unary slot updates are admissible, but the default conformance profile for
+named-root competition is contrastive.
+
+\begin{definition}[Comparative contribution on discriminator items]
+For unordered pair $\{h,g\}$ and discriminator item $d\in D(h,g)$, an
+EVALUATE step computes
+\[
+q_{h,g,d}
+:=
+\clip\!\big(\beta_D\,v_{h,g,d}^{\lambda_D}\,m_d\,u_{h,g,d},\ -W_D,\ W_D\big),
+\]
+where:
+- $u_{h,g,d}\in[-1,1]$ is signed directionality
+  (positive favors $h$, negative favors $g$),
+- $v_{h,g,d}\in[0,1]$ is validity,
+- $m_d\in(0,1]$ is claim-type leverage.
+Antisymmetry is required:
+\[
+q_{g,h,d}=-q_{h,g,d}.
+\]
+\end{definition}
+
+\begin{definition}[Delta-q memory and comparative ledger increment]
+Maintain pair-memory $\Gamma_D(h,g,d)=q^{\mathrm{applied}}_{h,g,d}$.
+On EVALUATE:
+\[
+\Delta q_{h,g,d}:=q_{h,g,d}-\Gamma_D(h,g,d).
+\]
+Define per-root increment:
+\[
+\Delta \ell(h)
+=
+\sum_{g\neq h}\omega_{h,g}\sum_{d\in D(h,g)}\Delta q_{h,g,d},
+\quad
+\omega_{h,g}\ge 0,\ \sum_{g\neq h}\omega_{h,g}=1.
+\]
+Then:
+\[
+\tilde p(h):=p(h)e^{\Delta \ell(h)},\qquad p':=\mathrm{Normalize}(\tilde p),
+\]
+and update $\Gamma_D\leftarrow q$ for touched $(h,g,d)$.
+\end{definition}
+
+Non-discriminative updates must be bounded:
+\[
+|\Delta \ell_{\mathrm{noncontrast}}(h)|\le \epsilon_{\mathrm{nc}},
+\qquad \epsilon_{\mathrm{nc}}\ll W_D.
+\]
+
+\begin{proposition}[No-free-probability under contrastive memory]
+With Delta-$q$ memory, DECOMPOSE and SEARCH are belief-neutral; only
+EVALUATE can change $p$.
+\end{proposition}
+
+** 7.4 Causal commitment contradiction floor
+\begin{definition}[Contradiction penalty floor]
+Let $X_h^-$ be incompatible observables for hypothesis $h$.
+If a validated evidence item $e$ entails $x\in X_h^-$ with
+$v(e,h)\ge v_{\min}$, then EVALUATE must impose:
+\[
+\Delta \ell_{\mathrm{contra}}(h;e)\le -\kappa_{\mathrm{contra}}\,v(e,h),
+\quad \kappa_{\mathrm{contra}}>0.
+\]
+\end{definition}
+
+This floor prevents contradictory-but-plausible narratives from drifting
+upward due to generic support elsewhere.
+
+** 7.5 Explaining-away requirement
+When two hypotheses compete on the same discriminator item, positive
+evidence for one must induce a corresponding negative comparative term for
+the rival (via antisymmetry), unless the pair is explicitly declared
+jointly compatible under a logged exception policy.
 
 * 8. Validity Weighting and Claim-Type Leverage
 ** 8.1 Validity scalar
@@ -346,11 +428,17 @@ Soft-AND is not associative for $c\in(0,1)$; thus tree shape can matter. Abducti
 Define for each named hypothesis $h$:
 \[
 \mathrm{priority}(h)
-=\Big(p(h)(1-p(h))+\lambda_{\mathrm{voi}}/|H|\Big)\cdot (1-k(h))\cdot s(h)\cdot \phi(h),
+=\Big(p(h)(1-p(h))+\lambda_{\mathrm{voi}}/|H|\Big)\cdot (1-k(h))\cdot s(h)\cdot \phi(h)\cdot \psi(h),
 \]
 with deterministic tie-break by canonical key.
 
 This proxy is interpretable as: “high uncertainty $\times$ low confidence $\times$ in-scope.”
+
+Here $\psi(h)\in(0,1]$ is discriminator-deficit pressure, for example
+\[
+\psi(h)=\epsilon_D + (1-\epsilon_D)\cdot \frac{U_h}{\max_{g}U_g+\delta},
+\]
+where $U_h$ is unresolved discriminator mass involving $h$.
 
 ** 11.2 Frontier and cycle discipline
 Let $h^\star$ be the argmax priority. Define frontier band
@@ -360,6 +448,18 @@ F:=\{h:\ \mathrm{priority}(h)\ge \mathrm{priority}(h^\star)-\epsilon\},
 iterated in sorted key order, round-robin, one operation per hypothesis per cycle.
 
 This ensures symmetry and blocks focal privilege.
+
+** 11.2A Minimum discriminator coverage checkpoint
+Define
+\[
+\mathrm{coverage}_{\mathrm{disc}}
+=
+\frac{\#\{\text{required pairwise discriminators with at least one valid scored item}\}}
+{\#\{\text{required pairwise discriminators}\}}.
+\]
+If coverage stagnates below threshold for $N_{\mathrm{stagnant}}$ cycles
+while credits are consumed, the session must emit a discriminator-deficit
+anomaly and increase abstention pressure (Section 14A).
 
 ** 11.3 Deterministic symmetric search
 SEARCH is a first-class credit operation that may add evidence to $E$ but must not change $p$.
@@ -377,10 +477,47 @@ SEARCH queries are deterministically generated from
 \[
 (S,\ h.\mathrm{statement},\ s.\mathrm{statement},\ d,\ \mathrm{role}).
 \]
+When pairwise discriminator deficits are nonzero, query templates must
+prioritize unresolved discriminator targets before broad expansion.
 Results are admitted only if snapshotted and hashed into $E$ with deterministic ordering and immutable text storage.
 \end{definition}
 
 *Robustness difficulty addressed:* efficiency vs determinism. This system permits *adaptive allocation* only with respect to coverage deficits and confidence (slot $k$), not with respect to whether interim results support a leader. This preserves safety against p-hacking while still focusing on uncertainty.
+
+** 11.4 Strict MECE certificate gate (normative when enabled)
+\begin{definition}[MECE certificate]
+For named roots $H_{\mathrm{named}}$, a certificate is
+\[
+C=(O,\ D,\ \theta_{\mathrm{overlap}},\ \mathrm{strict})
+\]
+where:
+- $O:\binom{H_{\mathrm{named}}}{2}\to[0,2]$ gives pairwise overlap scores,
+- $D:\binom{H_{\mathrm{named}}}{2}\to\Sigma^+$ gives non-empty pairwise discriminators,
+- $\theta_{\mathrm{overlap}}\in[0,2]$ is the maximum allowed overlap,
+- $\mathrm{strict}\in\{0,1\}$ enables full pair coverage requirements.
+\end{definition}
+
+\begin{definition}[Strict validity]
+If $\mathrm{strict}=1$, certificate $C$ is valid iff for every unordered pair
+$\{h_i,h_j\}\subset H_{\mathrm{named}}$:
+1) $O(h_i,h_j)$ is present and $O(h_i,h_j)\le \theta_{\mathrm{overlap}}$,
+2) $D(h_i,h_j)$ is present and non-empty after normalization.
+\end{definition}
+
+\begin{definition}[Inferential activation under strict mode]
+If strict mode is enabled and certificate validity holds, each paid
+named-root EVALUATE must either:
+1) score at least one active discriminator item from $D(h_i,h_j)$, or
+2) be tagged non-discriminative and bounded by
+   $|\Delta \ell_{\mathrm{noncontrast}}|\le \epsilon_{\mathrm{nc}}$.
+\end{definition}
+
+\begin{proposition}[Fail-fast safety]
+When strict mode is enabled, if certificate validity fails, the session MUST:
+1) halt before any paid operation,
+2) consume zero credits,
+3) emit an auditable stop reason \texttt{MECE\_CERTIFICATE\_FAILED} with machine-readable issue records.
+\end{proposition}
 
 * 12. Recursion: Nested Abductio Instances (Local MECE Attempts)
 Recursion is the principal extension and the main source of subtle inflation risks. This section provides the strongest safe formalization.
@@ -487,6 +624,23 @@ Under the residual admissibility rule (Section 9.3), if mismatch $M$ and underde
 Residual update policy is a deterministic monotone function of $(M,U)$ with zero increase when both are below thresholds.
 \end{proof}
 
+** 13.6 Bounded drift under non-discriminative evidence
+\begin{proposition}[Bounded non-contrastive drift]
+If an EVALUATE step is tagged non-discriminative and obeys
+$|\Delta \ell_{\mathrm{noncontrast}}(h)|\le \epsilon_{\mathrm{nc}}$ for all
+named roots, then post-step log-odds changes are bounded by
+$2\epsilon_{\mathrm{nc}}$ for every pair.
+\end{proposition}
+
+\begin{proof}
+For any pair $(h,g)$, change in log-odds is
+$\Delta \log\frac{p(h)}{p(g)}=\Delta \ell(h)-\Delta \ell(g)$.
+Each term is bounded in magnitude by $\epsilon_{\mathrm{nc}}$, so the
+difference is bounded by $2\epsilon_{\mathrm{nc}}$.
+\end{proof}
+
+This ensures non-adjudicative updates cannot dominate selection.
+
 * 14. Algorithm (Normative Pseudocode)
 #+begin_src text
 INPUT: scope S, roots H (statements + exclusions + applicability), evidence E0, credits B, config θ, regimes R
@@ -496,47 +650,98 @@ INIT:
   set initial ledger p (uniform over named; residual split if enabled)
   set all slot nodes to p=0.5, k=0.15, validity blank
   set w_applied[h,s]=0 for required slots
+  set q_applied[h,g,d]=0 for required discriminator entries
   set search counters C_search[h,s,d]=0
   set evidence hash H0 = Hash(E0)
 
 LOOP while B>0:
   compute regime posterior P(r|E) deterministically, log it
   compute scope scores s(h) = Σ_r P(r|E)A_h(r)
+  compute unresolved discriminator deficits U_h
   enforce scope soft caps on named hypotheses (log caps & renorm)
-  compute priority(h) = (p(1-p)+λ/|H|)(1-k(h))s(h)φ(h)
+  compute priority(h) = (p(1-p)+λ/|H|)(1-k(h))s(h)φ(h)ψ(h)
   define frontier band F and iterate in canonical key order
 
   for h in F (one operation each, round-robin):
-    choose target slot s*: lowest k among required slots (tie-break canonical)
+    choose target slot s*: lowest effective k among required slots
+      (tie-break canonical). Effective k is recursively propagated slot
+      confidence after applicable policy caps/penalties.
     choose operation deterministically:
       if root unscoped or missing template -> DECOMPOSE(root)
+      else if coverage deficit and symmetric quota permits -> SEARCH(h,s*,depth,target=highest unresolved discriminator pair)
+      else if has unassessed target under s* -> EVALUATE(s*)
       else if recursion warranted for node v and depth allows -> DECOMPOSE(v) into local instance (belief-neutral)
-      else if coverage deficit and symmetric quota permits -> SEARCH(h,s*,depth)
-      else if can decompose s* and k(s*)<τ -> DECOMPOSE(s*)
+      else if can decompose s* and k_eff(s*)<τ -> DECOMPOSE(s*)
       else -> EVALUATE(s*)  # only op that moves ledger
+
+    legality guard:
+      slot/subnode DECOMPOSE is forbidden while any required root slot remains unassessed
 
     apply operation:
       SEARCH: retrieve evidence deterministically, snapshot+hash, add to E, log; do NOT change p
       DECOMPOSE: add children / local instance; do NOT change p
       EVALUATE: obtain (p_node, k_node, validity artifacts)
-        compute v and m_type, compute k' = k*v^λ*m_type
-        compute w_new = clip(β k' logit(clip(p_node,η,1-η)),-W,W)
-        Δw = w_new - w_applied[h,s*]
-        p(h) *= exp(Δw); normalize; set w_applied[h,s*]=w_new
+        compute v and m_type
+        compute contradiction penalties from X_h^- (with configured floor)
+        compute q_new[h,g,d] on active discriminator items
+        Δq[h,g,d] = q_new[h,g,d] - q_applied[h,g,d]
+        Δell[h] = Σ_g Σ_d ω[h,g]Δq[h,g,d]
+        bound non-discriminative uplift by ε_nc
+        update all named roots via p(h)*=exp(Δell[h]); normalize
+        set q_applied <- q_new for touched discriminator items
         update root confidence k(h) deterministically from slots
         update residuals via admissibility policy; log all arithmetic
 
     B -= 1
     enforce invariants (no-free-probability, quota parity, min-eval-share, etc.)
 END
+apply abstention trigger before decisive winner reporting
 OUTPUT: (p(h),k(h)) + full audit log + evidence snapshots
 #+end_src
+
+* 14A. Principled Abstention Semantics (Normative)
+\begin{definition}[Abstention trigger]
+Let $h_{(1)},h_{(2)}$ be top two named hypotheses by ledger mass and
+\[
+m:=p(h_{(1)})-p(h_{(2)}).
+\]
+Let $\Upsilon$ be unresolved discriminator mass and
+$\mathrm{VOI}_{\max}^{\mathrm{disc}}$ be the best remaining
+discriminator-targeted expected gain proxy.
+Abstention is required when, at legal stop time:
+\[
+m<\delta_{\mathrm{win}}
+\quad\text{and}\quad
+\bigl(\Upsilon>\tau_{\Upsilon}\ \text{or}\ \mathrm{VOI}_{\max}^{\mathrm{disc}}<\nu_{\min}\bigr).
+\]
+\end{definition}
+
+Outcome policy:
+- OPEN_WORLD: allocate dominant residual to $h_{\mathrm{UND}}$ and mark
+  outcome non-decisive.
+- CLOSED_WORLD: emit a non-decisive underdetermination flag (no forced
+  single winner claim).
 
 * 15. Interpretation Contract (Claims Policy)
 1) $p(h)$ is a *session-scoped credence allocation* over a MECE attempt, not automatically a calibrated probability of truth.
 2) $k(h)$ measures robustness of the assessment under re-audit/adversarial checking.
 3) Only paid evaluations (EVALUATE) may move the ledger.
 4) High $p(h)$ with low applicability $s(h)$ is a flagged anomaly, not a confident conclusion.
+5) If abstention trigger conditions hold (Section 14A), reporting a
+   decisive winner violates conformance.
+
+** 15.1 Calibration layer (separate from inference)
+For empirical probability reporting, define a monotone calibrator
+$c:[0,1]\to[0,1]$ learned on resolved historical runs (walk-forward or
+strict time split):
+\[
+\hat p_{\mathrm{cal}} = c(\hat p_{\mathrm{raw}}).
+\]
+Normative boundary:
+- calibration does not alter session transitions, legality, or audit
+  arithmetic,
+- calibration version, training window, and evaluation metrics
+  (Brier/log-loss/ECE) must be logged.
 
 * 16. Configuration Defaults (Illustrative)
 - required slots: Feasibility, Availability, Fit, Defeater
@@ -591,4 +796,3 @@ A recursive node $v$ is admissible only if:
 - Evaluator: returns $(p,k)$ plus grounding artifacts, entailment labels, claim type, defeaters, assumptions.
 - Decomposer: returns children with types NEC/EVID and deterministic coupling/overlap metadata.
 - Searcher: returns deterministic ordered evidence items + snapshot hash; must persist immutable text for replay.
-

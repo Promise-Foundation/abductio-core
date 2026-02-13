@@ -1,0 +1,80 @@
+{
+  "case_id": "Boeing_737-8AS_9H-QAA_12-25",
+  "question": "Given this aviation incident case packet, provide a ranked list of the most likely causal explanations for the failure, and for each cause include (1) credence and (2) confidence.",
+  "ranked_causes": [
+    {
+      "rank": 1,
+      "cause_id": "GROK_C1",
+      "cause_label": "Distraction of the tug instructor due to multitasking (focusing on training/communicating with the trainee while driving)",
+      "mapped_root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "raw_credence_percent": 80.0,
+      "likelihood": 0.34782609,
+      "confidence_label": "High",
+      "confidence": 0.85
+    },
+    {
+      "rank": 2,
+      "cause_id": "GROK_C2",
+      "cause_label": "Failure of other ground crew members to intervene or communicate a warning",
+      "mapped_root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "raw_credence_percent": 60.0,
+      "likelihood": 0.26086957,
+      "confidence_label": "High",
+      "confidence": 0.85
+    },
+    {
+      "rank": 3,
+      "cause_id": "GROK_C3",
+      "cause_label": "Inadequate prominence or visibility of the Tug Release Point (TRP) marking",
+      "mapped_root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "raw_credence_percent": 40.0,
+      "likelihood": 0.17391304,
+      "confidence_label": "Medium",
+      "confidence": 0.65
+    },
+    {
+      "rank": 4,
+      "cause_id": "GROK_C4",
+      "cause_label": "Lack of opposing thrust from the aircraft's engines (allowing the tug to continue moving at idle power)",
+      "mapped_root_id": null,
+      "raw_credence_percent": 30.0,
+      "likelihood": 0.13043478,
+      "confidence_label": "Medium",
+      "confidence": 0.65
+    },
+    {
+      "rank": 5,
+      "cause_id": "GROK_C5",
+      "cause_label": "Inexperience or training gaps in the team",
+      "mapped_root_id": null,
+      "raw_credence_percent": 20.0,
+      "likelihood": 0.08695652,
+      "confidence_label": "Medium",
+      "confidence": 0.65
+    }
+  ],
+  "residuals": {
+    "underdetermined": 0.0,
+    "none_of_above": 0.0
+  },
+  "decision": {
+    "winner_id": "GROK_C1",
+    "winner_likelihood": 0.34782609,
+    "winner_confidence": 0.85,
+    "top2_margin": 0.08695652,
+    "status": "DECISIVE"
+  },
+  "normalization": {
+    "method": "proportional_rescale",
+    "raw_credence_sum_percent": 230.0,
+    "note": "Raw credences from source response did not sum to 100%; values were rescaled proportionally to produce a valid probability distribution for comparison."
+  },
+  "meta": {
+    "system": "llm_direct",
+    "model": "grok expert",
+    "created_at_utc": "2026-02-12T05:21:07Z",
+    "source_type": "user_supplied_external_result",
+    "source_file": "/Users/davidjoseph/github/abductio-core/case_studies/data/UK_AAIB_Reports/results/comparisons/Boeing_737-8AS_9H-QAA_12-25/20260212T052107Z_grok_expert/raw_response.txt",
+    "source_url": "https://grok.com/share/c2hhcmQtMw_75280523-061e-4a46-96f0-8af66bc90ba0"
+  }
+}

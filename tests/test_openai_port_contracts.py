@@ -13,6 +13,9 @@ def test_validate_evaluation_accepts_valid_payload() -> None:
         "C": 1,
         "D": 0,
         "evidence_ids": ["EV-1"],
+        "discriminator_ids": [],
+        "discriminator_payloads": [],
+        "entailment": "NEUTRAL",
         "evidence_quality": "direct",
         "reasoning_summary": "Supported by EV-1.",
         "defeaters": ["None observed."],
@@ -36,6 +39,58 @@ def test_validate_evaluation_rejects_bad_ranges() -> None:
         "C": 1,
         "D": 1,
         "evidence_ids": ["EV-1"],
+        "discriminator_ids": [],
+        "discriminator_payloads": [],
+        "entailment": "NEUTRAL",
+        "evidence_quality": "direct",
+        "reasoning_summary": "Supported by EV-1.",
+        "defeaters": ["None observed."],
+        "uncertainty_source": "Limited evidence.",
+        "assumptions": [],
+    }
+    with pytest.raises(RuntimeError):
+        _validate_evaluation(payload)
+
+
+def test_validate_evaluation_rejects_discriminator_payload_mismatch() -> None:
+    payload = {
+        "p": 0.6,
+        "A": 2,
+        "B": 1,
+        "C": 1,
+        "D": 0,
+        "evidence_ids": ["EV-1"],
+        "discriminator_ids": ["disc:H1|H2"],
+        "discriminator_payloads": [
+            {
+                "id": "disc:OTHER",
+                "pair": "H1|H2",
+                "direction": "FAVORS_LEFT",
+                "evidence_ids": ["EV-1"],
+            }
+        ],
+        "entailment": "SUPPORTS",
+        "evidence_quality": "direct",
+        "reasoning_summary": "Supported by EV-1.",
+        "defeaters": ["None observed."],
+        "uncertainty_source": "Limited evidence.",
+        "assumptions": [],
+    }
+    with pytest.raises(RuntimeError):
+        _validate_evaluation(payload)
+
+
+def test_validate_evaluation_rejects_invalid_entailment() -> None:
+    payload = {
+        "p": 0.6,
+        "A": 2,
+        "B": 1,
+        "C": 1,
+        "D": 0,
+        "evidence_ids": ["EV-1"],
+        "discriminator_ids": [],
+        "discriminator_payloads": [],
+        "entailment": "MAYBE",
         "evidence_quality": "direct",
         "reasoning_summary": "Supported by EV-1.",
         "defeaters": ["None observed."],

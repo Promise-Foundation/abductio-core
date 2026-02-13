@@ -1,0 +1,166 @@
+{
+  "config": {
+    "W": 3.0,
+    "alpha": 0.4,
+    "beta": 1.0,
+    "epsilon": 0.05,
+    "gamma": 0.2,
+    "gamma_noa": 0.1,
+    "gamma_und": 0.1,
+    "lambda_voi": 0.1,
+    "rho_eval_min": 0.5,
+    "tau": 0.7,
+    "world_mode": "open"
+  },
+  "credits": 40,
+  "evidence_items": [
+    {
+      "id": "H1",
+      "source": "history",
+      "text": "A tug driving instructor (tug instructor) and trainee tug driver (trainee driver) were seated beside each other in the tug. The flight crew were in communication with the headset operator via the aircraft\u2019s interphone."
+    },
+    {
+      "id": "H2",
+      "source": "history",
+      "text": "The trainee driver decided to stop the pushback and asked the tug instructor to take over."
+    },
+    {
+      "id": "H3",
+      "source": "history",
+      "text": "After swapping seats the instructor recommenced the pushback, correcting the aircraft back onto the taxiway centreline. He continued to reassure and advise the trainee while performing the pushback, looking at her while doing so. The headset operator continued walking on the right side of the tug, abeam its cabin. The wingman was on the left just ahead of the tug."
+    },
+    {
+      "id": "H4",
+      "source": "history",
+      "text": "The aircraft\u2019s nosewheel reached the \u2018Tug release point\u2019 (TRP) ground markings. However, it continued moving beyond the TRP with its engine at idle and hit the blast barrier at the end of the cul-de-sac."
+    },
+    {
+      "id": "H5",
+      "source": "history",
+      "text": "The tug instructor pulled the aircraft forward off the fence then stopped the tug."
+    }
+  ],
+  "force_scope_fail_root": null,
+  "framing": null,
+  "initial_ledger": null,
+  "max_pair_overlap": 1.0,
+  "max_search_depth": null,
+  "max_search_per_node": null,
+  "mece_certificate": {
+    "max_pair_overlap": 1.0,
+    "pairwise_discriminators": {
+      "R1_PUSHBACK_PROCEDURAL_DEVIATION|R2_COMMUNICATION_BREAKDOWN": "Stop-point and continuation behavior under aligned crew model distinguishes procedural deviation from coordination failure.",
+      "R1_PUSHBACK_PROCEDURAL_DEVIATION|R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": "Marker adequacy and visibility evidence separates procedural non-compliance from environmental deficiency.",
+      "R1_PUSHBACK_PROCEDURAL_DEVIATION|R4_MECHANICAL_CONTROL_FAILURE": "Equipment fault traces or bench checks separate control malfunction from operator procedural deviation.",
+      "R2_COMMUNICATION_BREAKDOWN|R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": "Challenge/alert behavior and shared-model mismatches discriminate crew coordination failures from deficient markings.",
+      "R2_COMMUNICATION_BREAKDOWN|R4_MECHANICAL_CONTROL_FAILURE": "Communication failures without corroborated hardware faults separate coordination breakdown from mechanical failure.",
+      "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY|R4_MECHANICAL_CONTROL_FAILURE": "Physical marking/location evidence versus verified fault codes or repeat malfunctions distinguishes environmental deficiency from control failure."
+    },
+    "pairwise_overlaps": {
+      "R1_PUSHBACK_PROCEDURAL_DEVIATION|R2_COMMUNICATION_BREAKDOWN": 1,
+      "R1_PUSHBACK_PROCEDURAL_DEVIATION|R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": 1,
+      "R1_PUSHBACK_PROCEDURAL_DEVIATION|R4_MECHANICAL_CONTROL_FAILURE": 0,
+      "R2_COMMUNICATION_BREAKDOWN|R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": 1,
+      "R2_COMMUNICATION_BREAKDOWN|R4_MECHANICAL_CONTROL_FAILURE": 1,
+      "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY|R4_MECHANICAL_CONTROL_FAILURE": 1
+    }
+  },
+  "policy": {
+    "closure_active_set_adjudication_required": true,
+    "closure_active_set_mass_ratio": 0.6,
+    "closure_active_set_size": 3,
+    "closure_min_pairwise_coverage_ratio": 1.0,
+    "compositional_story_auto_expand": true,
+    "contender_space_mode": "compositional_stories",
+    "contender_story_max_cardinality": 2,
+    "contrastive_budget_partition_enabled": true,
+    "coverage_confidence_cap_base": 0.4,
+    "coverage_confidence_cap_enabled": true,
+    "coverage_confidence_cap_gain": 0.5,
+    "decision_active_set_enabled": true,
+    "decision_active_set_mass_ratio": 0.6,
+    "decision_active_set_size": 3,
+    "decision_contract_enabled": true,
+    "decision_min_pairwise_coverage_ratio": 1.0,
+    "decision_min_winner_margin": 0.15,
+    "decision_require_counterevidence_probe": true,
+    "decision_require_loser_falsification": true,
+    "dynamic_abstention_contradiction_density_weight": 0.25,
+    "dynamic_abstention_frame_adequacy_weight": 0.1,
+    "dynamic_abstention_mass_enabled": true,
+    "dynamic_abstention_mass_maximum": 0.9,
+    "dynamic_abstention_mass_minimum": 0.05,
+    "dynamic_abstention_non_discriminative_weight": 0.2,
+    "dynamic_abstention_unresolved_pair_weight": 0.3,
+    "dynamic_abstention_v2_enabled": true,
+    "evidence_discrimination_tags_required": true,
+    "fixed_abstention_dominant_floor_enabled": false,
+    "hunter_judge_split_enabled": true,
+    "hunter_phase_search_loan_credits": 6,
+    "judge_phase_symmetric_verification_required": true,
+    "min_contrastive_discriminator_credits": 2,
+    "min_counterevidence_credits": 1,
+    "pair_adjudication_active_set_mass_ratio": 0.6,
+    "pair_adjudication_active_set_size": 3,
+    "pair_adjudication_queue_enabled": true,
+    "pair_adjudication_scope": "active_set",
+    "pair_resolution_engine_enabled": true,
+    "pair_resolution_max_contradiction_density": 0.45,
+    "pair_resolution_min_directional_evidence_count": 1,
+    "pair_resolution_min_directional_margin": 0.15,
+    "pair_resolution_winner_update_gain": 0.2,
+    "pair_value_prioritization_enabled": true,
+    "reasoning_mode": "certify",
+    "reasoning_profile": "causal_investigation",
+    "strict_contrastive_updates_required": true,
+    "strict_non_discriminative_margin_epsilon": 0.0,
+    "typed_discriminator_evidence_required": true
+  },
+  "pre_scoped_roots": null,
+  "required_slots": [
+    {
+      "role": "NEC",
+      "slot_key": "availability"
+    },
+    {
+      "role": "NEC",
+      "slot_key": "fit_to_key_features"
+    },
+    {
+      "role": "NEC",
+      "slot_key": "defeater_resistance"
+    }
+  ],
+  "roots": [
+    {
+      "exclusion_clause": "Not explained by any other root",
+      "root_id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+      "statement": "Procedural deviation in pushback execution"
+    },
+    {
+      "exclusion_clause": "Not explained by any other root",
+      "root_id": "R2_COMMUNICATION_BREAKDOWN",
+      "statement": "Communication/coordination breakdown among crew"
+    },
+    {
+      "exclusion_clause": "Not explained by any other root",
+      "root_id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+      "statement": "Environmental/marking deficiency"
+    },
+    {
+      "exclusion_clause": "Not explained by any other root",
+      "root_id": "R4_MECHANICAL_CONTROL_FAILURE",
+      "statement": "Mechanical/control failure"
+    }
+  ],
+  "run_count": null,
+  "run_mode": null,
+  "run_target": null,
+  "scope": "Boeing_737-8AS_9H-QAA_12-25:hist_composition_t1_early",
+  "search_deterministic": null,
+  "search_enabled": null,
+  "search_quota_per_slot": null,
+  "slot_initial_p": null,
+  "slot_k_min": null,
+  "strict_mece": true
+}

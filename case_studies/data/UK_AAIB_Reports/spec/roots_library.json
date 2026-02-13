@@ -2,6 +2,27 @@
   "root_sets": {
     "AAIB_GROUND_COLLISION_S1_v1": {
       "description": "Single proximate mechanism for ground collision during pushback/taxi",
+      "strict_mece_default": true,
+      "max_pair_overlap": 1.0,
+      "mece_certificate": {
+        "max_pair_overlap": 1.0,
+        "pairwise_overlaps": {
+          "R1_PUSHBACK_PROCEDURAL_DEVIATION|R2_COMMUNICATION_BREAKDOWN": 1,
+          "R1_PUSHBACK_PROCEDURAL_DEVIATION|R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": 1,
+          "R1_PUSHBACK_PROCEDURAL_DEVIATION|R4_MECHANICAL_CONTROL_FAILURE": 0,
+          "R2_COMMUNICATION_BREAKDOWN|R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": 1,
+          "R2_COMMUNICATION_BREAKDOWN|R4_MECHANICAL_CONTROL_FAILURE": 1,
+          "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY|R4_MECHANICAL_CONTROL_FAILURE": 1
+        },
+        "pairwise_discriminators": {
+          "R1_PUSHBACK_PROCEDURAL_DEVIATION|R2_COMMUNICATION_BREAKDOWN": "Stop-point and continuation behavior under aligned crew model distinguishes procedural deviation from coordination failure.",
+          "R1_PUSHBACK_PROCEDURAL_DEVIATION|R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": "Marker adequacy and visibility evidence separates procedural non-compliance from environmental deficiency.",
+          "R1_PUSHBACK_PROCEDURAL_DEVIATION|R4_MECHANICAL_CONTROL_FAILURE": "Equipment fault traces or bench checks separate control malfunction from operator procedural deviation.",
+          "R2_COMMUNICATION_BREAKDOWN|R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": "Challenge/alert behavior and shared-model mismatches discriminate crew coordination failures from deficient markings.",
+          "R2_COMMUNICATION_BREAKDOWN|R4_MECHANICAL_CONTROL_FAILURE": "Communication failures without corroborated hardware faults separate coordination breakdown from mechanical failure.",
+          "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY|R4_MECHANICAL_CONTROL_FAILURE": "Physical marking/location evidence versus verified fault codes or repeat malfunctions distinguishes environmental deficiency from control failure."
+        }
+      },
       "roots": [
         {
           "id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
@@ -56,6 +77,94 @@
             {
               "id": "NEC_CORROBORATION",
               "description": "Corroborating evidence (tests, fault codes, repeated failures)"
+            }
+          ]
+        },
+        {
+          "id": "H_OTHER",
+          "label": "Other / undetermined",
+          "nec_slots": [],
+          "policy": "Use when key NEC slots for any root are not supportable from E_T."
+        }
+      ]
+    },
+    "AAIB_GROUND_COLLISION_S1_boeing_v2": {
+      "description": "Boeing 9H-QAA proximate-cause partition with tighter primary-cause boundaries",
+      "strict_mece_default": true,
+      "max_pair_overlap": 1.0,
+      "mece_certificate": {
+        "max_pair_overlap": 1.0,
+        "pairwise_overlaps": {
+          "R1_PUSHBACK_PROCEDURAL_DEVIATION|R2_COMMUNICATION_BREAKDOWN": 1,
+          "R1_PUSHBACK_PROCEDURAL_DEVIATION|R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": 1,
+          "R1_PUSHBACK_PROCEDURAL_DEVIATION|R4_MECHANICAL_CONTROL_FAILURE": 0,
+          "R2_COMMUNICATION_BREAKDOWN|R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": 1,
+          "R2_COMMUNICATION_BREAKDOWN|R4_MECHANICAL_CONTROL_FAILURE": 1,
+          "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY|R4_MECHANICAL_CONTROL_FAILURE": 1
+        },
+        "pairwise_discriminators": {
+          "R1_PUSHBACK_PROCEDURAL_DEVIATION|R2_COMMUNICATION_BREAKDOWN": "Evidence that the active tug instructor passed the TRP while still controlling pushback supports R1; evidence that TRP stop-state was not shared/understood before exceedance supports R2.",
+          "R1_PUSHBACK_PROCEDURAL_DEVIATION|R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": "If crew recognized the TRP and expected stopping but motion continued, R1 dominates; if TRP visibility/placement was inadequate enough to explain the miss absent attention lapse, R3 dominates.",
+          "R1_PUSHBACK_PROCEDURAL_DEVIATION|R4_MECHANICAL_CONTROL_FAILURE": "Passing the TRP without corroborated malfunction supports R1; verified braking/control faults or repeatable failure signatures support R4.",
+          "R2_COMMUNICATION_BREAKDOWN|R3_ENVIRONMENT_OR_MARKING_DEFICIENCY": "Assumption/deference and failure to challenge despite cues supports R2; inadequate TRP marking/visibility as the key miss mechanism supports R3.",
+          "R2_COMMUNICATION_BREAKDOWN|R4_MECHANICAL_CONTROL_FAILURE": "Coordination failures without hardware evidence support R2; fault codes, tests, or repeat malfunctions support R4.",
+          "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY|R4_MECHANICAL_CONTROL_FAILURE": "Physical marking salience/location deficiencies support R3; corroborated control-system malfunction evidence supports R4."
+        }
+      },
+      "roots": [
+        {
+          "id": "R1_PUSHBACK_PROCEDURAL_DEVIATION",
+          "label": "Primary pushback control lapse: active tug instructor failed to stop at TRP",
+          "nec_slots": [
+            {
+              "id": "NEC_STOP_POINT_NOT_OBSERVED",
+              "description": "The required TRP stop/release point was reached but not complied with"
+            },
+            {
+              "id": "NEC_MOVEMENT_CONTINUED_UNTIL_CONTACT",
+              "description": "Pushback movement continued beyond TRP until blast-fence contact"
+            }
+          ]
+        },
+        {
+          "id": "R2_COMMUNICATION_BREAKDOWN",
+          "label": "Primary coordination failure: challenge/alert breakdown among ground crew",
+          "nec_slots": [
+            {
+              "id": "NEC_MISALIGNMENT_IN_SHARED_MODEL",
+              "description": "Crew held divergent assumptions about stop-state or intent"
+            },
+            {
+              "id": "NEC_FAILURE_TO_CHALLENGE_OR_ALERT",
+              "description": "No timely effective challenge or stop warning occurred despite cues"
+            }
+          ]
+        },
+        {
+          "id": "R3_ENVIRONMENT_OR_MARKING_DEFICIENCY",
+          "label": "Primary environmental/marking deficiency at TRP",
+          "nec_slots": [
+            {
+              "id": "NEC_MARKING_INADEQUATE",
+              "description": "TRP marking visibility/prominence/placement was inadequate"
+            },
+            {
+              "id": "NEC_CONTRIBUTED_TO_ERROR",
+              "description": "The marking deficiency plausibly caused or materially enabled the TRP miss"
+            }
+          ]
+        },
+        {
+          "id": "R4_MECHANICAL_CONTROL_FAILURE",
+          "label": "Primary mechanical or control-system failure",
+          "nec_slots": [
+            {
+              "id": "NEC_EQUIPMENT_MALFUNCTION",
+              "description": "A tug or aircraft control/braking malfunction affected stopping"
+            },
+            {
+              "id": "NEC_CORROBORATION",
+              "description": "Corroboration exists via tests, diagnostics, or repeat failures"
             }
           ]
         },

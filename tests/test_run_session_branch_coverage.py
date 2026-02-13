@@ -45,6 +45,15 @@ class ChildDecomposer:
 
 
 @dataclass
+class RootOnlyDecomposer:
+    def has_decomposition(self, target_id: str) -> bool:
+        return ":" not in target_id
+
+    def decompose(self, target_id: str) -> Dict[str, Any]:
+        return {"ok": True, "feasibility_statement": f"{target_id} feasible"}
+
+
+@dataclass
 class NoopEvaluator:
     def evaluate(
         self,
@@ -54,6 +63,26 @@ class NoopEvaluator:
         evidence_items: List[Any] | None = None,
     ) -> Dict[str, Any]:
         return {}
+
+
+@dataclass
+class StrongEvidenceEvaluator:
+    def evaluate(
+        self,
+        node_key: str,
+        statement: str = "",
+        context: Dict[str, Any] | None = None,
+        evidence_items: List[Any] | None = None,
+    ) -> Dict[str, Any]:
+        return {
+            "p": 0.80,
+            "A": 2,
+            "B": 2,
+            "C": 2,
+            "D": 2,
+            "evidence_ids": ["E1"],
+            "evidence_quality": "direct",
+        }
 
 
 def _deps() -> RunSessionDeps:
@@ -123,6 +152,91 @@ def test_aggregate_soft_and_no_assessed_children() -> None:
     assert value == 0.5
     assert details["p_min"] == 0.5
     assert details["p_prod"] == 0.5
+
+
+def test_propagate_parent_k_and_or_with_caps() -> None:
+    and_parent = Node(node_key="H1:slot_and", statement="slot", role="NEC", decomp_type="AND")
+    and_parent.children = ["H1:slot_and:c1", "H1:slot_and:c2"]
+    and_children = {
+        "H1:slot_and:c1": Node(
+            node_key="H1:slot_and:c1",
+            statement="c1",
+            role="UNSCOPED",
+            assessed=True,
+            p=0.9,
+            k=0.9,
+        ),
+        "H1:slot_and:c2": Node(
+            node_key="H1:slot_and:c2",
+            statement="c2",
+            role="NEC",
+            assessed=True,
+            p=0.8,
+            k=0.75,
+        ),
+    }
+    k_and, details_and = rs._propagate_parent_k(and_parent, and_children)
+    assert k_and == 0.4
+    assert details_and["rule"] == "AND_MIN_K"
+    assert details_and["unscoped_cap_applied"] is True
+
+    or_parent = Node(node_key="H1:slot_or", statement="slot", role="NEC", decomp_type="OR")
+    or_parent.children = ["H1:slot_or:a", "H1:slot_or:b"]
+    or_children = {
+        "H1:slot_or:a": Node(
+            node_key="H1:slot_or:a",
+            statement="a",
+            role="EVID",
+            assessed=True,
+            p=0.8,
+            k=0.35,
+        ),
+        "H1:slot_or:b": Node(
+            node_key="H1:slot_or:b",
+            statement="b",
+            role="EVID",
+            assessed=True,
+            p=0.8,
+            k=0.9,
+        ),
+    }
+    k_or, details_or = rs._propagate_parent_k(or_parent, or_children)
+    assert k_or == 0.35
+    assert details_or["rule"] == "OR_MAX_P_TIEBREAK"
+    assert details_or["decisive_child"] == "H1:slot_or:a"
+
+
+def test_propagate_parent_updates_recursive() -> None:
+    leaf = Node(node_key="H1:fit:c1", statement="leaf", role="NEC", assessed=True, p=0.6, k=0.35)
+    parent = Node(
+        node_key="H1:fit",
+        statement="parent",
+        role="NEC",
+        assessed=True,
+        p=0.5,
+        k=0.15,
+        decomp_type="AND",
+        coupling=0.8,
+        children=["H1:fit:c1"],
+    )
+    grand = Node(
+        node_key="H1:availability",
+        statement="grand",
+        role="NEC",
+        assessed=True,
+        p=0.5,
+        k=0.15,
+        decomp_type="OR",
+        children=["H1:fit"],
+    )
+    nodes = {leaf.node_key: leaf, parent.node_key: parent, grand.node_key: grand}
+    events = rs._propagate_parent_updates("H1:fit:c1", nodes)
+    event_types = [e.event_type for e in events]
+    assert "SOFT_AND_COMPUTED" in event_types
+    assert "SOFT_OR_COMPUTED" in event_types
+    assert "PARENT_K_PROPAGATED" in event_types
+    assert parent.k == 0.35
+    assert grand.k == 0.35
 
 
 def test_apply_node_decomposition_branches() -> None:
@@ -235,7 +349,7 @@ def test_frontier_confident_and_legal_next_helpers() -> None:
     nodes["H1:slot"] = Node(node_key="H1:slot", statement="", role="NEC", k=0.1, assessed=False)
     root.obligations["slot"] = "H1:slot"
     nxt = rs._legal_next_for_root(root, ["slot"], 0.7, nodes, credits_left=2)
-    assert nxt == ("DECOMPOSE", "H1:slot")
+    assert nxt == ("EVALUATE", "H1:slot")
 
     nodes["H1:slot"].decomp_type = "NONE"
     nxt = rs._legal_next_for_root(root, ["slot"], 0.7, nodes, credits_left=1)
@@ -271,6 +385,54 @@ def test_select_slot_for_evaluation_returns_node_key() -> None:
     nodes = {"H1:feasibility": Node(node_key="H1:feasibility", statement="", role="NEC", assessed=False)}
     root.obligations["feasibility"] = "H1:feasibility"
     assert rs._select_slot_for_evaluation(root, ["feasibility"], nodes) == "H1:feasibility"
+
+
+def test_policy_cap_is_applied_to_slots_and_blocks_frontier_confident_stop() -> None:
+    deps = RunSessionDeps(
+        evaluator=StrongEvidenceEvaluator(),
+        decomposer=RootOnlyDecomposer(),
+        audit_sink=MemAudit(),
+        searcher=NoopSearcher(),
+    )
+    req = _base_request()
+    req = req.__class__(
+        **{
+            **req.__dict__,
+            "config": SessionConfig(
+                tau=0.7,
+                epsilon=0.05,
+                gamma_noa=0.10,
+                gamma_und=0.10,
+                alpha=0.4,
+                beta=1.0,
+                W=3.0,
+                lambda_voi=0.1,
+                world_mode="open",
+                gamma=0.2,
+            ),
+            "credits": 8,
+            "required_slots": [
+                {"slot_key": "availability", "role": "NEC"},
+                {"slot_key": "fit_to_key_features", "role": "NEC"},
+                {"slot_key": "defeater_resistance", "role": "NEC"},
+            ],
+            "run_mode": "until_stops",
+            "pre_scoped_roots": ["H1"],
+            "evidence_items": [{"id": "E1", "source": "bdd", "text": "Evidence E1"}],
+            "policy": {
+                "reasoning_profile": "forecasting",
+                "historical_calibration_status": "unvalidated",
+                "forecasting_confidence_cap": 0.55,
+            },
+        }
+    )
+    res = rs.run_session(req, deps).to_dict_view()
+    assert res["stop_reason"] == "NO_LEGAL_OP"
+    assert res["stop_reason"] != "FRONTIER_CONFIDENT"
+    root = res["roots"]["H1"]
+    assert float(root["k_root"]) <= 0.55
+    for slot_key in ("availability", "fit_to_key_features", "defeater_resistance"):
+        assert float(root["obligations"][slot_key]["k"]) <= 0.55
 
 
 def test_evaluation_mode_continues_to_next_root() -> None:

@@ -6,6 +6,7 @@ or infrastructure code.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -17,8 +18,13 @@ except Exception:  # pragma: no cover - fallback for behave versions without Pen
 
 from abductio_core.application.dto import RootSpec, SessionConfig, SessionRequest
 from abductio_core.domain.canonical import canonical_id_for_statement
+from abductio_core.domain.invariants import H_NOA_ID, H_UND_ID
 from abductio_core.application.ports import RunSessionDeps
 from abductio_core.application.result import SessionResult
+from abductio_core.application.use_cases.run_simple_claim_session import (
+    DEFAULT_SIMPLE_CONFIG,
+    run_simple_claim_session,
+)
 from abductio_core.application.use_cases.run_session import run_session
 from tests.bdd.steps.support.deterministic_decomposer import DeterministicDecomposer
 from tests.bdd.steps.support.deterministic_evaluator import DeterministicEvaluator
@@ -49,6 +55,15 @@ class StepWorld:
     child_id_map: Dict[str, Dict[str, str]] = field(default_factory=dict)
     framing_a: Optional[str] = None
     framing_b: Optional[str] = None
+    mece_certificate: Dict[str, Any] = field(default_factory=dict)
+    strict_mece: Optional[bool] = None
+    max_pair_overlap: Optional[float] = None
+    simple_claim: Optional[str] = None
+    evidence_text_overrides: Dict[str, str] = field(default_factory=dict)
+    release_gate_summary: Dict[str, float] = field(default_factory=dict)
+    release_gate_thresholds: Dict[str, float] = field(default_factory=dict)
+    release_gate_report: Dict[str, Any] = field(default_factory=dict)
+    release_gate_domains_count: int = 0
 
     def mark_pending(self, message: str) -> None:
         raise Pending(message)
@@ -76,6 +91,15 @@ class StepWorld:
 
     def set_credits(self, credits: int) -> None:
         self.credits = credits
+
+    def set_simple_claim(self, claim: str) -> None:
+        self.simple_claim = str(claim or "").strip()
+
+    def set_evidence_item_text(self, evidence_id: str, text: str) -> None:
+        key = str(evidence_id or "").strip()
+        if not key:
+            return
+        self.evidence_text_overrides[key] = str(text)
 
     def set_decomposer_scope_roots(self, table: Optional[List[Dict[str, str]]] = None) -> None:
         self.decomposer_script["scope_roots"] = table or "all"
@@ -133,6 +157,17 @@ class StepWorld:
     def set_rubric(self, rubric: Dict[str, int]) -> None:
         self.rubric = rubric
 
+    def set_evaluator_context_strategy(self, strategy: str, **params: Any) -> None:
+        self.evaluator_script["context_strategy"] = str(strategy).strip()
+        emitter = self.evaluator_script.setdefault("context_emitter", {})
+        if not isinstance(emitter, dict):
+            emitter = {}
+            self.evaluator_script["context_emitter"] = emitter
+        emitter.setdefault("evidence_id", "ref_ctx")
+        emitter.setdefault("p", 0.72)
+        if params:
+            emitter.update(params)
+
     def _normalize_outcome(self, outcome: Dict[str, Any]) -> Dict[str, Any]:
         normalized = dict(outcome)
         if "evidence_ids" not in normalized and "evidence_refs" in normalized:
@@ -146,8 +181,54 @@ class StepWorld:
                 normalized["evidence_ids"] = [item.strip() for item in refs.split(",") if item.strip()]
         if "evidence_ids" not in normalized:
             normalized["evidence_ids"] = []
+        if "discriminator_ids" in normalized and isinstance(normalized.get("discriminator_ids"), str):
+            refs = str(normalized.get("discriminator_ids") or "").strip()
+            if refs in {"", "(empty)"}:
+                normalized["discriminator_ids"] = []
+            else:
+                normalized["discriminator_ids"] = [item.strip() for item in refs.split(",") if item.strip()]
+        if "discriminator_ids" not in normalized:
+            normalized["discriminator_ids"] = []
+        if "discriminator_payloads" in normalized and isinstance(normalized.get("discriminator_payloads"), str):
+            raw_payloads = str(normalized.get("discriminator_payloads") or "").strip()
+            if raw_payloads in {"", "(empty)", "[]"}:
+                normalized["discriminator_payloads"] = []
+            else:
+                try:
+                    parsed = json.loads(raw_payloads)
+                except json.JSONDecodeError as exc:
+                    raise AssertionError(
+                        f"discriminator_payloads must be valid JSON list, got {raw_payloads!r}"
+                    ) from exc
+                if not isinstance(parsed, list):
+                    raise AssertionError(
+                        f"discriminator_payloads must decode to a list, got {type(parsed).__name__}"
+                    )
+                normalized["discriminator_payloads"] = parsed
+        if "discriminator_payloads" not in normalized:
+            normalized["discriminator_payloads"] = []
+        if "quotes" in normalized and isinstance(normalized.get("quotes"), str):
+            raw_quotes = str(normalized.get("quotes") or "").strip()
+            if raw_quotes in {"", "(empty)", "[]"}:
+                normalized["quotes"] = []
+            else:
+                try:
+                    parsed_quotes = json.loads(raw_quotes)
+                except json.JSONDecodeError as exc:
+                    raise AssertionError(
+                        f"quotes must be valid JSON list, got {raw_quotes!r}"
+                    ) from exc
+                if not isinstance(parsed_quotes, list):
+                    raise AssertionError(
+                        f"quotes must decode to a list, got {type(parsed_quotes).__name__}"
+                    )
+                normalized["quotes"] = parsed_quotes
+        if "non_discriminative" in normalized and isinstance(normalized.get("non_discriminative"), str):
+            raw = str(normalized.get("non_discriminative") or "").strip().lower()
+            normalized["non_discriminative"] = raw in {"1", "true", "yes", "y"}
         if "evidence_quality" not in normalized:
             normalized["evidence_quality"] = "direct" if normalized["evidence_ids"] else "none"
+        normalized.setdefault("entailment", "UNKNOWN")
         normalized.setdefault("reasoning_summary", "BDD evaluator stub.")
         normalized.setdefault("defeaters", ["None noted."])
         normalized.setdefault("uncertainty_source", "BDD evaluator stub.")
@@ -165,6 +246,35 @@ class StepWorld:
 
     def set_slot_initial_p(self, node_key: str, p_value: float) -> None:
         self.decomposer_script.setdefault("slot_initial_p", {})[node_key] = p_value
+
+    def set_mece_strict(self, max_pair_overlap: float) -> None:
+        self.strict_mece = True
+        self.max_pair_overlap = float(max_pair_overlap)
+
+    @staticmethod
+    def _pair_key(root_a: str, root_b: str) -> str:
+        a = str(root_a).strip()
+        b = str(root_b).strip()
+        if not a or not b:
+            return ""
+        left, right = sorted((a, b))
+        return f"{left}|{right}"
+
+    def set_pairwise_overlaps(self, table: List[Dict[str, str]]) -> None:
+        overlaps = self.mece_certificate.setdefault("pairwise_overlaps", {})
+        for row in table:
+            pair_key = self._pair_key(row.get("root_a", ""), row.get("root_b", ""))
+            if not pair_key:
+                continue
+            overlaps[pair_key] = float(row.get("score", "0"))
+
+    def set_pairwise_discriminators(self, table: List[Dict[str, str]]) -> None:
+        discriminators = self.mece_certificate.setdefault("pairwise_discriminators", {})
+        for row in table:
+            pair_key = self._pair_key(row.get("root_a", ""), row.get("root_b", ""))
+            if not pair_key:
+                continue
+            discriminators[pair_key] = str(row.get("discriminator", "")).strip()
 
     def set_child_evaluated(self, child_id: str, p_value: float, evidence_ids: List[str]) -> None:
         canonical = self._resolve_child_alias(child_id)
@@ -309,6 +419,68 @@ class StepWorld:
                 replay_result = run_session(replay_request, replay_deps)
                 self.replay_result = replay_result.to_dict_view()
 
+    def run_simple_claim_interface(self) -> None:
+        if not self.simple_claim:
+            self.mark_pending("Simple claim not provided")
+        config_override: Optional[SessionConfig] = None
+        if self.config:
+            base = DEFAULT_SIMPLE_CONFIG
+            config_override = SessionConfig(
+                tau=float(self.config.get("tau", base.tau)),
+                epsilon=float(
+                    self.epsilon_override if self.epsilon_override is not None else self.config.get("epsilon", base.epsilon)
+                ),
+                gamma_noa=float(self.config.get("gamma_noa", base.gamma_noa)),
+                gamma_und=float(self.config.get("gamma_und", base.gamma_und)),
+                alpha=float(self.config.get("alpha", base.alpha)),
+                beta=float(self.config.get("beta", base.beta)),
+                W=float(self.config.get("W", base.W)),
+                lambda_voi=float(self.config.get("lambda_voi", base.lambda_voi)),
+                world_mode=str(self.config.get("world_mode", base.world_mode)),
+                rho_eval_min=float(self.config.get("rho_eval_min", base.rho_eval_min)),
+                gamma=float(self.config.get("gamma", base.gamma)),
+            )
+        evidence_ids: List[str] = []
+        for outcome in self.evaluator_script.get("outcomes", {}).values():
+            if isinstance(outcome, dict):
+                refs = outcome.get("evidence_ids")
+                if isinstance(refs, list):
+                    evidence_ids.extend([str(item) for item in refs if isinstance(item, str)])
+        for outcome in self.evaluator_script.get("child_evaluations", {}).values():
+            if isinstance(outcome, dict):
+                refs = outcome.get("evidence_ids")
+                if isinstance(refs, list):
+                    evidence_ids.extend([str(item) for item in refs if isinstance(item, str)])
+        evidence_items = [
+            {
+                "id": evidence_id,
+                "source": "bdd",
+                "text": self.evidence_text_overrides.get(evidence_id, f"Evidence {evidence_id}."),
+            }
+            for evidence_id in sorted(set(evidence_ids))
+        ]
+        deps = self._build_deps()
+        result = run_simple_claim_session(
+            self.simple_claim,
+            deps,
+            credits=self.credits,
+            config=config_override,
+            required_slots=self.required_slots or None,
+            evidence_items=evidence_items,
+            run_mode="until_stops",
+            policy=self.decomposer_script.get("policy"),
+        )
+        self.roots = [
+            {
+                "id": root_id,
+                "statement": str(root.get("statement", "")),
+                "exclusion_clause": str(root.get("exclusion_clause", "")),
+            }
+            for root_id, root in result.roots.items()
+            if root_id not in {H_NOA_ID, H_UND_ID}
+        ]
+        self.result = result.to_dict_view()
+
     def derive_k_from_rubric(self) -> None:
         from abductio_core.application.use_cases.run_session import _derive_k_from_rubric
 
@@ -359,6 +531,11 @@ class StepWorld:
                 ids = outcome.get("evidence_ids")
                 if isinstance(ids, list):
                     evidence_ids.extend([str(item) for item in ids if isinstance(item, str)])
+        context_emitter = self.evaluator_script.get("context_emitter")
+        if isinstance(context_emitter, dict):
+            evidence_id = str(context_emitter.get("evidence_id", "")).strip()
+            if evidence_id:
+                evidence_ids.append(evidence_id)
         kwargs: Dict[str, Any] = dict(
             scope=scope,
             roots=root_specs,
@@ -375,13 +552,21 @@ class StepWorld:
             search_quota_per_slot=self.config.get("search_quota_per_slot"),
             search_deterministic=self.config.get("search_deterministic"),
             evidence_items=[
-                {"id": evidence_id, "source": "bdd", "text": f"Evidence {evidence_id}."}
+                {
+                    "id": evidence_id,
+                    "source": "bdd",
+                    "text": self.evidence_text_overrides.get(evidence_id, f"Evidence {evidence_id}."),
+                }
                 for evidence_id in sorted(set(evidence_ids))
             ],
             pre_scoped_roots=sorted(self.decomposer_script.get("scoped_roots", [])),
             slot_k_min=self.decomposer_script.get("slot_k_min"),
             slot_initial_p=self.decomposer_script.get("slot_initial_p"),
             force_scope_fail_root=self.decomposer_script.get("force_scope_fail_root"),
+            mece_certificate=self.mece_certificate or None,
+            strict_mece=self.strict_mece,
+            max_pair_overlap=self.max_pair_overlap,
+            policy=self.decomposer_script.get("policy"),
         )
         if framing is not None:
             kwargs["framing"] = framing

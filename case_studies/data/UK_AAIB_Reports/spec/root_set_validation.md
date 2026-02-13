@@ -18,3 +18,12 @@ Ensure MECE root sets are defensible and not gerrymandered.
 - Map each oracle conclusion to the root set.
 - Record ambiguous mappings and rationale.
 - If ambiguity > 10%, revisit root granularity.
+
+## Serialization contract (benchmark runner)
+Store validated certificates in `spec/roots_library.json` (and keep YAML in sync) under each `root_set`:
+
+- `strict_mece_default: true` to enforce strict mode for benchmark runs.
+- `max_pair_overlap: <float>` threshold.
+- `mece_certificate.max_pair_overlap: <float>` (same threshold).
+- `mece_certificate.pairwise_overlaps`: one entry for every unordered named-root pair (`ROOT_A|ROOT_B` -> score 0..2).
+- `mece_certificate.pairwise_discriminators`: one non-empty discriminator text per unordered named-root pair.
